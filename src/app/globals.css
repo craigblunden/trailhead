@@ -1,0 +1,199 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-karla);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-heading: var(--font-source-serif);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* Trail scene + brand accents, exposed as utilities where they are
+     applied via className rather than an SVG fill attribute. */
+  --color-eyebrow: var(--eyebrow);
+  --color-sky: var(--sky);
+  --color-meadow: var(--meadow);
+  --color-chip: var(--chip);
+  --color-chip-foreground: var(--chip-foreground);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --radius: 0.3rem;
+
+  /* Surfaces run warm; the page itself sits on a sky-to-meadow wash. */
+  --background: #f3f5ef;
+  --foreground: #22261f;
+  --card: #fcfcf7;
+  --card-foreground: #22261f;
+  --popover: #fcfcf7;
+  --popover-foreground: #22261f;
+
+  --primary: #4d6b48;
+  --primary-foreground: #f7faf3;
+  --secondary: #e9ede2;
+  --secondary-foreground: #2f3529;
+  --muted: #edf0e7;
+  /* Deep enough to clear 4.5:1 on every surface it lands on, including the
+     translucent muted fills used by the file dropzone. */
+  --muted-foreground: #656d5e;
+  --accent: #e4e9db;
+  --accent-foreground: #2f3529;
+  --destructive: #a4443a;
+
+  --border: #dde1d5;
+  --input: #d6dbcc;
+  --ring: #4d6b48;
+
+  /* Darker than the sampled mock so 12px uppercase still clears AA on the
+     sky wash, which axe cannot verify automatically behind a gradient. */
+  --eyebrow: #4c657d;
+  --chip: #eaece4;
+  --chip-foreground: #5b6255;
+
+  /* Landing / auth backdrop */
+  --sky: #e2e9f0;
+  --meadow: #e8f0e0;
+  /* The board sits on a warmer, quieter version of the same wash */
+  --basecamp: #f7f8f3;
+
+  /* Illustration palette — referenced directly by the SVG scene */
+  --peak-far: #a9b9d1;
+  --peak-mid: #94a9c8;
+  --peak-near: #7c94bc;
+  --snow: #f8fafc;
+  --hill-far: #a9c68f;
+  --hill-near: #8fb27b;
+  --pine: #3f5f3f;
+  --pine-dark: #2e4a30;
+  --trunk: #8a6a4a;
+  --sun: #edc158;
+  --hiker: #e08a4f;
+  --trail-path: #c8a86b;
+
+  /* Pipeline stages — hue carries the stage, but never alone: every use
+     is paired with the stage name in text. */
+  --stage-interested: #7b93b0;
+  --stage-applied: #6b87ab;
+  --stage-interviewing: #5b8a9e;
+  --stage-offer: #5a8a52;
+  --stage-rejected: #a2a898;
+
+  --sidebar: #fcfcf7;
+  --sidebar-foreground: #22261f;
+  --sidebar-primary: #4d6b48;
+  --sidebar-primary-foreground: #f7faf3;
+  --sidebar-accent: #e9ede2;
+  --sidebar-accent-foreground: #2f3529;
+  --sidebar-border: #dde1d5;
+  --sidebar-ring: #4d6b48;
+}
+
+.dark {
+  --background: #1a1e19;
+  --foreground: #eaeee4;
+  --card: #232821;
+  --card-foreground: #eaeee4;
+  --popover: #232821;
+  --popover-foreground: #eaeee4;
+
+  --primary: #8fb086;
+  --primary-foreground: #161a15;
+  --secondary: #2c322a;
+  --secondary-foreground: #eaeee4;
+  --muted: #2c322a;
+  --muted-foreground: #a2ab99;
+  --accent: #333a30;
+  --accent-foreground: #eaeee4;
+  --destructive: #d97b70;
+
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 18%);
+  --ring: #8fb086;
+
+  --eyebrow: #9db4c9;
+  --chip: #2f352c;
+  --chip-foreground: #b6bdad;
+
+  --sky: #1f2630;
+  --meadow: #1d2620;
+  --basecamp: #1a1e19;
+
+  --sidebar: #232821;
+  --sidebar-foreground: #eaeee4;
+  --sidebar-primary: #8fb086;
+  --sidebar-primary-foreground: #161a15;
+  --sidebar-accent: #2c322a;
+  --sidebar-accent-foreground: #eaeee4;
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: #8fb086;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-heading;
+  }
+}
+
+@utility scene-wash {
+  background-image: linear-gradient(
+    to bottom,
+    var(--sky) 0%,
+    color-mix(in oklab, var(--sky), var(--meadow) 55%) 45%,
+    var(--meadow) 100%
+  );
+}
+
+@utility board-wash {
+  background-image: linear-gradient(
+    to bottom,
+    var(--basecamp) 0%,
+    color-mix(in oklab, var(--basecamp), var(--meadow) 60%) 70%,
+    var(--meadow) 100%
+  );
+}
