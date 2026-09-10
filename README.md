@@ -34,13 +34,13 @@ computed colour, so contrast, horizontal overflow, and real focus order are asse
 
 ## Routes
 
-| Route         | What it is                                                        |
-| ------------- | ----------------------------------------------------------------- |
-| `/`           | Marketing landing page                                            |
-| `/signup`     | Create account                                                    |
-| `/login`      | Sign in                                                           |
-| `/board`      | Kanban board across five stages, plus the "Add a job" dialog       |
-| `/board/[id]` | Job detail — description, notes, salary, contacts, activity        |
+| Route         | What it is                                                   |
+| ------------- | ------------------------------------------------------------ |
+| `/`           | Marketing landing page                                       |
+| `/signup`     | Create account                                               |
+| `/login`      | Sign in                                                      |
+| `/board`      | Kanban board across five stages, plus the "Add a job" dialog |
+| `/board/[id]` | Job detail — description, notes, salary, contacts, activity  |
 
 ## Where things live
 
@@ -59,7 +59,7 @@ docs/spec.md             The spec these tests are written against.
 ## Design system
 
 All colour, radius, and illustration values are CSS custom properties in
-`src/app/globals.css` — the two page washes (`scene-wash`, `board-wash`) and the SVG in
+`src/app/globals.css` — the page wash `scene-wash` and the SVG in
 `trail-scene.tsx` read from the same tokens, so retheming happens in one file.
 
 Text colours are tuned to clear WCAG 2.1 AA (4.5:1). Note that `--eyebrow` is deliberately

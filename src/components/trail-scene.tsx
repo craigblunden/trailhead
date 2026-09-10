@@ -100,29 +100,52 @@ export function TrailScene({ variant = "hero", className }: TrailSceneProps) {
           <path
             d="M-20 320 C 200 302 340 334 520 322 C 700 310 900 300 1120 320 C 1280 334 1370 330 1460 312"
             fill="none"
-            stroke="var(--trail-path)"
+            stroke="#C2A878"
             strokeWidth={7}
             strokeLinecap="round"
             strokeDasharray="26 20"
           />
           {/* Hiker, mid-trail */}
           <g transform="translate(752 258)">
-            <rect x={-16} y={20} width={13} height={19} rx={3} fill="var(--hiker)" opacity={0.75} />
-            <circle cx={2} cy={6} r={9} fill="var(--hiker)" />
-            <path d="M-4 16 h13 l3 22 h-19 Z" fill="var(--hiker)" />
+            {/* Bag */}
+            <rect
+              x={-16}
+              y={20}
+              width={13}
+              height={19}
+              rx={3}
+              fill="#46584C"
+              opacity={0.75}
+            />
+            {/* Head */}
+            <circle cx={2} cy={6} r={9} fill="#E8B48C" />
+            {/* Hand */}
+            <path
+              d="M18 20 l4 40"
+              stroke="#D1603F"
+              strokeWidth={4}
+              strokeLinecap="round"
+              fill="none"
+              transform="rotate(-55)"
+            />
+            {/* Shirt */}
+            <path d="M-4 16 h13 l3 22 h-19 Z" fill="#D1603F" />
+            {/* Legs */}
             <path
               d="M2 38 l-6 20 M8 38 l5 20"
-              stroke="var(--foreground)"
+              stroke="#000"
               strokeWidth={5}
               strokeLinecap="round"
               fill="none"
             />
+            {/* Stick */}
             <path
               d="M18 20 l4 40"
               stroke="var(--trunk)"
               strokeWidth={3}
               strokeLinecap="round"
               fill="none"
+              transform="rotate(-10)"
             />
           </g>
         </>

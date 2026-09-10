@@ -58,7 +58,7 @@
   /* Surfaces run warm; the page itself sits on a sky-to-meadow wash. */
   --background: #f3f5ef;
   --foreground: #22261f;
-  --card: #fcfcf7;
+  --card: #fff;
   --card-foreground: #22261f;
   --popover: #fcfcf7;
   --popover-foreground: #22261f;
@@ -165,7 +165,7 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring/90;
   }
   html {
     @apply font-sans;
@@ -182,18 +182,9 @@
 
 @utility scene-wash {
   background-image: linear-gradient(
-    to bottom,
-    var(--sky) 0%,
-    color-mix(in oklab, var(--sky), var(--meadow) 55%) 45%,
-    var(--meadow) 100%
-  );
-}
-
-@utility board-wash {
-  background-image: linear-gradient(
-    to bottom,
-    var(--basecamp) 0%,
-    color-mix(in oklab, var(--basecamp), var(--meadow) 60%) 70%,
-    var(--meadow) 100%
+    180deg,
+    #dcebf2 0%,
+    #eaf3ec 60%,
+    #cfe4cf 100%
   );
 }

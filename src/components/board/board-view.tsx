@@ -10,7 +10,13 @@ import { useJobs } from "@/components/jobs-provider";
 import { TrailheadLogo } from "@/components/trailhead-logo";
 import { TrailScene } from "@/components/trail-scene";
 import { Button } from "@/components/ui/button";
-import { ACTIVE_STAGES, STAGES, pluralize, type Job, type Stage } from "@/lib/jobs";
+import {
+  ACTIVE_STAGES,
+  STAGES,
+  pluralize,
+  type Job,
+  type Stage,
+} from "@/lib/jobs";
 
 export function BoardView() {
   const { jobs } = useJobs();
@@ -37,7 +43,7 @@ export function BoardView() {
   ).length;
 
   return (
-    <div className="board-wash flex flex-1 flex-col">
+    <div className="scene-wash flex flex-1 flex-col">
       <AppHeader
         leading={<TrailheadLogo href="/board" />}
         actions={
@@ -60,8 +66,8 @@ export function BoardView() {
           <div className="mt-8 rounded-lg border border-dashed border-border px-6 py-16 text-center">
             <h2 className="text-lg">No roles on the board yet</h2>
             <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-              Add the first posting you&rsquo;re interested in and it will show up
-              here.
+              Add the first posting you&rsquo;re interested in and it will show
+              up here.
             </p>
             <Button className="mt-5 h-10 px-4" onClick={openAddJob}>
               <Plus aria-hidden="true" />
