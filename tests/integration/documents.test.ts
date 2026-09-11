@@ -257,6 +257,10 @@ describe("ticket 19: an upload that cannot be used has one owner — the delete 
 
     expect(result).toMatchObject({ ok: false, error: "rejected", code: "no-text-layer" });
     if (!result.ok) expect(result.message).toMatch(/no text in it/);
+    // The refusal carries a written message and nothing internal: no key, no user id, no parser text.
+    expect(JSON.stringify(result)).not.toContain(key);
+    expect(JSON.stringify(result)).not.toContain(alice.userId);
+    expect(JSON.stringify(result)).not.toMatch(/pdf\.js|unpdf|mammoth|stack/i);
     expect(await storedRow(alice, ticket.documentId)).toBeNull();
     expect(await objectExists(alice, key)).toBe(false);
     expect(await listDocuments()).toEqual([]);

@@ -5,7 +5,7 @@ import { withTenant, type TenantClient } from "@/server/db/tenant";
 
 import { newUserId, resetTables } from "./helpers";
 
-const TABLES = ["Job", "ActivityEntry", "Contact", "JobContact", "Document"] as const;
+const TABLES = ["Job", "ActivityEntry", "Contact", "JobContact", "Document", "GenerationQuota"] as const;
 
 /** Seeds one row in every application table for `userId`, returning the ids. */
 async function seedEverything(tx: TenantClient, userId: string) {
@@ -35,6 +35,7 @@ async function seedEverything(tx: TenantClient, userId: string) {
       mimeType: "application/pdf",
     },
   });
+  await tx.generationQuota.create({ data: { userId, weekStart: new Date("2026-07-20"), used: 2 } });
   return { job, contact, document };
 }
 
@@ -46,10 +47,11 @@ async function countAll(db: TenantClient | typeof prisma) {
     Contact: await db.contact.count(),
     JobContact: await db.jobContact.count(),
     Document: await db.document.count(),
+    GenerationQuota: await db.generationQuota.count(),
   };
 }
 
-const NOTHING = { Job: 0, ActivityEntry: 0, Contact: 0, JobContact: 0, Document: 0 };
+const NOTHING = { Job: 0, ActivityEntry: 0, Contact: 0, JobContact: 0, Document: 0, GenerationQuota: 0 };
 
 beforeEach(async () => {
   await resetTables();
@@ -97,7 +99,14 @@ describe("ticket 04: tenant isolation, proven", () => {
     await withTenant(userA, (tx) => seedEverything(tx, userA));
 
     const asA = await withTenant(userA, (tx) => countAll(tx));
-    expect(asA).toEqual({ Job: 1, ActivityEntry: 1, Contact: 1, JobContact: 1, Document: 1 });
+    expect(asA).toEqual({
+      Job: 1,
+      ActivityEntry: 1,
+      Contact: 1,
+      JobContact: 1,
+      Document: 1,
+      GenerationQuota: 1,
+    });
 
     const asB = await withTenant(userB, (tx) => countAll(tx));
     expect(asB).toEqual(NOTHING);

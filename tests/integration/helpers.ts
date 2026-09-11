@@ -3,7 +3,14 @@ import { randomUUID } from "node:crypto";
 import pg from "pg";
 
 /** The application tables, in an order TRUNCATE … CASCADE is happy with. */
-const APPLICATION_TABLES = ["JobContact", "ActivityEntry", "Job", "Contact", "Document"] as const;
+const APPLICATION_TABLES = [
+  "JobContact",
+  "ActivityEntry",
+  "Job",
+  "Contact",
+  "Document",
+  "GenerationQuota",
+] as const;
 
 /**
  * Empties every application table so no test depends on another's leftovers.

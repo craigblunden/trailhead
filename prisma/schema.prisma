@@ -182,3 +182,15 @@ model Document {
   @@index([userId, createdAt])
   @@index([deletedAt])
 }
+
+/// Cover letters taken from one user's weekly quota (ticket 18) — the only thing generation
+/// persists. Weeks start Monday, UTC. Reserved atomically before the Claude call and given back if
+/// no letter is delivered (see src/server/data/generation.ts).
+model GenerationQuota {
+  userId    String   @db.Uuid
+  weekStart DateTime @db.Date
+  used      Int      @default(0)
+  updatedAt DateTime @default(now())
+
+  @@id([userId, weekStart])
+}

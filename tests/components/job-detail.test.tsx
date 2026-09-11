@@ -193,12 +193,11 @@ describe("supporting panels", () => {
     ]);
   });
 
-  it("DET-9: offers the cover letter action but keeps it disabled", () => {
+  it("DET-9: offers to write a cover letter, with the letters left this week", async () => {
     renderWithJobs(<JobDetail jobId={HARVEST} />);
 
-    expect(
-      screen.getByRole("button", { name: /Generate — coming soon/ }),
-    ).toBeDisabled();
+    expect(await screen.findByText("5 of 5 left this week")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Write cover letter" })).toBeEnabled();
   });
 });
 

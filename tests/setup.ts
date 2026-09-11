@@ -6,6 +6,18 @@ import * as axeMatchers from "vitest-axe/matchers";
 
 expect.extend(axeMatchers);
 
+/*
+ * The cover-letter card asks the server how many letters are left. Component tests never have a
+ * server, so every job page renders against a quiet default; tests/components/cover-letter.test.tsx
+ * replaces this with its own controllable fake.
+ */
+vi.mock("@/components/job/cover-letter-client", () => ({
+  coverLetterClient: {
+    status: async () => ({ limit: 5, used: 0, remaining: 5, resetsOn: "2026-07-27", available: true }),
+    generate: async () => ({ ok: false, error: "unavailable", message: "Not in component tests." }),
+  },
+}));
+
 afterEach(() => {
   cleanup();
 });

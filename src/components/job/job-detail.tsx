@@ -9,7 +9,7 @@ import { useJobs, type JobPatch } from "@/components/jobs-provider";
 import { ActivityCard } from "@/components/job/activity-card";
 import { ApplicationKitCard } from "@/components/job/application-kit";
 import { ContactsCard } from "@/components/job/job-contacts";
-import { CoverLetterCard } from "@/components/job/cover-letter-card";
+import { CoverLetterCard } from "@/components/job/cover-letter";
 import { DetailsCard } from "@/components/job/details-card";
 import { useDraft } from "@/components/job/use-draft";
 import { Button } from "@/components/ui/button";
@@ -212,7 +212,7 @@ function JobDetailView({ job, error, dismissError, onPatch, onStage }: JobDetail
               />
             </section>
 
-            <CoverLetterCard />
+            <CoverLetterCard job={job} />
           </div>
 
           <aside className="space-y-6">
