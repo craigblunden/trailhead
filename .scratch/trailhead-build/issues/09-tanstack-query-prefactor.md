@@ -1,6 +1,6 @@
 # 09: TanStack Query replaces the provider's internals
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 **Blocked by:** None (can start immediately)
 
@@ -52,3 +52,43 @@ be carried forward.
 - [ ] Optimistic update and rollback run through TanStack's mutation lifecycle, and a component test
       drives a rejecting mutation and asserts the board visibly reverts
 - [ ] No `refresh()` call remains that exists to keep job state fresh
+
+## Comments
+
+### 2026-09-11 — agent
+
+**Built.** The board behaves as before; its state now lives in TanStack Query, against the same
+fixtures, so the swap is judged on its own. Ticket 10 only has to change where data comes from.
+
+- `src/lib/jobs-cache.ts` — the one definition of the query key (`["jobs"]`) and `staleTime`
+  (60 s, with the reason in a comment: 0 would refetch on mount and discard the streamed prefetch).
+  Both the server prefetch and the client read import it.
+- `src/lib/jobs-rules.ts` — the Phase-1 rules as pure functions (`nextAccent`, `stageChange`
+  with the no-op / "Moved to …" / applied-date backfill rules). The optimistic update and the
+  fixture client both use them, so what the user sees instantly is what the server will confirm.
+- `src/lib/jobs-client.ts` — `JobsClient` (`list/add/update/setStage`) and
+  `createFixtureJobsClient(seed)`. Ticket 10 supplies the server-actions client; ticket 12 moves
+  the fixture client to tests.
+- `src/components/providers.tsx` — `getQueryClient()`: new per server render, singleton in the
+  browser. `Providers` wraps `QueryClientProvider`.
+- `src/components/jobs-provider.tsx` — rewritten on `useQuery` + three `useMutation`s. Every
+  mutation is optimistic through the lifecycle: `onMutate` snapshots and applies the rules,
+  `onError` restores and sets a visible error, `onSuccess` replaces the optimistic row with the
+  server's. Exposes `status`, `error`, `dismissError`, `reload` alongside the Phase-1 API.
+  Re-selecting the current stage sends nothing. No `refresh()` anywhere.
+- `src/server/prefetch.ts` — per-request `QueryClient`, prefetch **unawaited**, pending queries
+  dehydrated so the server streams. `src/app/board/page.tsx` and `[id]/page.tsx` wrap their view
+  in `HydrationBoundary`; the layout hosts `Providers` + `JobsProvider` and checks nothing.
+- `BoardView` and `JobDetail` gained loading (`role="status"`) and failure (`role="alert"` with
+  "Try again") states, and a dismissible non-blocking alert for a rolled-back mutation.
+- `tests/test-utils.tsx` seeds the cache the way hydration does, so the 104 existing tests run
+  unchanged in behaviour (assertions untouched; only the provider's wiring changed). New
+  `tests/components/jobs-provider.test.tsx` (8): key shared, `staleTime > 0`, browser singleton,
+  rejected stage change reverts visibly with a dismissible alert, rejected add removes the card,
+  successful add adopts the server id, loading state, failed load with retry.
+
+**Consumer change, deliberate:** `JobPatch` (and ticket 08's `jobPatchSchema`) includes
+`salaryMin`/`salaryMax` as well as description and notes, because the Phase-1 details card
+already edits the salary expectation and a dead input would lie. Stage stays a separate action.
+
+**Status:** ready-for-review (pending the e2e run's result)

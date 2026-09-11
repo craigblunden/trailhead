@@ -50,6 +50,8 @@ test("RESP-2: board columns stack on a narrow screen and spread out on a wide on
   await page.setViewportSize({ width: 320, height: 900 });
   await page.goto("/board");
   const columns = page.getByRole("region");
+  // The list streams in after the shell; measure once the columns exist.
+  await expect(columns.first()).toBeVisible();
 
   const narrow = await columns.evaluateAll((nodes) =>
     nodes.map((n) => Math.round(n.getBoundingClientRect().left)),

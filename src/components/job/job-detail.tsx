@@ -42,8 +42,21 @@ function DetailHeader() {
 }
 
 export function JobDetail({ jobId }: { jobId: string }) {
-  const { getJob, updateJob, setStage } = useJobs();
+  const { getJob, updateJob, setStage, status, error, dismissError } = useJobs();
   const job = getJob(jobId);
+
+  if (!job && status === "pending") {
+    return (
+      <div className="flex flex-1 flex-col bg-background">
+        <DetailHeader />
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+          <p role="status" className="text-sm text-muted-foreground">
+            Loading this job…
+          </p>
+        </main>
+      </div>
+    );
+  }
 
   if (!job) {
     return (
@@ -69,6 +82,18 @@ export function JobDetail({ jobId }: { jobId: string }) {
       <DetailHeader />
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+        {error && (
+          <div
+            role="alert"
+            className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/40 bg-card px-4 py-3 text-sm"
+          >
+            <span>{error}</span>
+            <Button variant="outline" size="sm" onClick={dismissError}>
+              Dismiss
+            </Button>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
           <div className="flex min-w-0 items-start gap-4">
             <CompanyAvatar company={job.company} accent={job.accent} size="lg" />

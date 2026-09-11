@@ -19,7 +19,7 @@ import {
 } from "@/lib/jobs";
 
 export function BoardView() {
-  const { jobs } = useJobs();
+  const { jobs, status, error, dismissError, reload } = useJobs();
   const [addOpen, setAddOpen] = useState(false);
   // Either the header button or the empty-state button can open the dialog;
   // remember which, so focus goes back to it on close.
@@ -62,7 +62,36 @@ export function BoardView() {
           </p>
         </div>
 
-        {jobs.length === 0 ? (
+        {error && (
+          <div
+            role="alert"
+            className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/40 bg-card px-4 py-3 text-sm"
+          >
+            <span>{error}</span>
+            <Button variant="outline" size="sm" onClick={dismissError}>
+              Dismiss
+            </Button>
+          </div>
+        )}
+
+        {status === "pending" ? (
+          <p role="status" className="mt-8 text-sm text-muted-foreground">
+            Loading your trail…
+          </p>
+        ) : status === "error" ? (
+          <div
+            role="alert"
+            className="mt-8 rounded-lg border border-dashed border-border px-6 py-16 text-center"
+          >
+            <h2 className="text-lg">We couldn&rsquo;t load your trail</h2>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+              Something went wrong on our side. Your jobs are safe — try again in a moment.
+            </p>
+            <Button className="mt-5 h-10 px-4" onClick={reload}>
+              Try again
+            </Button>
+          </div>
+        ) : jobs.length === 0 ? (
           <div className="mt-8 rounded-lg border border-dashed border-border px-6 py-16 text-center">
             <h2 className="text-lg">No roles on the board yet</h2>
             <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">

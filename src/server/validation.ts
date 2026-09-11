@@ -90,13 +90,16 @@ export const newJobSchema = z.object({
 export type NewJobInput = z.infer<typeof newJobSchema>;
 
 /**
- * Editing is an allowlist, not a filter. Only description and notes are writable this phase, and
- * any other field in the patch is REJECTED rather than dropped — so a field added later cannot
- * become writable by accident.
+ * Editing is an allowlist, not a filter. Description, notes, and the salary expectation (which
+ * the Phase-1 details card already edits) are writable; any other field in the patch is REJECTED
+ * rather than dropped — so a field added later cannot become writable by accident. Stage changes
+ * go through their own action because they write history.
  */
 export const jobPatchSchema = z.strictObject({
   description: boundedText(JOB_LIMITS.description).optional(),
   notes: boundedText(JOB_LIMITS.notes).optional(),
+  salaryMin: salaryBound.optional(),
+  salaryMax: salaryBound.optional(),
 });
 
 export type JobPatchInput = z.infer<typeof jobPatchSchema>;

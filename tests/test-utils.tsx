@@ -1,9 +1,12 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, type RenderOptions } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 
 import { JobsProvider } from "@/components/jobs-provider";
-import type { Job } from "@/lib/jobs";
+import { SEED_JOBS, type Job } from "@/lib/jobs";
+import { jobsCache } from "@/lib/jobs-cache";
+import { createFixtureJobsClient, type JobsClient } from "@/lib/jobs-client";
 
 /** The clock every date-sensitive test runs against (spec T-3). */
 export const FROZEN_NOW = new Date("2026-07-25T12:00:00Z");
@@ -18,18 +21,46 @@ export function freezeClock() {
   vi.setSystemTime(FROZEN_NOW);
 }
 
-type Options = Omit<RenderOptions, "wrapper"> & { initialJobs?: Job[] };
+/** A query client that fails fast and keeps nothing between tests. */
+export function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: Infinity },
+      mutations: { retry: false },
+    },
+  });
+}
 
-/** Renders inside the job store, and hands back a bound user-event instance. */
+type Options = Omit<RenderOptions, "wrapper"> & {
+  initialJobs?: Job[];
+  /** Overrides the fixture client — e.g. one whose mutations reject. */
+  client?: JobsClient;
+  /** Set false to leave the cache empty, so the provider has to fetch (loading and error states). */
+  seedCache?: boolean;
+};
+
+/**
+ * Renders inside the job store, and hands back a bound user-event instance.
+ *
+ * The cache is seeded with `initialJobs` before the first render, which is what hydration does in
+ * the real app: the board never shows a loading state in these tests unless a test asks for one.
+ */
 export function renderWithJobs(
   ui: React.ReactElement,
-  { initialJobs, ...options }: Options = {},
+  { initialJobs = SEED_JOBS, client, seedCache = true, ...options }: Options = {},
 ) {
+  const queryClient = createTestQueryClient();
+  if (seedCache) queryClient.setQueryData(jobsCache.key, initialJobs);
+  const jobsClient = client ?? createFixtureJobsClient(initialJobs);
+
   return {
     user: userEvent.setup(),
+    queryClient,
     ...render(ui, {
       wrapper: ({ children }) => (
-        <JobsProvider initialJobs={initialJobs}>{children}</JobsProvider>
+        <QueryClientProvider client={queryClient}>
+          <JobsProvider client={jobsClient}>{children}</JobsProvider>
+        </QueryClientProvider>
       ),
       ...options,
     }),

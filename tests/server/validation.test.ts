@@ -114,9 +114,12 @@ describe("newJobSchema", () => {
 });
 
 describe("jobPatchSchema", () => {
-  it("VAL-8: allows description and notes, bounded", () => {
+  it("VAL-8: allows description, notes, and the salary expectation, bounded", () => {
     const result = parseInput(jobPatchSchema, { description: "New", notes: "Ask about team size" });
     expect(result).toEqual({ ok: true, data: { description: "New", notes: "Ask about team size" } });
+
+    const salary = parseInput(jobPatchSchema, { salaryMin: "150", salaryMax: "" });
+    expect(salary).toEqual({ ok: true, data: { salaryMin: 150, salaryMax: null } });
 
     const tooLong = parseInput(jobPatchSchema, { notes: "n".repeat(JOB_LIMITS.notes + 1) });
     expect(tooLong.ok).toBe(false);

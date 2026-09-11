@@ -1,116 +1,186 @@
 "use client";
 
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
+import { SEED_JOBS, type Job, type Stage } from "@/lib/jobs";
+import { jobsCache } from "@/lib/jobs-cache";
 import {
-  ACCENTS,
-  SEED_JOBS,
-  STAGE_META,
-  type Accent,
-  type Job,
-  type Stage,
-} from "@/lib/jobs";
+  createFixtureJobsClient,
+  type JobPatch,
+  type JobsClient,
+  type NewJobInput,
+} from "@/lib/jobs-client";
+import { OPENING_ACTIVITY_LABEL, nextAccent, stageChange } from "@/lib/jobs-rules";
 
-export type NewJobInput = {
-  company: string;
-  role: string;
-  location: string;
-  salaryMin: number | null;
-  salaryMax: number | null;
-  postingUrl: string;
-  resumeFile: string | null;
-  description: string;
-};
+export type { JobPatch, NewJobInput };
 
-/** A job's identity is assigned once and never patched. */
-export type JobPatch = Partial<Omit<Job, "id">>;
+export type JobsStatus = "pending" | "error" | "success";
 
 type JobsContextValue = {
   jobs: Job[];
+  status: JobsStatus;
   getJob: (id: string) => Job | undefined;
   addJob: (input: NewJobInput) => void;
   updateJob: (id: string, patch: JobPatch) => void;
   setStage: (id: string, stage: Stage) => void;
+  /** The most recent mutation failure, already rolled back. Null when there is none. */
+  error: string | null;
+  dismissError: () => void;
+  /** Refetches the list — the recovery from a failed load. */
+  reload: () => void;
 };
 
 const JobsContext = createContext<JobsContextValue | null>(null);
 
-const ACCENT_KEYS = Object.keys(ACCENTS) as Accent[];
+const defaultClient: JobsClient = createFixtureJobsClient(SEED_JOBS);
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** Optimistic ids are stamped so a stray one is recognisable in a bug report. */
+function optimisticId(): string {
+  return `optimistic-${crypto.randomUUID()}`;
+}
+
 /**
- * In-memory store for the prototype. Swapping this for a real data layer means
- * replacing the provider body — consumers only see the context shape.
+ * Job state lives in TanStack Query. The server prefetches the list under `jobsCache.key` and
+ * this component reads the same key, so hydration hands the client a warm cache. What TanStack
+ * buys over the Phase-1 `useState`: refetch on window focus and on reconnect (a tracker left open
+ * overnight no longer shows stale data), and retry with backoff on the read path. Deduplication
+ * and shared state were already there.
  *
- * `initialJobs` is the seam for that swap, and lets tests drive states the
- * fixtures don't cover (an empty board, a single stage).
+ * Every mutation is optimistic and runs through TanStack's mutation lifecycle: `onMutate` applies
+ * the Phase-1 rules to the cache immediately, `onError` restores the snapshot and surfaces the
+ * failure, `onSuccess` replaces the guess with what the server actually wrote.
  */
 export function JobsProvider({
   children,
-  initialJobs = SEED_JOBS,
+  client = defaultClient,
 }: {
   children: React.ReactNode;
-  initialJobs?: Job[];
+  /** Where jobs come from and go to. Defaults to the fixture client until a server exists. */
+  client?: JobsClient;
 }) {
-  const [jobs, setJobs] = useState<Job[]>(initialJobs);
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
 
-  const getJob = useCallback(
-    (id: string) => jobs.find((job) => job.id === id),
-    [jobs],
+  const query = useQuery(jobsCache.options(() => client.list()));
+  const jobs = useMemo(() => query.data ?? [], [query.data]);
+
+  const snapshot = useCallback(async () => {
+    await queryClient.cancelQueries({ queryKey: jobsCache.key });
+    return queryClient.getQueryData<Job[]>(jobsCache.key);
+  }, [queryClient]);
+
+  const restore = useCallback(
+    (previous: Job[] | undefined, message: string) => {
+      queryClient.setQueryData<Job[]>(jobsCache.key, previous);
+      setError(message);
+    },
+    [queryClient],
   );
 
-  const addJob = useCallback((input: NewJobInput) => {
-    setJobs((current) => {
+  const patchCache = useCallback(
+    (id: string, mutate: (job: Job) => Job) => {
+      queryClient.setQueryData<Job[]>(jobsCache.key, (current = []) =>
+        current.map((job) => (job.id === id ? mutate(job) : job)),
+      );
+    },
+    [queryClient],
+  );
+
+  const add = useMutation({
+    mutationFn: (input: NewJobInput) => client.add(input),
+    onMutate: async (input) => {
+      const previous = await snapshot();
       const addedOn = today();
-      const job: Job = {
+      const optimistic: Job = {
         ...input,
-        id: crypto.randomUUID(),
+        id: optimisticId(),
         stage: "interested",
         addedOn,
         appliedOn: null,
         notes: "",
         contacts: [],
-        activity: [
-          { id: crypto.randomUUID(), label: "Added to board — Interested", date: addedOn },
-        ],
-        accent: ACCENT_KEYS[current.length % ACCENT_KEYS.length],
+        activity: [{ id: optimisticId(), label: OPENING_ACTIVITY_LABEL, date: addedOn }],
+        accent: nextAccent(previous?.length ?? 0),
       };
-      return [...current, job];
-    });
-  }, []);
+      queryClient.setQueryData<Job[]>(jobsCache.key, (current = []) => [...current, optimistic]);
+      return { previous, optimisticId: optimistic.id };
+    },
+    onError: (_error, _input, context) => {
+      restore(context?.previous, "That job wasn't saved. Check your connection and try again.");
+    },
+    onSuccess: (saved, _input, context) => {
+      patchCache(context.optimisticId, () => saved);
+    },
+  });
 
-  const updateJob = useCallback((id: string, patch: JobPatch) => {
-    setJobs((current) =>
-      current.map((job) => (job.id === id ? { ...job, ...patch } : job)),
-    );
-  }, []);
+  const update = useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: JobPatch }) => client.update(id, patch),
+    onMutate: async ({ id, patch }) => {
+      const previous = await snapshot();
+      patchCache(id, (job) => ({ ...job, ...patch }));
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      restore(context?.previous, "That edit wasn't saved. Check your connection and try again.");
+    },
+  });
 
-  const setStage = useCallback((id: string, stage: Stage) => {
-    setJobs((current) =>
-      current.map((job) => {
-        if (job.id !== id || job.stage === stage) return job;
-        const entry = {
-          id: crypto.randomUUID(),
-          label: `Moved to ${STAGE_META[stage].label}`,
-          date: today(),
-        };
+  const move = useMutation({
+    mutationFn: ({ id, stage }: { id: string; stage: Stage }) => client.setStage(id, stage),
+    onMutate: async ({ id, stage }) => {
+      const previous = await snapshot();
+      patchCache(id, (job) => {
+        const change = stageChange(job, stage, today());
+        if (!change.entry) return job;
         return {
           ...job,
-          stage,
-          // Reaching "Applied" without a date on file backfills one.
-          appliedOn: job.appliedOn ?? (stage === "interested" ? null : entry.date),
-          activity: [entry, ...job.activity],
+          stage: change.stage,
+          appliedOn: change.appliedOn,
+          activity: [{ id: optimisticId(), ...change.entry }, ...job.activity],
         };
-      }),
-    );
-  }, []);
+      });
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      restore(
+        context?.previous,
+        "That stage change wasn't saved. Check your connection and try again.",
+      );
+    },
+    onSuccess: (saved) => {
+      patchCache(saved.id, () => saved);
+    },
+  });
 
-  const value = useMemo(
-    () => ({ jobs, getJob, addJob, updateJob, setStage }),
-    [jobs, getJob, addJob, updateJob, setStage],
+  const status: JobsStatus = query.status;
+  const { mutate: mutateAdd } = add;
+  const { mutate: mutateUpdate } = update;
+  const { mutate: mutateMove } = move;
+  const { refetch } = query;
+
+  const value = useMemo<JobsContextValue>(
+    () => ({
+      jobs,
+      status,
+      getJob: (id) => jobs.find((job) => job.id === id),
+      addJob: (input) => mutateAdd(input),
+      updateJob: (id, patch) => mutateUpdate({ id, patch }),
+      setStage: (id, stage) => {
+        // Re-selecting the current stage is a no-op all the way down: no request, no entry.
+        const current = jobs.find((job) => job.id === id);
+        if (!current || current.stage === stage) return;
+        mutateMove({ id, stage });
+      },
+      error,
+      dismissError: () => setError(null),
+      reload: () => void refetch(),
+    }),
+    [jobs, status, mutateAdd, mutateUpdate, mutateMove, error, refetch],
   );
 
   return <JobsContext.Provider value={value}>{children}</JobsContext.Provider>;
