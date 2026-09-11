@@ -1,6 +1,6 @@
 # 21: `verify`, CI, and the record of what this work superseded
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 **Blocked by:** 20
 
@@ -59,3 +59,52 @@ Desktop provides that name. **A Linux runner may not.** Confirm the Supabase CLI
 `host-gateway` mapping to the auth container there, and that a loopback-bound listener is
 reachable through it. If it is not, the fake must listen on the Docker bridge address instead.
 Check this before assuming a red CI run is a linking regression.
+
+### 2026-09-11 — agent
+
+**Built.**
+
+- **`npm run verify`** already chained lint → typecheck → unit → integration → e2e; the integration
+  level has been part of it since ticket 04. It was run on a **clean worktree of the committed code**
+  (`bcf6169`, without the uncommitted landing rewrite in the main working tree):
+  **lint, typecheck, unit (272), and integration (71) passed; e2e passed 78 of 79.** The one failure
+  is `RESP-1: landing does not overflow horizontally at 320px` — the committed landing page's
+  "Everything you need for the climb" section is wider than a 320px screen. That file is unchanged
+  by this work (it predates `e827e04`), it fails on every run, and the uncommitted landing rewrite in
+  the working tree replaces that section; it is left for that rewrite rather than patched underneath
+  it. The same rewrite currently fails `A11Y-1: landing` on contrast (10.4px text at 4.33:1), so
+  **`verify` is not green on either tree until the landing work lands.** Everything this effort
+  built is.
+- **CI:** `.github/workflows/verify.yml` runs `npm run verify` on every push and pull request on
+  `ubuntu-latest`, Node 22: `npm ci` → `npx supabase start` (Postgres, Auth, Storage, and Mailpit as
+  containers; applies the provisioning migration and the local role passwords) → `cp .env.example
+  .env.local` → `npm run db:deploy` (migrations before any test) → Playwright's Chromium →
+  `npm run verify`, keeping `test-results/` on failure. A bare Postgres service container was not
+  enough: the integration and e2e suites need Auth and Storage too, and the Supabase CLI's Postgres
+  *is* a container alongside them.
+- **The unit suite stays fast and database-free:** `npm test` is the jsdom project only (272 tests,
+  ~2 minutes on this Windows machine, no database), unchanged in shape.
+- **The Supersedes record:** `docs/supersedes.md`. Neither spec is in the working tree — Phase 1's
+  `docs/spec.md` was removed in `2aebb4f` and Phase 2's `.scratch/trailhead-backend/spec.md` was never
+  committed — so the record is its own document with a table per spec instead of a section appended
+  to each: every item this ticket lists (AUTH-3's unchecked auth seam, DET-7, ADD-5/the filename-only
+  resume field, DET-9, the persistence question, the seed fixtures, the `better-auth` surface, Prisma
+  owning auth, the frozen provider contract and its "no consumer changed" criterion, `refresh()` after
+  every mutation, the deployment question), each naming what replaced it and the ticket that did,
+  plus the Phase-1 items that still hold.
+- **The deferrals:** `docs/deferred.md` — gap analysis and the portfolio review as the headline ask,
+  with every open question from phase3/12 intact (that folder is untracked, so the questions are
+  copied where a future phase will find them), streaming, drag-and-drop, dark mode, the orphaned-object
+  residual from ticket 16, and what has been verified only locally.
+- **A clean clone** reaches a running app from `.env.example` and the README's five commands (the
+  same ones as `docs/provisioning.md`). `.env.example` gains `TEST_POSTGRES_URL`, the local
+  `postgres` connection the janitor test and the e2e teardown use. The README is rewritten: it had
+  described the interface-only prototype.
+
+**Not verified — CI itself.** No run on GitHub was possible from here. Two things to watch on the
+first one: (1) ticket 07's note — the social-linking suites need the Auth container to reach the fake
+OAuth provider on the runner via `host.docker.internal`; if the Supabase CLI does not map it on Linux,
+those tests fail for that reason, not because linking broke. (2) Runner time: the e2e build and suite
+take a few minutes on top of the stack's start; the job allows 45.
+
+**Status:** ready-for-review

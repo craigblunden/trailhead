@@ -1,0 +1,63 @@
+name: verify
+
+# One command proves the application (ticket 21): lint, typecheck, unit, integration, and e2e, on
+# every push. Integration and e2e need the real stack — Postgres with the provisioning roles and
+# row-level security, Supabase Auth with Mailpit, and Storage — so the job starts the Supabase CLI's
+# local stack (its Postgres runs as a container alongside the other services) and applies the
+# migrations before anything runs. A bare Postgres service container would have no Auth or Storage
+# for those suites to talk to.
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start the local Supabase stack (Postgres, Auth, Storage, Mailpit)
+        # Applies supabase/migrations (roles, bucket, storage policies, cron) and supabase/seed.sql
+        # (the two roles' local development passwords, which .env.example already uses).
+        run: npx supabase start
+
+      - name: Use the local environment
+        # .env.example carries the local stack's well-known development values; nothing secret.
+        run: cp .env.example .env.local
+
+      - name: Apply the application migrations
+        run: npm run db:deploy
+
+      - name: Install Playwright's browser
+        run: npx playwright install --with-deps chromium
+
+      - name: npm run verify
+        run: npm run verify
+
+      - name: Keep Playwright traces from a failed run
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: test-results
+          retention-days: 7
+
+      - name: Stop the stack
+        if: always()
+        run: npx supabase stop --no-backup
