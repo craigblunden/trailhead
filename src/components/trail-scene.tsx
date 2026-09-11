@@ -16,6 +16,49 @@ type PineProps = {
   fill: string;
 };
 
+type MountainProps = {
+  apexX: number;
+  apexY: number;
+  baseY: number;
+  halfWidth: number;
+  fill: string;
+};
+
+/**
+ * A peak whose snow cap is derived from the slope, so its outer edges sit
+ * exactly on the mountain and its notches mirror about the apex.
+ */
+function Mountain({ apexX, apexY, baseY, halfWidth, fill }: MountainProps) {
+  const run = halfWidth / (baseY - apexY);
+  const capDepth = (baseY - apexY) * 0.24;
+  const capY = apexY + capDepth;
+  const capHalf = capDepth * run;
+  const notch = capDepth * 0.28;
+
+  const cap = [
+    [apexX, apexY],
+    [apexX + capHalf, capY],
+    [apexX + capHalf * 0.55, capY + notch],
+    [apexX + capHalf * 0.2, capY - notch * 0.6],
+    [apexX, capY + notch * 0.2],
+    [apexX - capHalf * 0.2, capY - notch * 0.6],
+    [apexX - capHalf * 0.55, capY + notch],
+    [apexX - capHalf, capY],
+  ]
+    .map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)} ${y.toFixed(1)}`)
+    .join(" ");
+
+  return (
+    <g>
+      <path
+        d={`M${apexX - halfWidth} ${baseY} L${apexX} ${apexY} L${apexX + halfWidth} ${baseY} Z`}
+        fill={fill}
+      />
+      <path d={`${cap} Z`} fill="var(--snow)" />
+    </g>
+  );
+}
+
 function Pine({ x, baseY, height, fill }: PineProps) {
   const halfWidth = height * 0.32;
   const canopyBottom = baseY - height * 0.16;
@@ -52,26 +95,30 @@ export function TrailScene({ variant = "hero", className }: TrailSceneProps) {
       className={cn("block h-auto w-full", className)}
     >
       {variant === "hero" && (
-        <path d="M1268 232a62 62 0 0 1 124 0Z" fill="var(--sun)" />
+        <circle cx={1338} cy={236} r={64} fill="var(--sun)" />
       )}
 
       {/* Ridgeline, far to near */}
-      <path d="M150 312 L330 142 L510 312 Z" fill="var(--peak-far)" />
-      <path
-        d="M330 142 L372 182 L352 192 L332 178 L310 196 L288 182 Z"
-        fill="var(--snow)"
+      <Mountain
+        apexX={330}
+        apexY={142}
+        baseY={312}
+        halfWidth={180}
+        fill="var(--peak-far)"
       />
-
-      <path d="M1035 312 L1215 156 L1395 312 Z" fill="var(--peak-far)" />
-      <path
-        d="M1215 156 L1256 196 L1237 206 L1217 192 L1195 210 L1174 196 Z"
-        fill="var(--snow)"
+      <Mountain
+        apexX={1215}
+        apexY={156}
+        baseY={312}
+        halfWidth={180}
+        fill="var(--peak-far)"
       />
-
-      <path d="M545 312 L760 96 L975 312 Z" fill="var(--peak-near)" />
-      <path
-        d="M760 96 L806 142 L784 153 L762 137 L738 157 L714 142 Z"
-        fill="var(--snow)"
+      <Mountain
+        apexX={760}
+        apexY={96}
+        baseY={312}
+        halfWidth={215}
+        fill="var(--peak-near)"
       />
 
       {/* Meadow */}
