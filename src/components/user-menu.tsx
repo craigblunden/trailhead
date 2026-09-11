@@ -13,7 +13,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-type UserMenuProps = { name: string; email: string };
+type UserMenuProps = {
+  name: string;
+  email: string;
+  /** The sign-out Server Action. Sign-out is a mutation, so it is a submit control, not a link. */
+  signOut: () => Promise<void>;
+};
 
 function toInitials(name: string): string {
   return name
@@ -23,7 +28,7 @@ function toInitials(name: string): string {
     .join("");
 }
 
-export function UserMenu({ name, email }: UserMenuProps) {
+export function UserMenu({ name, email, signOut }: UserMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -50,8 +55,19 @@ export function UserMenu({ name, email }: UserMenuProps) {
           <Link href="/board">Your trail</Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link href="/">Sign out</Link>
+          <Link href="/contacts">Contacts</Link>
         </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/documents">Documents</Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <form action={signOut}>
+          <DropdownMenuItem asChild>
+            <button type="submit" className="w-full">
+              Sign out
+            </button>
+          </DropdownMenuItem>
+        </form>
       </DropdownMenuContent>
     </DropdownMenu>
   );

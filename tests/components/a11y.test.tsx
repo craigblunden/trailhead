@@ -8,6 +8,8 @@ import { BoardView } from "@/components/board/board-view";
 import { JobDetail } from "@/components/job/job-detail";
 import { renderWithJobs } from "../test-utils";
 
+const idle = async () => ({ status: "idle" as const });
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
 }));
@@ -28,12 +30,16 @@ describe("A11Y-1: no structural violations", () => {
   });
 
   it("signup", async () => {
-    const { container } = render(<AuthForm mode="signup" />);
+    const { container } = render(
+      <AuthForm mode="signup" action={idle} resendAction={idle} />,
+    );
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
   });
 
   it("login", async () => {
-    const { container } = render(<AuthForm mode="login" />);
+    const { container } = render(
+      <AuthForm mode="login" action={idle} resendAction={idle} />,
+    );
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
   });
 
