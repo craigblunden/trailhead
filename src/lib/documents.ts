@@ -4,6 +4,9 @@
  * (CONTEXT.md). Pure: shared by the server and the browser.
  */
 
+/** The one private bucket Documents live in. Its policies and limits are in the provisioning migration. */
+export const DOCUMENTS_BUCKET = "documents";
+
 export const DOCUMENT_KINDS = ["resume", "cover_letter"] as const;
 
 export type DocumentKind = (typeof DOCUMENT_KINDS)[number];

@@ -24,6 +24,11 @@ export function generationTimeoutMs(): number {
     : DEFAULT_TIMEOUT_MS;
 }
 
+/** Whether a key is configured. Says nothing about the key itself. */
+export function generationAvailable(): boolean {
+  return Boolean(process.env.ANTHROPIC_API_KEY);
+}
+
 /**
  * Null when no key is configured: generation is then unavailable, not broken. `ANTHROPIC_BASE_URL`
  * is honoured by the SDK itself, which is how the test suites point it at a fake.
@@ -31,11 +36,6 @@ export function generationTimeoutMs(): number {
  * `maxRetries: 0` — nothing retries automatically (ticket 19). A retry is the user's act, and
  * because a failure gives the reserved letter back, it costs them nothing.
  */
-/** Whether a key is configured. Says nothing about the key itself. */
-export function generationAvailable(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY);
-}
-
 export function createClaudeClient(): Anthropic | null {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return null;

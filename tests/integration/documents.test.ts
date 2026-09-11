@@ -246,7 +246,7 @@ describe("ticket 15: upload a resume", () => {
 });
 
 describe("ticket 19: an upload that cannot be used has one owner — the delete path", () => {
-  it("a PDF with no text layer is refused at upload, and neither its row nor its object is kept", async () => {
+  it("a PDF with no text layer is refused at upload: its object is removed and it leaves the list", async () => {
     actAs(alice);
     const bytes = fixture("scan.pdf");
     const ticket = await startUpload({ kind: "resume", fileName: "scan.pdf", sizeBytes: bytes.length });
@@ -261,7 +261,12 @@ describe("ticket 19: an upload that cannot be used has one owner — the delete 
     expect(JSON.stringify(result)).not.toContain(key);
     expect(JSON.stringify(result)).not.toContain(alice.userId);
     expect(JSON.stringify(result)).not.toMatch(/pdf\.js|unpdf|mammoth|stack/i);
-    expect(await storedRow(alice, ticket.documentId)).toBeNull();
+    // Tombstoned, not forgotten, while its upload URL could still be used (see finishDeleting).
+    expect(await storedRow(alice, ticket.documentId)).toMatchObject({
+      ingestion: "failed",
+      ingestionError: "no-text-layer",
+    });
+    expect((await storedRow(alice, ticket.documentId))?.deletedAt).toBeInstanceOf(Date);
     expect(await objectExists(alice, key)).toBe(false);
     expect(await listDocuments()).toEqual([]);
   });
@@ -271,6 +276,50 @@ describe("ticket 19: an upload that cannot be used has one owner — the delete 
     const ticket = await startUpload({ kind: "resume", fileName: "resume.pdf", sizeBytes: 1024 });
 
     expect(await finishUploadAction(ticket.documentId)).toMatchObject({ code: "upload-missing" });
+    expect((await storedRow(alice, ticket.documentId))?.deletedAt).toBeInstanceOf(Date);
+    expect(await listDocuments()).toEqual([]);
+    const afterTheUrlExpires = new Date(Date.now() + ABANDONED_UPLOAD_MS + 60_000);
+    expect(await sweepMyDocuments(afterTheUrlExpires)).toEqual({ deleted: 1 });
+  });
+
+  for (const [name, code, words] of [
+    ["locked.pdf", "password-protected", /password-protected/],
+    ["locked.docx", "password-protected", /password-protected/],
+    ["pdf-named-as.docx", "type-mismatch", /the kind its name says/],
+  ] as const) {
+    it(`${name}, a real file of its kind, is refused with the message for ${code}`, async () => {
+      actAs(alice);
+      const bytes = fixture(name);
+      const ticket = await startUpload({ kind: "resume", fileName: name, sizeBytes: bytes.length });
+      expect((await putObject(alice, ticket, bytes)).error).toBeNull();
+      const key = (await storedRow(alice, ticket.documentId))!.storageKey;
+
+      const result = await finishUploadAction(ticket.documentId);
+
+      expect(result).toMatchObject({ ok: false, error: "rejected", code });
+      if (!result.ok) expect(result.message).toMatch(words);
+      expect(await objectExists(alice, key)).toBe(false);
+      expect(await listDocuments()).toEqual([]);
+    });
+  }
+
+  it("a late upload through the URL of a deleted pending document is still reclaimed", async () => {
+    actAs(alice);
+    const ticket = await startUpload({ kind: "resume", fileName: "resume.pdf", sizeBytes: 1024 });
+    await deleteDocument(ticket.documentId);
+    expect(await listDocuments()).toEqual([]);
+
+    // The browser was slow: its upload lands after the delete, through the still-valid URL.
+    expect((await putObject(alice, ticket, fixture("resume.pdf"))).error).toBeNull();
+    const key = (await storedRow(alice, ticket.documentId))!.storageKey;
+    expect(await objectExists(alice, key)).toBe(true);
+
+    // The tombstone kept the key known, so the next sweep removes the object; once the URL has
+    // expired, the row goes too.
+    expect(await sweepMyDocuments()).toEqual({ deleted: 0 });
+    expect(await objectExists(alice, key)).toBe(false);
+    const afterTheUrlExpires = new Date(Date.now() + ABANDONED_UPLOAD_MS + 60_000);
+    expect(await sweepMyDocuments(afterTheUrlExpires)).toEqual({ deleted: 1 });
     expect(await storedRow(alice, ticket.documentId)).toBeNull();
   });
 });

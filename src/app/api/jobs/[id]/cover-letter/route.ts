@@ -6,6 +6,7 @@ import {
   type GenerationFailure,
   type GenerationResponse,
 } from "@/lib/generation";
+import { ACTION_MESSAGES } from "@/server/action-result";
 import { UnauthenticatedError, getOptionalSession } from "@/server/auth/session";
 import { NotFoundError, RuleError } from "@/server/data/errors";
 import {
@@ -46,10 +47,11 @@ const reply = (status: number, body: GenerationResponse) => NextResponse.json(bo
 const UNAUTHENTICATED = {
   ok: false,
   error: "unauthenticated",
-  message: "Your session has ended. Sign in again to continue.",
+  message: ACTION_MESSAGES.unauthenticated,
 } as const;
 
-const NOT_FOUND = { ok: false, error: "not-found", message: "This job isn't on your trail." } as const;
+/** The same words an action uses for a missing or foreign job. */
+const NOT_FOUND = { ok: false, error: "not-found", message: `${new NotFoundError().message}.` } as const;
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getOptionalSession();

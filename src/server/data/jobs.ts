@@ -112,7 +112,7 @@ export async function setJobStage(id: string, stage: Stage, now: Date = new Date
     if (!change.entry) return current;
 
     return tx.job.update({
-      where: { id: current.id },
+      where: { id: current.id, userId },
       data: {
         stage: change.stage,
         appliedOn: change.appliedOn ? toDateColumn(change.appliedOn) : null,

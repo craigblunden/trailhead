@@ -1,7 +1,7 @@
 import { createBrowserClient } from "@supabase/ssr";
 
 import { ActionError, unwrap } from "@/components/jobs-actions-client";
-import { UPLOAD_REFUSALS } from "@/lib/documents";
+import { DOCUMENTS_BUCKET, UPLOAD_REFUSALS } from "@/lib/documents";
 import type { DocumentsClient } from "@/lib/documents-client";
 import { supabasePublicEnv } from "@/lib/supabase-env";
 import {
@@ -37,7 +37,7 @@ export function createActionsDocumentsClient(): DocumentsClient {
 
       onStage?.("uploading");
       const { url, publishableKey } = supabasePublicEnv();
-      const storage = createBrowserClient(url, publishableKey).storage.from("documents");
+      const storage = createBrowserClient(url, publishableKey).storage.from(DOCUMENTS_BUCKET);
       const { error } = await storage.uploadToSignedUrl(ticket.path, ticket.token, file, {
         contentType: ticket.contentType,
       });

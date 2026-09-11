@@ -1,8 +1,7 @@
 import "server-only";
 
+import { DOCUMENTS_BUCKET } from "@/lib/documents";
 import { createServerSupabase } from "@/server/auth/supabase";
-
-export const DOCUMENTS_BUCKET = "documents";
 
 /**
  * The private `documents` bucket, as the signed-in user. Every call made through it is checked by

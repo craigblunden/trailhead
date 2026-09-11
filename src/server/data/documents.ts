@@ -174,7 +174,7 @@ export async function deleteDocument(id: string): Promise<void> {
   await finishDeleting(userId, [tombstoned]);
 }
 
-type Tombstoned = { id: string; storageKey: string };
+type Tombstoned = { id: string; storageKey: string; ingestion: string; createdAt: Date };
 
 /**
  * One transaction: detach it from every Job, then mark it deleted. `ON DELETE SET NULL` would
@@ -185,18 +185,25 @@ async function tombstone(userId: string, id: string): Promise<Tombstoned> {
   return withTenant(userId, async (tx) => {
     const row = await tx.document.findFirst({
       where: { id, userId, deletedAt: null },
-      select: { id: true, storageKey: true },
+      select: { id: true, storageKey: true, ingestion: true, createdAt: true },
     });
     if (!row) throw new NotFoundError("document");
     await tx.job.updateMany({ where: { userId, resumeId: id }, data: { resumeId: null } });
     await tx.job.updateMany({ where: { userId, coverLetterId: id }, data: { coverLetterId: null } });
-    await tx.document.update({ where: { id: row.id }, data: { deletedAt: new Date() } });
+    await tx.document.update({ where: { id: row.id, userId }, data: { deletedAt: new Date() } });
     return row;
   });
 }
 
-/** Removes the objects through the Storage API, then the rows. Never throws for the caller. */
-async function finishDeleting(userId: string, rows: Tombstoned[]): Promise<number> {
+/**
+ * Removes the objects through the Storage API, then the rows. Never throws for the caller.
+ *
+ * A row that never became `ready` keeps its tombstone until its signed upload URL has expired
+ * (`ABANDONED_UPLOAD_MS`): the token stays valid after the row is deleted, and a late upload through
+ * it would land an object no row tracks. While the tombstone stays, every sweep removes whatever
+ * arrived under its key, so the key is only forgotten once nothing more can arrive.
+ */
+async function finishDeleting(userId: string, rows: Tombstoned[], now: Date = new Date()): Promise<number> {
   if (rows.length === 0) return 0;
   try {
     const bucket = await documentsBucket();
@@ -207,9 +214,13 @@ async function finishDeleting(userId: string, rows: Tombstoned[]): Promise<numbe
     logError({ operation: "documents.removeObjects", tenant: userId }, error);
     return 0;
   }
+  const settled = rows.filter(
+    (row) => row.ingestion === "ready" || row.createdAt.getTime() < now.getTime() - ABANDONED_UPLOAD_MS,
+  );
+  if (settled.length === 0) return 0;
   const { count } = await withTenant(userId, (tx) =>
     tx.document.deleteMany({
-      where: { id: { in: rows.map((row) => row.id) }, userId, deletedAt: { not: null } },
+      where: { id: { in: settled.map((row) => row.id) }, userId, deletedAt: { not: null } },
     }),
   );
   return count;
@@ -239,10 +250,10 @@ export async function sweepMyDocuments(now: Date = new Date()): Promise<{ delete
     });
     return tx.document.findMany({
       where: { userId, deletedAt: { not: null } },
-      select: { id: true, storageKey: true },
+      select: { id: true, storageKey: true, ingestion: true, createdAt: true },
     });
   });
-  return { deleted: await finishDeleting(userId, tombstones) };
+  return { deleted: await finishDeleting(userId, tombstones, now) };
 }
 
 /**
@@ -296,7 +307,7 @@ export async function setJobDocument(
       if (document.kind !== kind) throw new RuleError("wrong-kind", WRONG_KIND[kind]);
     }
     return tx.job.update({
-      where: { id: job.id },
+      where: { id: job.id, userId },
       data: kind === "resume" ? { resumeId: documentId } : { coverLetterId: documentId },
       include: JOB_INCLUDE,
     });

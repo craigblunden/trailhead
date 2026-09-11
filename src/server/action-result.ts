@@ -25,14 +25,15 @@ export type ActionFailure = {
 
 export type ActionResult<T> = { ok: true; data: T } | ActionFailure;
 
-const MESSAGES = {
+/** The messages for failures that carry no message of their own. Shared with the cover-letter route. */
+export const ACTION_MESSAGES = {
   unauthenticated: "Your session has ended. Sign in again to continue.",
   invalid: "Check the highlighted fields.",
   failed: "Something went wrong on our side. Your changes weren't saved — please try again.",
 } as const;
 
 export function invalid(fields: FieldErrors): ActionFailure {
-  return { ok: false, error: "invalid", message: MESSAGES.invalid, fields };
+  return { ok: false, error: "invalid", message: ACTION_MESSAGES.invalid, fields };
 }
 
 /** Runs a data-layer call and turns whatever it throws into a result the client may see. */
@@ -45,7 +46,7 @@ export async function runAction<T>(
   } catch (error) {
     if (error instanceof UnauthenticatedError) {
       // An action cannot redirect the way a render can; the client re-authenticates.
-      return { ok: false, error: "unauthenticated", message: MESSAGES.unauthenticated };
+      return { ok: false, error: "unauthenticated", message: ACTION_MESSAGES.unauthenticated };
     }
     if (error instanceof NotFoundError) {
       // The same message for a missing id and a foreign one — see NotFoundError.
@@ -56,6 +57,6 @@ export async function runAction<T>(
     }
     const session = await getOptionalSession().catch(() => null);
     logError({ operation, tenant: session?.userId ?? null }, error);
-    return { ok: false, error: "failed", message: MESSAGES.failed };
+    return { ok: false, error: "failed", message: ACTION_MESSAGES.failed };
   }
 }

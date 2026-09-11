@@ -50,6 +50,11 @@ A file the user uploaded — a resume or a cover letter — owned by the user an
 as they like. Uploading a revised file creates a new Document; a Document is never versioned in place.
 _Avoid_: File, Attachment, Upload, Resume (as an entity — a resume is a _kind_ of Document)
 
+**Application kit**:
+The Documents that go out with one Job — at most one resume and one cover letter, chosen from the
+user's Documents. A name for that pair on the job page, not a record, and not a synonym for a Job.
+_Avoid_: Attachment (for a Document), Application (for the Job itself)
+
 **Requirement**:
 A single typed thing one job description asks for — a skill, a credential, proof of work, a span of
 experience. The atom of a job description once it has been read.

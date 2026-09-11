@@ -63,6 +63,13 @@ test.describe("tickets 15 and 16: documents", () => {
     await expect(page.getByRole("main").getByRole("alert")).toContainText("no text in it");
     await expect(list.getByText("scan.pdf", { exact: true })).toHaveCount(0);
 
+    // A locked PDF and a PDF under a .docx name each get their own message, naming what to do.
+    await uploadAs(page, "locked.pdf");
+    await expect(page.getByRole("main").getByRole("alert")).toContainText("password-protected");
+    await uploadAs(page, "pdf-named-as.docx");
+    await expect(page.getByRole("main").getByRole("alert")).toContainText("the kind its name says");
+    await expect(list.getByText(/locked\.pdf|pdf-named-as\.docx/)).toHaveCount(0);
+
     // The third slot is the last; after it the control is gone.
     await uploadAs(page, "long.pdf");
     // Scoped to main: Next's route announcer is also role="alert".
