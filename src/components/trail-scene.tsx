@@ -1,3 +1,4 @@
+import { HIKER_FEET, HikerFigure } from "@/components/hiker-mark";
 import { cn } from "@/lib/utils";
 
 type TrailSceneProps = {
@@ -152,48 +153,11 @@ export function TrailScene({ variant = "hero", className }: TrailSceneProps) {
             strokeLinecap="round"
             strokeDasharray="26 20"
           />
-          {/* Hiker, mid-trail */}
-          <g transform="translate(752 258)">
-            {/* Bag */}
-            <rect
-              x={-16}
-              y={20}
-              width={13}
-              height={19}
-              rx={3}
-              fill="#46584C"
-              opacity={0.75}
-            />
-            {/* Head */}
-            <circle cx={2} cy={6} r={9} fill="#E8B48C" />
-            {/* Hand */}
-            <path
-              d="M18 20 l4 40"
-              stroke="#D1603F"
-              strokeWidth={4}
-              strokeLinecap="round"
-              fill="none"
-              transform="rotate(-55)"
-            />
-            {/* Shirt */}
-            <path d="M-4 16 h13 l3 22 h-19 Z" fill="#D1603F" />
-            {/* Legs */}
-            <path
-              d="M2 38 l-6 20 M8 38 l5 20"
-              stroke="#000"
-              strokeWidth={5}
-              strokeLinecap="round"
-              fill="none"
-            />
-            {/* Stick */}
-            <path
-              d="M18 20 l4 40"
-              stroke="var(--trunk)"
-              strokeWidth={3}
-              strokeLinecap="round"
-              fill="none"
-              transform="rotate(-10)"
-            />
+          {/* Hiker, mid-trail, feet on the path */}
+          <g
+            transform={`translate(752 316) scale(1.5) translate(${-HIKER_FEET.x} ${-HIKER_FEET.y})`}
+          >
+            <HikerFigure />
           </g>
         </>
       )}

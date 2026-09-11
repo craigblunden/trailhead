@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { HikerMark } from "@/components/hiker-mark";
 import { cn } from "@/lib/utils";
 
 type TrailheadLogoProps = {
@@ -10,8 +11,8 @@ type TrailheadLogoProps = {
 };
 
 const MARK = {
-  sm: "size-7 text-[0.9rem]",
-  lg: "size-9 text-lg",
+  sm: "size-7",
+  lg: "size-9",
 } as const;
 
 const WORD = {
@@ -26,15 +27,7 @@ export function TrailheadLogo({
 }: TrailheadLogoProps) {
   const content = (
     <>
-      <span
-        aria-hidden="true"
-        className={cn(
-          "grid shrink-0 place-items-center rounded-full bg-primary font-heading leading-none text-primary-foreground",
-          MARK[size],
-        )}
-      >
-        T
-      </span>
+      <HikerMark className={cn("shrink-0", MARK[size])} />
       <span className={cn("font-heading font-semibold tracking-tight", WORD[size])}>
         Trailhead
       </span>
