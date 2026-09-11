@@ -1,0 +1,11 @@
+// Trailhead schema. Supabase Auth owns the `auth` schema; nothing here models users.
+// The datasource URL lives in `prisma.config.ts` — Prisma 7 rejects it here (P1012).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
