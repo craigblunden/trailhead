@@ -24,6 +24,15 @@ export default defineConfig({
     // the axe results and the overflow measurements.
     command: `npm run build && npx next start --port ${PORT}`,
     url: BASE_URL,
+    // Placeholder OAuth credentials, so the social buttons render and every sweep covers them.
+    // They reach no provider: `e2e/social-sign-in.spec.ts` routes sign-in to a fake one. A server
+    // reused locally must have been started with them too, or the social spec fails.
+    env: {
+      SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID: "e2e-placeholder",
+      SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET: "e2e-placeholder",
+      SUPABASE_AUTH_EXTERNAL_GITHUB_CLIENT_ID: "e2e-placeholder",
+      SUPABASE_AUTH_EXTERNAL_GITHUB_SECRET: "e2e-placeholder",
+    },
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
   },

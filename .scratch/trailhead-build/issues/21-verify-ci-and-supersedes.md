@@ -46,3 +46,16 @@ which have been open since Phase 1 and remain so.
 - [ ] The deferred work is recorded with its open questions intact, in a place a future phase will find
 - [ ] A clean clone can reach a running application from the `.env.example` and the documented commands
       alone
+
+## Comments
+
+### 2026-09-11 — agent (from ticket 07)
+
+**CI must let the local Auth container reach the test-only OAuth provider.** Ticket 07's
+integration (`tests/integration/social-linking.test.ts`) and e2e (`e2e/social-sign-in.spec.ts`)
+suites start a fake identity provider on the runner at `127.0.0.1:54399`. Auth, in Docker, reaches it as
+`http://host.docker.internal:54399` (`supabase/config.toml`, `[auth.external.gitlab]`). Docker
+Desktop provides that name. **A Linux runner may not.** Confirm the Supabase CLI adds a
+`host-gateway` mapping to the auth container there, and that a loopback-bound listener is
+reachable through it. If it is not, the fake must listen on the Docker bridge address instead.
+Check this before assuming a red CI run is a linking regression.

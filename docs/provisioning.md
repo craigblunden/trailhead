@@ -23,6 +23,21 @@ is at http://127.0.0.1:54323.
 `supabase/seed.sql` (which only sets the two roles' development passwords). Run `npm run
 db:deploy` again afterwards.
 
+### Social sign-in, locally
+
+The Google and GitHub buttons render only when both of a provider's variables are set
+(`SUPABASE_AUTH_EXTERNAL_<PROVIDER>_CLIENT_ID` and `_SECRET`). A clean clone has neither, so
+it shows no buttons and loses nothing else. To try a real provider locally, create its OAuth app
+with the callback `http://127.0.0.1:54321/auth/v1/callback`, export the two variables in the shell
+that runs `npm run supabase:start` **and** put them in `.env.local`, and set that provider's
+`enabled = true` in `supabase/config.toml` without committing it.
+
+`supabase/config.toml` also enables a **test-only** provider in the `gitlab` slot, pointed at a fake
+identity provider the test suites start on `127.0.0.1:54399`
+(`tests/fakes/oauth-provider.ts`; Auth reaches it as `host.docker.internal`). No button offers
+it. It lets the integration and e2e suites run a real OAuth round trip through the local Auth
+server. Never enable it on the hosted project, and never `supabase config push` this file.
+
 ## What lives where
 
 | Concern | Owner | File |
@@ -72,9 +87,12 @@ Things only a dashboard login can do. Do them once, in this order.
    publishable key as `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Do **not** copy the secret /
    `service_role` key anywhere in this project.
 8. **Social sign-in (optional)**: create the Google and GitHub OAuth apps with the callback URL
-   the provider page shows, enter the credentials there, and set the four
-   `SUPABASE_AUTH_EXTERNAL_*` variables in Vercel so the buttons render. Leave them unset and the
-   buttons do not render.
+   the provider page shows (`https://<ref>.supabase.co/auth/v1/callback`), enter the credentials
+   there, and set the four `SUPABASE_AUTH_EXTERNAL_*` variables in Vercel so the buttons render.
+   Leave them unset and the buttons do not render. The app's own landing,
+   `<app URL>/auth/callback`, must be covered by the redirect allow-list from step 6. Then sign in
+   once with each provider on the deployment: this is the one part of ticket 07 no local test can
+   reach.
 9. **Confirm the bucket** under _Storage_: `documents`, private, 5 MB limit, MIME types
    `application/pdf` and the DOCX type. The migration creates it; this is a check.
 
@@ -100,3 +118,17 @@ Recorded here because the tickets that depend on it must not re-derive it.
 | Who owns an object uploaded through a signed upload URL? | The user who minted the URL: `owner_id` is set from the token, so the owner-keyed policies hold. Minting under another user's prefix is refused by RLS at mint time. |
 | Can a second user list, sign a download URL for, or remove another user's object? | **No** to all three — list returns empty, sign returns "Object not found", remove returns an empty result. |
 | Can an existing key be overwritten? | **No** — with no UPDATE policy, minting an upsert URL for an existing key is refused by RLS. |
+
+## What ticket 07 verified against a real stack
+
+Account linking, asserted by `tests/integration/social-linking.test.ts` against the local Auth
+server (`gotrue` v2.196.0) with a real OAuth round trip and a fake identity provider. Auth's
+linking decision does not depend on which provider the identity came from.
+
+| Situation | What Auth does |
+| --- | --- |
+| Verified password account, then a social identity whose provider verified the same address | **Links**: the same user id — so the same jobs — with both identities. The password keeps working. The provider's name replaces the display name from sign-up. |
+| Verified password account, then a social identity whose provider did **not** verify the address | **Refuses** with `provider_email_needs_verification`; the app lands on `/login?error=oauth`. No second account. |
+| Unverified password sign-up (someone squatting the address), then the owner's verified social identity | The owner gets the account; Auth **strips the unverified password identity**, so the squatter's password stops working. |
+| Social account first, then a password sign-up for the same address | Auth reports it already registered; no second account. The form shows the usual "check your email". |
+| Auth finds an existing identity by (provider, provider user id) **before** email | A provider account whose address changed still reaches the user it first created. |

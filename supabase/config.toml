@@ -355,6 +355,17 @@ client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 skip_nonce_check = true
 
+# TEST-ONLY identity provider (ticket 07). The app never offers it: no button names it. It exists
+# so the test suites can drive a real OAuth sign-in through this local Auth server against a fake
+# provider (tests/fakes/oauth-provider.ts, listening on the host) and prove how Auth links a social
+# identity to an existing account. GitLab is used only because Auth lets its URL be overridden.
+# Local stack only: never enable this on the hosted project, and never run `supabase config push`.
+[auth.external.gitlab]
+enabled = true
+client_id = "trailhead-fake-provider"
+secret = "trailhead-fake-provider-not-a-secret"
+url = "http://host.docker.internal:54399"
+
 [auth.web3.solana]
 enabled = false
 
