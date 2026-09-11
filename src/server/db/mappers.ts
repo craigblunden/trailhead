@@ -5,7 +5,8 @@ import type {
   Job as JobModel,
   JobContact as JobContactRow,
 } from "@/generated/prisma/client";
-import type { ActivityEntry, Contact, Job } from "@/lib/jobs";
+import type { ContactDetail, ContactListItem } from "@/lib/contacts";
+import { STAGES, type ActivityEntry, type Contact, type Job } from "@/lib/jobs";
 
 /**
  * Pure functions from database rows to the DTOs `src/lib/jobs.ts` defines. This is the boundary:
@@ -13,11 +14,19 @@ import type { ActivityEntry, Contact, Job } from "@/lib/jobs";
  * tested with plain objects.
  */
 
+/** A contact row with the number of Jobs it is linked to, as Prisma's `_count` returns it. */
+export type CountedContactRow = ContactRow & { _count: { jobs: number } };
+
 /** A job row with the relations the detail page needs. */
 export type JobRow = JobModel & {
   activity: ActivityEntryRow[];
-  contacts: (JobContactRow & { contact: ContactRow })[];
+  contacts: (JobContactRow & { contact: CountedContactRow })[];
   document: DocumentRow | null;
+};
+
+/** A contact row with the Jobs it is linked to, for its own page. */
+export type ContactDetailRow = ContactRow & {
+  jobs: (JobContactRow & { job: Pick<JobModel, "id" | "company" | "role" | "stage"> })[];
 };
 
 /**
@@ -69,8 +78,59 @@ export function sortContacts<T extends Pick<ContactRow, "id" | "name">>(rows: re
   );
 }
 
-export function toContactDto(row: ContactRow): Contact {
-  return { id: row.id, name: row.name, title: row.title, email: row.email };
+/** A Contact on a Job. The link to this Job is one of its links, so "other" is one fewer. */
+export function toContactDto(row: CountedContactRow): Contact {
+  return {
+    id: row.id,
+    name: row.name,
+    kind: row.kind,
+    title: row.title,
+    agency: row.agency,
+    email: row.email,
+    otherJobCount: Math.max(0, row._count.jobs - 1),
+  };
+}
+
+export function toContactListItem(row: CountedContactRow): ContactListItem {
+  return {
+    id: row.id,
+    name: row.name,
+    kind: row.kind,
+    title: row.title,
+    agency: row.agency,
+    jobCount: row._count.jobs,
+  };
+}
+
+/**
+ * Linked Jobs in pipeline order, then by company and role, then id — so "Roles with <name>"
+ * groups by stage without the page having to sort, and never reshuffles.
+ */
+export function toContactDetail(row: ContactDetailRow): ContactDetail {
+  const jobs = row.jobs
+    .map((link) => link.job)
+    .sort(
+      (a, b) =>
+        STAGES.indexOf(a.stage) - STAGES.indexOf(b.stage) ||
+        a.company.localeCompare(b.company, "en") ||
+        a.role.localeCompare(b.role, "en") ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    )
+    .map((job) => ({ id: job.id, company: job.company, role: job.role, stage: job.stage }));
+
+  return {
+    id: row.id,
+    name: row.name,
+    kind: row.kind,
+    title: row.title,
+    agency: row.agency,
+    email: row.email,
+    phone: row.phone,
+    notes: row.notes,
+    linkedinUrl: row.linkedinUrl,
+    lastSpokenOn: row.lastSpokenOn ? toIsoDate(row.lastSpokenOn) : null,
+    jobs,
+  };
 }
 
 export function toJobDto(row: JobRow): Job {

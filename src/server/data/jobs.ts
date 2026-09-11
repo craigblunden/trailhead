@@ -19,9 +19,10 @@ import { NotFoundError } from "./errors";
  * - returns DTOs from the mappers and throws typed domain errors. Prisma types stop here.
  */
 
-const JOB_INCLUDE = {
+/** The relations a Job DTO is built from. Contacts carry their link count for "Also on N other jobs". */
+export const JOB_INCLUDE = {
   activity: true,
-  contacts: { include: { contact: true } },
+  contacts: { include: { contact: { include: { _count: { select: { jobs: true } } } } } },
   document: true,
 } as const;
 

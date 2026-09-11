@@ -14,3 +14,17 @@ export class NotFoundError extends Error {
     this.name = "NotFoundError";
   }
 }
+
+/**
+ * A domain rule said no — the document cap, a quota, a document of the wrong kind. The message is
+ * written for the user and names what to do; the code lets the UI render the designed state.
+ */
+export class RuleError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "RuleError";
+  }
+}

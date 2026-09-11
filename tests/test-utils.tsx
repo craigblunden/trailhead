@@ -3,11 +3,14 @@ import { render, type RenderOptions } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 
+import { ContactsProvider } from "@/components/contacts/contacts-provider";
 import { JobsProvider } from "@/components/jobs-provider";
 import { SessionProvider } from "@/components/session-provider";
 import { SEED_JOBS, type Job } from "@/lib/jobs";
 import { jobsCache } from "@/lib/jobs-cache";
+import type { ContactsClient } from "@/lib/contacts-client";
 import { createFixtureJobsClient, type JobsClient } from "@/lib/jobs-client";
+import { createFakeContactsClient } from "./fakes/contacts-client";
 
 /** The signed-in user every board test renders as. */
 export const TEST_USER = { name: "Sam Rivera", email: "sam.rivera@example.com" };
@@ -41,6 +44,8 @@ type Options = Omit<RenderOptions, "wrapper"> & {
   client?: JobsClient;
   /** Set false to leave the cache empty, so the provider has to fetch (loading and error states). */
   seedCache?: boolean;
+  /** Overrides the in-memory contacts client built over `initialJobs`. */
+  contactsClient?: ContactsClient;
 };
 
 /**
@@ -51,11 +56,12 @@ type Options = Omit<RenderOptions, "wrapper"> & {
  */
 export function renderWithJobs(
   ui: React.ReactElement,
-  { initialJobs = SEED_JOBS, client, seedCache = true, ...options }: Options = {},
+  { initialJobs = SEED_JOBS, client, seedCache = true, contactsClient, ...options }: Options = {},
 ) {
   const queryClient = createTestQueryClient();
   if (seedCache) queryClient.setQueryData(jobsCache.key, initialJobs);
   const jobsClient = client ?? createFixtureJobsClient(initialJobs);
+  const contacts = contactsClient ?? createFakeContactsClient({ jobs: initialJobs });
 
   return {
     user: userEvent.setup(),
@@ -64,7 +70,9 @@ export function renderWithJobs(
       wrapper: ({ children }) => (
         <SessionProvider user={TEST_USER}>
           <QueryClientProvider client={queryClient}>
-            <JobsProvider client={jobsClient}>{children}</JobsProvider>
+            <ContactsProvider client={contacts}>
+              <JobsProvider client={jobsClient}>{children}</JobsProvider>
+            </ContactsProvider>
           </QueryClientProvider>
         </SessionProvider>
       ),

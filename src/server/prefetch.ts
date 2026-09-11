@@ -18,7 +18,15 @@ import { jobsCache } from "@/lib/jobs-cache";
  * worth it.
  */
 export async function prefetchJobs(fetchJobs: () => Promise<Job[]>) {
+  return prefetch((queryClient) => queryClient.prefetchQuery(jobsCache.options(fetchJobs)));
+}
+
+/**
+ * A per-request QueryClient filled by `fill` and dehydrated. Awaited for the reason given above.
+ * A failed prefetch dehydrates nothing, and the client fetches for itself.
+ */
+export async function prefetch(fill: (queryClient: QueryClient) => Promise<unknown>) {
   const queryClient = new QueryClient();
-  await queryClient.prefetchQuery(jobsCache.options(fetchJobs));
+  await fill(queryClient);
   return dehydrate(queryClient);
 }

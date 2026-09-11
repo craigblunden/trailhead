@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { CONTACT_KINDS, todayUtc } from "@/lib/contacts";
 import { STAGES } from "@/lib/jobs";
 
 /**
@@ -51,25 +52,33 @@ const salaryBound = z.preprocess(
     .nullable(),
 );
 
+/** Absent or null is blank; the bound and trim still apply to anything given. */
+const optionalText = (max: number) =>
+  z.preprocess((value) => (value === null || value === undefined ? "" : value), boundedText(max));
+
 /**
  * `<input type="url">` accepts `javascript:` and `data:`. A stored hostile URL is a stored XSS
- * vector for every future consumer of the field, so only ordinary web links are stored.
+ * vector for every future consumer of the field, so only ordinary web links are stored. Blank
+ * means no link.
  */
-const postingUrl = z.preprocess(
-  (value) => (value === null || value === undefined ? "" : value),
-  boundedText(JOB_LIMITS.postingUrl).refine(
-    (url) => {
-      if (url === "") return true;
-      try {
-        const { protocol } = new URL(url);
-        return protocol === "http:" || protocol === "https:";
-      } catch {
-        return false;
-      }
-    },
-    { message: "Enter a web address starting with http:// or https://" },
-  ),
-);
+const webAddress = (max: number) =>
+  z.preprocess(
+    (value) => (value === null || value === undefined ? "" : value),
+    boundedText(max).refine(
+      (url) => {
+        if (url === "") return true;
+        try {
+          const { protocol } = new URL(url);
+          return protocol === "http:" || protocol === "https:";
+        } catch {
+          return false;
+        }
+      },
+      { message: "Enter a web address starting with http:// or https://" },
+    ),
+  );
+
+const postingUrl = webAddress(JOB_LIMITS.postingUrl);
 
 export const newJobSchema = z.object({
   company: requiredText(JOB_LIMITS.company),
@@ -105,6 +114,81 @@ export const jobPatchSchema = z.strictObject({
 export type JobPatchInput = z.infer<typeof jobPatchSchema>;
 
 export const stageSchema = z.enum(STAGES);
+
+/**
+ * Ticket 13 decided these bounds. Name and kind are required; everything else is optional and
+ * stored blank. Last spoken is set by the user, never derived, and never in the future.
+ */
+export const CONTACT_LIMITS = {
+  name: 120,
+  title: 120,
+  agency: 120,
+  email: 254,
+  phone: 40,
+  notes: 2_000,
+  linkedinUrl: 2048,
+} as const;
+
+const EMAIL = z.email();
+
+const contactEmail = z.preprocess(
+  (value) => (value === null || value === undefined ? "" : value),
+  boundedText(CONTACT_LIMITS.email).refine((email) => email === "" || EMAIL.safeParse(email).success, {
+    message: "Enter an email address like name@example.com",
+  }),
+);
+
+const contactPhone = z.preprocess(
+  (value) => (value === null || value === undefined ? "" : value),
+  boundedText(CONTACT_LIMITS.phone).regex(/^[0-9 +().-]*$/, "Use digits, spaces, and + ( ) . - only"),
+);
+
+/** A `YYYY-MM-DD` that names a real day, today (UTC) at the latest. Blank means never recorded. */
+const lastSpokenOn = z.preprocess(
+  (value) => (value === null || value === undefined || value === "" ? null : value),
+  z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a date")
+    .refine((iso) => {
+      const parsed = new Date(`${iso}T00:00:00.000Z`);
+      return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === iso;
+    }, "Enter a real date")
+    .refine((iso) => iso <= todayUtc(), "That date is in the future")
+    .nullable(),
+);
+
+export const contactKindSchema = z.enum(CONTACT_KINDS, "Choose what kind of contact this is");
+
+const contactFields = {
+  name: requiredText(CONTACT_LIMITS.name),
+  kind: contactKindSchema,
+  title: optionalText(CONTACT_LIMITS.title),
+  agency: optionalText(CONTACT_LIMITS.agency),
+  email: contactEmail,
+  phone: contactPhone,
+  notes: optionalText(CONTACT_LIMITS.notes),
+  linkedinUrl: webAddress(CONTACT_LIMITS.linkedinUrl),
+  lastSpokenOn,
+};
+
+export const newContactSchema = z.object(contactFields);
+
+export type NewContactInput = z.infer<typeof newContactSchema>;
+
+/** Editing a Contact is an allowlist of its own fields; anything else is rejected, not dropped. */
+export const contactPatchSchema = z.strictObject({
+  name: contactFields.name.optional(),
+  kind: contactFields.kind.optional(),
+  title: boundedText(CONTACT_LIMITS.title).optional(),
+  agency: boundedText(CONTACT_LIMITS.agency).optional(),
+  email: contactFields.email.optional(),
+  phone: contactFields.phone.optional(),
+  notes: boundedText(CONTACT_LIMITS.notes).optional(),
+  linkedinUrl: contactFields.linkedinUrl.optional(),
+  lastSpokenOn: contactFields.lastSpokenOn.optional(),
+});
+
+export type ContactPatchInput = z.infer<typeof contactPatchSchema>;
 
 /** Ids are opaque cuids; this only stops a caller handing us a novel. */
 export const idSchema = z.string().trim().min(1).max(64);

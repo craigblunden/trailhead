@@ -14,6 +14,8 @@ const idle = async () => ({ status: "idle" as const });
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+  usePathname: () => "/board",
+  useSelectedLayoutSegment: () => null,
 }));
 
 /**

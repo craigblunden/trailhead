@@ -160,24 +160,19 @@ describe("editing free text", () => {
 });
 
 describe("supporting panels", () => {
-  it("DET-7: lists each contact with a mailto link", () => {
+  it("DET-7: lists each contact with their kind, a mailto link, and a link to the contact", () => {
     renderWithJobs(<JobDetail jobId={HARVEST} />);
     const contacts = screen.getByRole("region", { name: "Contacts" });
 
-    expect(within(contacts).getByText("Tom Okafor")).toBeInTheDocument();
-    expect(within(contacts).getByText("Design Manager")).toBeInTheDocument();
+    expect(within(contacts).getByRole("link", { name: "Tom Okafor" })).toHaveAttribute(
+      "href",
+      "/contacts/c1",
+    );
+    expect(within(contacts).getByText("Hiring manager")).toBeInTheDocument();
     expect(
       within(contacts).getByRole("link", { name: "t.okafor@harvest.co" }),
     ).toHaveAttribute("href", "mailto:t.okafor@harvest.co");
     expect(within(contacts).getAllByRole("listitem")).toHaveLength(2);
-  });
-
-  it("DET-7: keeps the add-contact control disabled rather than inert", () => {
-    renderWithJobs(<JobDetail jobId={HARVEST} />);
-    const contacts = screen.getByRole("region", { name: "Contacts" });
-
-    // An enabled button that does nothing is a false affordance.
-    expect(within(contacts).getByRole("button", { name: /Add contact/ })).toBeDisabled();
   });
 
   it("DET-7: explains an empty contact list", () => {

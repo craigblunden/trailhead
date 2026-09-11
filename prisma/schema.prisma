@@ -122,6 +122,8 @@ model Contact {
   /// The independent firm a recruiter works for, when it differs from the company hiring.
   agency       String      @default("")
   notes        String      @default("")
+  /// http(s) only, sanitised on write like `Job.postingUrl` (ticket 14). Blank means none.
+  linkedinUrl  String      @default("")
   /// Set by the user; activity entries are job-scoped, so there is nothing to derive it from.
   lastSpokenOn DateTime?   @db.Date
   jobs         JobContact[]

@@ -1,4 +1,9 @@
-import type { Accent as DbAccent, Stage as DbStage } from "@/generated/prisma/enums";
+import type {
+  Accent as DbAccent,
+  ContactKind as DbContactKind,
+  Stage as DbStage,
+} from "@/generated/prisma/enums";
+import type { ContactKind } from "@/lib/contacts";
 import type { Accent, Stage } from "@/lib/jobs";
 
 /**
@@ -10,3 +15,4 @@ type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 
 export const stageEnumsAgree: Same<DbStage, Stage> = true;
 export const accentEnumsAgree: Same<DbAccent, Accent> = true;
+export const contactKindEnumsAgree: Same<DbContactKind, ContactKind> = true;

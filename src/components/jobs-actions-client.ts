@@ -14,19 +14,24 @@ export class ActionError extends Error {
   constructor(
     readonly kind: ActionFailure["error"],
     message: string,
+    /** Per-field messages for an `invalid` result, in the shape forms render inline. */
+    readonly fields: Record<string, string> = {},
+    /** For a `rejected` result: which rule said no. */
+    readonly code?: string,
   ) {
     super(message);
     this.name = "ActionError";
   }
 }
 
-function unwrap<T>(result: ActionResult<T>): T {
+/** A successful result's data, or the failure as an `ActionError`. */
+export function unwrap<T>(result: ActionResult<T>): T {
   if (result.ok) return result.data;
   if (result.error === "unauthenticated" && typeof window !== "undefined") {
     // The session ended under us. Nothing on this page can succeed now; go and get a new one.
     window.location.assign(SESSION_ENDED_PATH);
   }
-  throw new ActionError(result.error, result.message);
+  throw new ActionError(result.error, result.message, result.fields, result.code);
 }
 
 /** The board's client over Server Actions — the only write path from the browser. */

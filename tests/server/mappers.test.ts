@@ -65,6 +65,7 @@ function link(contact: {
     userId: "6a0c2e20-0000-4000-8000-000000000001",
     createdAt: new Date("2026-06-26T09:00:00.000Z"),
     contact: {
+      _count: { jobs: 1 },
       id: contact.id,
       userId: "6a0c2e20-0000-4000-8000-000000000001",
       name: contact.name,
@@ -73,6 +74,7 @@ function link(contact: {
       email: contact.email ?? "",
       phone: "",
       agency: "",
+      linkedinUrl: "",
       notes: "",
       lastSpokenOn: null,
       createdAt: new Date("2026-06-26T09:00:00.000Z"),
@@ -174,9 +176,9 @@ describe("toJobDto", () => {
     const backward = toJobDto(row({ contacts: [...links].reverse() })).contacts;
 
     expect(forward).toEqual([
-      { id: "c1", name: "Jess Liu", title: "Recruiter", email: "jess.l@harvest.co" },
-      { id: "c3", name: "Jess Liu", title: "Recruiter", email: "jess@harvest.co" },
-      { id: "c2", name: "Tom Okafor", title: "Design Manager", email: "t@harvest.co" },
+      { id: "c1", name: "Jess Liu", kind: "recruiter", title: "Recruiter", agency: "", email: "jess.l@harvest.co", otherJobCount: 0 },
+      { id: "c3", name: "Jess Liu", kind: "recruiter", title: "Recruiter", agency: "", email: "jess@harvest.co", otherJobCount: 0 },
+      { id: "c2", name: "Tom Okafor", kind: "recruiter", title: "Design Manager", agency: "", email: "t@harvest.co", otherJobCount: 0 },
     ]);
     expect(backward).toEqual(forward);
   });

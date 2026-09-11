@@ -1,3 +1,5 @@
+import type { ContactKind } from "@/lib/contacts";
+
 export const STAGES = [
   "interested",
   "applied",
@@ -35,11 +37,17 @@ export const ACCENTS = {
 
 export type Accent = keyof typeof ACCENTS;
 
+/** A Contact as it appears on a Job: enough for the sidebar row and its "also on" link. */
 export type Contact = {
   id: string;
   name: string;
+  kind: ContactKind;
   title: string;
+  /** The independent firm they work for, when it differs from the company hiring. */
+  agency: string;
   email: string;
+  /** How many of the user's other Jobs this Contact is linked to. */
+  otherJobCount: number;
 };
 
 export type ActivityEntry = {
@@ -112,8 +120,11 @@ export const SEED_JOBS: Job[] = [
       {
         id: "c1",
         name: "Dana Whitfield",
+        kind: "recruiter",
         title: "Recruiter",
+        agency: "",
         email: "dana@fernwood.co",
+        otherJobCount: 0,
       },
     ],
     activity: [
@@ -169,10 +180,21 @@ export const SEED_JOBS: Job[] = [
       {
         id: "c1",
         name: "Tom Okafor",
+        kind: "hiring_manager",
         title: "Design Manager",
+        agency: "",
         email: "t.okafor@harvest.co",
+        otherJobCount: 0,
       },
-      { id: "c2", name: "Jess Liu", title: "Recruiter", email: "jess@harvest.co" },
+      {
+        id: "c2",
+        name: "Jess Liu",
+        kind: "recruiter",
+        title: "Recruiter",
+        agency: "",
+        email: "jess@harvest.co",
+        otherJobCount: 0,
+      },
     ],
     activity: [
       { id: "a1", label: "Portfolio review scheduled", date: "2026-07-20" },
@@ -201,8 +223,11 @@ export const SEED_JOBS: Job[] = [
       {
         id: "c1",
         name: "Ravi Menon",
+        kind: "hiring_manager",
         title: "Head of Design",
+        agency: "",
         email: "ravi@northbeam.io",
+        otherJobCount: 0,
       },
     ],
     activity: [
@@ -235,8 +260,11 @@ export const SEED_JOBS: Job[] = [
       {
         id: "c1",
         name: "Alex Chen",
+        kind: "hiring_manager",
         title: "Design Director",
+        agency: "",
         email: "alex@bramble.app",
+        otherJobCount: 0,
       },
     ],
     activity: [
