@@ -5,7 +5,9 @@ import { describe, expect, it } from "vitest";
 
 /**
  * Ticket 12: the Phase-1 seed jobs are test fixtures, and production code does not import them. New
- * accounts start empty; the board's empty state is the answer to "restore demo data".
+ * accounts start empty; the board's empty state is the answer to "restore demo data". The same holds
+ * for `npm run db:seed`: its accounts are made on the local stack by `scripts/`, which nothing in
+ * `src/` may reach.
  */
 
 const SRC = join(process.cwd(), "src");
@@ -19,11 +21,11 @@ function walk(dir: string): string[] {
 }
 
 describe("fixtures stay in tests (ticket 12)", () => {
-  it("FIX-1: nothing under src/ names SEED_JOBS or imports from tests/", () => {
+  it("FIX-1: nothing under src/ names SEED_JOBS or imports from tests/ or scripts/", () => {
     const offenders = walk(SRC)
       .filter((file) => {
         const source = readFileSync(file, "utf8");
-        return /\bSEED_JOBS\b/.test(source) || /from\s+["'][^"']*tests\//.test(source);
+        return /\bSEED_JOBS\b/.test(source) || /from\s+["'][^"']*(tests|scripts)\//.test(source);
       })
       .map((file) => relative(SRC, file).split(sep).join("/"));
 

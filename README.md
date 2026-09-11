@@ -57,6 +57,7 @@ npm install                  # also runs prisma generate
 npm run supabase:start       # Postgres, Auth, Storage, Mailpit in Docker; applies supabase/migrations
 cp .env.example .env.local   # the local stack's well-known development values are already filled in
 npm run db:deploy            # the application's tables, policies, and sweep, as trailhead_migrator
+npm run db:seed              # optional: an account for each flow worth looking at (below)
 npm run dev                  # http://localhost:3000
 ```
 
@@ -69,12 +70,38 @@ Then:
 - **Google and GitHub sign-in** are off until a provider's credentials are set; see
   `docs/provisioning.md` → _Social sign-in, locally_.
 
+**Seeded accounts.** `npm run db:seed` creates these on the local stack, all with the password
+`trailhead-seed`, and prints what each one is for. Running it again puts each account back as it
+started, so anything done while signed in as one is lost. It refuses to run unless the database and
+Auth are on this machine.
+
+| Account | What it shows |
+| --- | --- |
+| `new@trailhead.test` | First run: the empty board, contacts, and documents |
+| `searching@trailhead.test` | Mid-search: eight jobs across all five stages, a recruiter on three of them, a resume and a cover letter in kits, and two of this week's five letters used. Harvest & Co is ready to write a letter, Cobalt's description is short, and Meridian has no resume |
+| `at-limits@trailhead.test` | At every limit: all three document slots used, so upload refuses, and this week's letters used, so Tidewater's card says when the next ones arrive |
+| `unverified@trailhead.test` | Signed up and never verified: sign-in asks to verify, and the resent link lands in Mailpit |
+
+- **Cover-letter states need `ANTHROPIC_API_KEY`.** Without it, every job's cover-letter card says
+  letters aren't available: the letter count, the reset day, and the ready, short, and no-resume
+  states only show with it set.
+- **Letter counts are this week's.** A week starts on Monday (UTC). Seed again after a Monday to
+  bring the counts back.
+- **Verifying the unverified account can't be undone.** Once you've followed its link, seeding leaves
+  it verified and says so; `npm run db:reset` starts it over.
+- **`npm run test:integration` empties every application table**, including the seeded accounts'
+  data. Seed again afterwards.
+
+The accounts are written in `scripts/seed/accounts.ts`. The seed builds them with the app's own
+rules and validation, and `tests/seed/` fails if an account stops showing its flow.
+
 Day to day:
 
 | Command | What it does |
 | --- | --- |
 | `npm run supabase:stop` | Stops the stack; your data survives. |
 | `npm run db:reset` | Rebuilds the database from scratch and re-applies every migration. |
+| `npm run db:seed` | Creates the seeded accounts, or resets them to how they started. Run it again after `db:reset`. |
 | `npm run db:migrate` | Creates a new Prisma migration from a schema change (applied migrations are never edited). |
 | `npm run db:studio` | Prisma Studio. |
 
@@ -183,6 +210,7 @@ src/server/ingest/        Text extraction at upload (unpdf, mammoth).
 src/server/generation/    The Claude call and the one place its prompt is assembled.
 prisma/                   Schema and migrations (tables, row-level security, the document sweep).
 supabase/                 Local stack config and the provisioning migration (roles, bucket, cron).
+scripts/seed/             npm run db:seed: the local seeded accounts. Nothing in src/ may import it.
 tests/                    Vitest: unit, component, and integration (tests/integration/).
 e2e/                      Playwright specs, and the shared accessibility and overflow checks.
 CONTEXT.md                The glossary. A Contact is user-owned; the record is a Job.

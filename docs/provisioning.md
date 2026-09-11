@@ -13,6 +13,7 @@ npm install
 npm run supabase:start     # Postgres, Auth, Storage, Mailpit; applies supabase/migrations + seed.sql
 cp .env.example .env.local # the local values are already filled in
 npm run db:deploy          # Prisma migrations, as trailhead_migrator
+npm run db:seed            # optional: the seeded accounts (README → Seeded accounts)
 npm run dev
 ```
 
@@ -21,7 +22,16 @@ is at http://127.0.0.1:54323.
 
 `npm run supabase:reset` rebuilds the database from `supabase/migrations/` and re-runs
 `supabase/seed.sql` (which only sets the two roles' development passwords). Run `npm run
-db:deploy` again afterwards.
+db:deploy` again afterwards, then `npm run db:seed` if you use the seeded accounts.
+
+`npm run db:seed` holds no key that bypasses anything:
+- It makes each account through Auth's public API and follows the verification mail out of Mailpit.
+- It writes rows as `trailhead_app` under that account's tenant id.
+- It uploads files with that account's own session.
+
+It refuses to run unless `DATABASE_URL` and `NEXT_PUBLIC_SUPABASE_URL` are loopback URLs. It checks
+`TEST_MAIL_API_URL` too when it is set; unset, the mail reader uses the local Mailpit. Never point it at
+the hosted project.
 
 ### Social sign-in, locally
 
@@ -46,6 +56,7 @@ server. Never enable it on the hosted project, and never `supabase config push` 
 | Local bucket declaration, auth settings (confirmations on, 8-character minimum), redirect allow-list, social providers | Supabase CLI config | `supabase/config.toml` |
 | Application tables, enums, indexes, RLS policies, the sweep function | Prisma migrations, run as `trailhead_migrator` | `prisma/migrations/` |
 | Development passwords for the two roles (never pushed) | Local seed | `supabase/seed.sql` |
+| Seeded accounts for looking at each flow (local only) | `npm run db:seed`, through Auth and `trailhead_app` | `scripts/seed/` |
 
 An applied migration is never edited. A change is a new migration.
 
