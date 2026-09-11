@@ -3,6 +3,7 @@ import { z } from "zod";
 import { CONTACT_KINDS, CONTACT_LIMITS } from "@/lib/contacts";
 import { todayUtc } from "@/lib/dates";
 import { DOCUMENT_KINDS, MAX_UPLOAD_BYTES, UPLOAD_REFUSALS, extensionOf } from "@/lib/documents";
+import { locationOrFallback, salaryFromText } from "@/lib/job-fields";
 import { STAGES } from "@/lib/jobs";
 
 /**
@@ -27,8 +28,6 @@ export const JOB_LIMITS = {
 /** Thousands per year. Nobody is paid a billion; this bounds accidental and hostile input alike. */
 const SALARY_MAX = 100_000;
 
-const LOCATION_FALLBACK = "Location TBD";
-
 const boundedText = (max: number) => z.string().trim().max(max, `Keep this under ${max} characters`);
 
 const requiredText = (max: number) =>
@@ -36,16 +35,11 @@ const requiredText = (max: number) =>
 
 /**
  * Blank or non-numeric means "not specified". A number that parses but is negative, fractional, or
- * absurd is a mistake worth telling the user about rather than silently nulling.
+ * absurd is a mistake worth telling the user about rather than silently nulling. The forms read the
+ * text with the same `salaryFromText` before they send it.
  */
 const salaryBound = z.preprocess(
-  (value) => {
-    if (value === null || value === undefined) return null;
-    if (typeof value === "number") return value;
-    const text = String(value).trim();
-    if (text === "") return null;
-    return /^-?\d+(\.\d+)?$/.test(text) ? Number(text) : null;
-  },
+  salaryFromText,
   z
     .number()
     .int("Enter a whole number of thousands")
@@ -87,7 +81,7 @@ export const newJobSchema = z.object({
   role: requiredText(JOB_LIMITS.role),
   location: z.preprocess(
     (value) => (value === null || value === undefined ? "" : value),
-    boundedText(JOB_LIMITS.location).transform((text) => text || LOCATION_FALLBACK),
+    boundedText(JOB_LIMITS.location).transform(locationOrFallback),
   ),
   salaryMin: salaryBound,
   salaryMax: salaryBound,
@@ -178,13 +172,16 @@ export const contactPatchSchema = z.strictObject({
 
 export type ContactPatchInput = z.infer<typeof contactPatchSchema>;
 
+/** A resume or a cover letter: what a Document is, and which slot of a Job's application kit it fills. */
+export const documentKindSchema = z.enum(DOCUMENT_KINDS, "Choose resume or cover letter");
+
 /**
  * Starting an upload. The browser sends a description of the file, never its bytes: those go
  * straight to Storage, whose bucket limits are what actually enforce size and type. These checks
  * refuse early, before a row or a token exists, with the same messages the upload control shows.
  */
 export const startUploadSchema = z.object({
-  kind: z.enum(DOCUMENT_KINDS, "Choose resume or cover letter"),
+  kind: documentKindSchema,
   fileName: requiredText(255).refine((name) => extensionOf(name) !== null, UPLOAD_REFUSALS["unsupported-type"]),
   sizeBytes: z
     .number("That file could not be read")
@@ -198,12 +195,6 @@ export type StartUploadInput = z.infer<typeof startUploadSchema>;
 /** Ids are opaque cuids; this only stops a caller handing us a novel. */
 export const idSchema = z.string().trim().min(1).max(64);
 
-/** Setting a Job’s resume or cover letter; `null` clears that slot. */
-export const jobDocumentSchema = z.object({
-  jobId: idSchema,
-  kind: z.enum(DOCUMENT_KINDS),
-  documentId: idSchema.nullable(),
-});
 
 /** Field name → first message, in the shape the forms render inline. */
 export type FieldErrors = Record<string, string>;

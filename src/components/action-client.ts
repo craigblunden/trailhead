@@ -1,5 +1,5 @@
 import { SESSION_ENDED_PATH } from "@/lib/auth-routing";
-import type { ActionFailure, ActionResult } from "@/server/actions/jobs";
+import type { ActionFailure, ActionResult } from "@/server/action-result";
 
 /*
  * How every browser client reads a Server Action's answer — jobs, contacts, documents, and the
@@ -29,6 +29,17 @@ export function unwrap<T>(result: ActionResult<T>): T {
     window.location.assign(SESSION_ENDED_PATH);
   }
   throw new ActionError(result.error, result.message, result.fields, result.code);
+}
+
+/**
+ * A Server Action as a client method: resolves with its data, or throws its failure as an
+ * `ActionError`. Every client over Server Actions is built from this one mapping. An action's
+ * arguments are `unknown` on the server, so the client interface it fills decides their types.
+ */
+export function unwrapping<Args extends unknown[], T>(
+  action: (...args: Args) => Promise<ActionResult<T>>,
+): (...args: Args) => Promise<T> {
+  return async (...args) => unwrap(await action(...args));
 }
 
 /** What went wrong, in words written for the user: a field message, a rule's message, or a fallback. */

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { JobPatch } from "@/components/jobs-provider";
+import { salaryFromText } from "@/lib/job-fields";
 import { formatLongDate, type Job } from "@/lib/jobs";
 
 type DetailsCardProps = {
@@ -22,21 +23,14 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Blank means "not specified"; anything else is parsed and the server has the final say. */
-function toBound(text: string): number | null {
-  const trimmed = text.trim();
-  if (trimmed === "") return null;
-  const parsed = Number(trimmed);
-  return Number.isNaN(parsed) ? null : parsed;
-}
-
 export function DetailsCard({ job, onChange }: DetailsCardProps) {
   const fieldId = useId();
+  // Read the way validation reads it, so what is sent is what the server would make of the text.
   const [min, setMin, flushMin] = useDraft(job.salaryMin?.toString() ?? "", (value) =>
-    onChange({ salaryMin: toBound(value) }),
+    onChange({ salaryMin: salaryFromText(value) }),
   );
   const [max, setMax, flushMax] = useDraft(job.salaryMax?.toString() ?? "", (value) =>
-    onChange({ salaryMax: toBound(value) }),
+    onChange({ salaryMax: salaryFromText(value) }),
   );
 
   return (

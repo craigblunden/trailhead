@@ -1,14 +1,14 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createContext, useCallback, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 import { createActionsDocumentsClient } from "@/components/documents-actions-client";
 import { describeFailure } from "@/components/action-client";
+import { jobCache } from "@/components/job-cache";
 import { UPLOAD_REFUSALS, type DocumentKind, type DocumentSummary } from "@/lib/documents";
 import { documentsCache, precheckFile, type DocumentsClient } from "@/lib/documents-client";
-import { kitSlot, withKitSlot, type AttachedDocument, type Job } from "@/lib/jobs";
-import { jobsCache, replaceJob } from "@/lib/jobs-cache";
+import { withKitSlot } from "@/lib/jobs";
 
 const defaultClient: DocumentsClient = createActionsDocumentsClient();
 
@@ -84,47 +84,19 @@ export function useDocumentUpload({ onUploaded }: { onUploaded?: (document: Docu
 
 const ATTACH_FAILED = "That change wasn’t saved. Check your connection and try again.";
 
-/** One choice in the kit, carrying what that one slot held before, to restore if the server refuses. */
-type Choice = { kind: DocumentKind; documentId: string | null; before: AttachedDocument | null };
-
 /**
  * A Job's application kit: its resume and its cover letter, each set independently (ticket 17).
- * Optimistic, like the rest of the job page: the choice shows at once and rolls back visibly if the
- * server refuses it.
+ * Optimistic, like the rest of the job page, through the Job cache module: the choice shows at once,
+ * and a refused one rolls back only its own slot.
  */
 export function useJobDocuments(jobId: string) {
   const client = useDocumentsClient();
   const queryClient = useQueryClient();
+  const cache = useMemo(() => jobCache(queryClient), [queryClient]);
   const [error, setError] = useState<string | null>(null);
   // The pick the user just made, per kind, held in React state so the radio moves within the click
   // itself; the jobs cache notifies a tick later. Cleared when the server settles.
   const [picked, setPicked] = useState<Partial<Record<DocumentKind, string | null>>>({});
-
-  const choose = useMutation({
-    mutationFn: ({ kind, documentId }: Choice) => client.attach(jobId, kind, documentId),
-    onError: (failure, { kind, documentId, before }) => {
-      // Roll back this slot only, and only if it still holds this attempt's choice: the other slot, a
-      // later choice, and every other Job keep whatever they have since become.
-      queryClient.setQueryData<Job[]>(jobsCache.key, (jobs) =>
-        jobs?.map((job) =>
-          job.id === jobId && (kitSlot(job, kind)?.id ?? null) === documentId ? withKitSlot(job, kind, before) : job,
-        ),
-      );
-      setError(describeFailure(failure, ATTACH_FAILED));
-    },
-    onSuccess: (job) => {
-      queryClient.setQueryData<Job[]>(jobsCache.key, (jobs) => replaceJob(jobs, job));
-    },
-    onSettled: (_job, _failure, { kind }) => {
-      setPicked((current) => {
-        const next = { ...current };
-        delete next[kind];
-        return next;
-      });
-      // "On N jobs" changed.
-      void queryClient.invalidateQueries({ queryKey: documentsCache.key });
-    },
-  });
 
   return {
     /**
@@ -134,20 +106,29 @@ export function useJobDocuments(jobId: string) {
     choose: (kind: DocumentKind, documentId: string | null, fileName?: string) => {
       setError(null);
       setPicked((current) => ({ ...current, [kind]: documentId }));
-      // A refetch already on its way must not land over the choice; the server's answer settles it.
-      void queryClient.cancelQueries({ queryKey: jobsCache.key });
-      const job = queryClient.getQueryData<Job[]>(jobsCache.key)?.find((candidate) => candidate.id === jobId);
-      const before = (job && kitSlot(job, kind)) ?? null;
       const name =
         fileName ??
         queryClient
           .getQueryData<DocumentSummary[]>(documentsCache.key)
           ?.find((candidate) => candidate.id === documentId)?.fileName;
       const attached = documentId ? { id: documentId, fileName: name ?? "" } : null;
-      queryClient.setQueryData<Job[]>(jobsCache.key, (jobs) =>
-        jobs?.map((candidate) => (candidate.id === jobId ? withKitSlot(candidate, kind, attached) : candidate)),
-      );
-      choose.mutate({ kind, documentId, before });
+
+      void cache
+        .update(jobId, {
+          apply: (job) => withKitSlot(job, kind, attached),
+          send: () => client.attach(jobId, kind, documentId),
+          fallback: ATTACH_FAILED,
+        })
+        .then((result) => {
+          if (!result.ok) setError(result.message);
+          setPicked((current) => {
+            const next = { ...current };
+            delete next[kind];
+            return next;
+          });
+          // "On N jobs" changed.
+          void queryClient.invalidateQueries({ queryKey: documentsCache.key });
+        });
     },
     /** What the kit should show as chosen for `kind`: the pending pick, else what is attached. */
     selected: (kind: DocumentKind, attachedId: string | null) =>
@@ -157,10 +138,11 @@ export function useJobDocuments(jobId: string) {
   };
 }
 
-/** Delete and download. Deleting detaches the Document from its Jobs, so jobs are refetched too. */
+/** Delete and download. Deleting detaches the Document from its Jobs, so the jobs are resynced too. */
 export function useDocumentActions() {
   const client = useDocumentsClient();
   const queryClient = useQueryClient();
+  const cache = useMemo(() => jobCache(queryClient), [queryClient]);
 
   const remove = useMutation({
     mutationFn: (id: string) => client.remove(id),
@@ -171,7 +153,7 @@ export function useDocumentActions() {
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: documentsCache.key });
-      void queryClient.invalidateQueries({ queryKey: jobsCache.key });
+      cache.refresh();
     },
   });
 

@@ -1,6 +1,6 @@
 # 06: The jobs data module owns reading a Job back
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 **Blocked by:** None (can start immediately)
 
@@ -29,8 +29,37 @@ These decisions still hold:
 
 ## Acceptance criteria
 
-- [ ] The Contacts, Documents, and generation data modules no longer import the Job query shape or map Job rows themselves.
-- [ ] The ownership check for a Job is written once.
-- [ ] The boundaries test passes unchanged: no data function takes a `userId`.
-- [ ] The cross-Tenant integration tests pass unchanged, for jobs, Contacts, Documents, a Job's Documents, and generation.
-- [ ] The attach-versus-delete race test still passes.
+- [x] The Contacts, Documents, and generation data modules no longer import the Job query shape or map Job rows themselves.
+- [x] The ownership check for a Job is written once.
+- [x] The boundaries test passes unchanged: no data function takes a `userId`.
+- [x] The cross-Tenant integration tests pass unchanged, for jobs, Contacts, Documents, a Job's Documents, and generation.
+- [x] The attach-versus-delete race test still passes.
+
+## Comments
+
+### 2026-09-11 — agent
+
+**Built.**
+
+- **`withTenant(userId, fn)`** now hands `fn` a second argument, a `Tenant`: `{ tx, userId }`, made only by `withTenant`.
+  - A function that takes a `Tenant` can only be called from inside a tenant transaction the data layer opened, never with an owner a caller chose. That keeps the boundaries rule in substance.
+  - Existing callbacks that take only `tx` are unaffected.
+- **In `src/server/data/jobs.ts`:**
+  - **`ownJob(tenant, jobId, select)`** returns the selected fields of the Tenant's Job, or `NotFoundError` for a missing id and a foreign one alike. It is the one ownership check.
+  - **`readJob(tenant, jobId)`** returns the Job as the board sees it.
+  - **`JOB_INCLUDE`** is no longer exported. `JobRow` stays in the mappers beside `toJobDto`, which consumes it.
+  - **`updateJob`** uses `readJob`.
+- **The callers:**
+  - `linkContact`, `unlinkContact`, and `createContactForJob` use `ownJob` then `readJob`.
+  - `setJobDocument` uses `ownJob`, then its `FOR UPDATE` lock on the Document in the same order as before, then the update, then `readJob`.
+  - `coverLetterInputs` reads its fields through `ownJob`.
+- **One cast:** Prisma cannot carry a generic `select` through to its result type, so `ownJob` casts its row to `Prisma.JobGetPayload<{ select: S }>`, with a comment. Every call site is typed exactly.
+
+**Tests:**
+- `tests/server/job-reads.test.ts`:
+  - **JOBREAD-1:** no data module but jobs mentions `JOB_INCLUDE` or `toJobDto`, or calls `.job.findFirst`, `findUnique`, or `findMany`.
+  - **JOBREAD-2:** `JOB_INCLUDE` is not exported.
+- The boundaries test passes unchanged.
+- The cross-Tenant and race tests in `jobs`, `contacts`, `documents`, `job-documents`, `generation`, and `tenant-isolation` pass unchanged. That includes the attach-versus-delete race, run 25 times.
+
+**Verified:** typecheck, lint, 354 unit tests, 88 integration tests, 83 of 84 e2e tests. The e2e failure is A11Y-1 on the landing page, a colour-contrast violation in "Everything you need", in files last changed by `a943576` that no architecture ticket touches.

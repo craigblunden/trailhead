@@ -12,7 +12,8 @@ import { toDateColumn } from "@/server/db/mappers";
 import { withTenant } from "@/server/db/tenant";
 import type { CoverLetterInputs } from "@/server/generation/prompt";
 
-import { NotFoundError, RuleError } from "./errors";
+import { RuleError } from "./errors";
+import { ownJob } from "./jobs";
 
 /**
  * The data access layer for cover-letter generation. Generation persists nothing but the quota
@@ -26,7 +27,9 @@ import { NotFoundError, RuleError } from "./errors";
  *   refund. Retrying is then free for the user, and that is safe for the bill because nothing
  *   retries automatically and a refusal before any output is not billed.
  * - **The reservation is one upsert whose update only applies below the limit**, so concurrent
- *   requests cannot overdraw it, and it is enforced here, in the route's own server-side path.
+ *   requests cannot overdraw it.
+ *
+ * The order these run in is the generation module's (`src/server/generation/generate-cover-letter.ts`).
  */
 
 const WEEK = /^\d{4}-\d{2}-\d{2}$/;
@@ -48,18 +51,14 @@ export async function generationQuota(now: Date = new Date()): Promise<QuotaStat
  */
 export async function coverLetterInputs(jobId: string): Promise<CoverLetterInputs> {
   const { userId } = await requireSession();
-  const job = await withTenant(userId, (tx) =>
-    tx.job.findFirst({
-      where: { id: jobId, userId },
-      select: {
-        company: true,
-        role: true,
-        description: true,
-        resume: { select: { text: true, ingestion: true, deletedAt: true } },
-      },
+  const job = await withTenant(userId, (_tx, tenant) =>
+    ownJob(tenant, jobId, {
+      company: true,
+      role: true,
+      description: true,
+      resume: { select: { text: true, ingestion: true, deletedAt: true } },
     }),
   );
-  if (!job) throw new NotFoundError();
   const resume = job.resume;
   if (!resume || resume.ingestion !== "ready" || resume.deletedAt || !resume.text.trim()) {
     throw new RuleError("no-resume", GENERATION_FAILURES["no-resume"]);

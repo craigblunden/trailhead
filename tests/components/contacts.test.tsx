@@ -8,7 +8,7 @@ import { JobDetail } from "@/components/job/job-detail";
 import { ActionError } from "@/components/action-client";
 import type { Job } from "@/lib/jobs";
 import { SEED_JOBS } from "../fixtures/jobs";
-import { createFakeContactsClient } from "../fakes/contacts-client";
+import { createTrail } from "../fakes/trail";
 import { freezeClock, renderWithJobs, screen, waitFor, within } from "../test-utils";
 
 const navigation = vi.hoisted(() => ({
@@ -29,6 +29,9 @@ const HARVEST = "harvest-lead-product-designer";
 const FERNWOOD = "fernwood-product-designer-growth";
 const harvest = SEED_JOBS.find((job) => job.id === HARVEST)!;
 const fernwood = SEED_JOBS.find((job) => job.id === FERNWOOD)!;
+const cobalt = SEED_JOBS.find((job) => job.id === "cobalt-staff-ux-designer")!;
+
+const priya = { id: "priya", name: "Priya Raman", kind: "referrer" as const, agency: "" };
 
 beforeEach(() => {
   freezeClock();
@@ -45,13 +48,15 @@ const contactsRegion = () => screen.getByRole("region", { name: "Contacts" });
 
 describe("the job page's Contacts card (ticket 14)", () => {
   it("CON-J1: says how many other jobs a contact is on, and links to the contact", () => {
-    const jobs: Job[] = [
-      {
-        ...harvest,
-        contacts: [{ ...harvest.contacts[1], agency: "Northstar Talent", otherJobCount: 2 }],
-      },
-    ];
-    renderWithJobs(<JobDetail jobId={HARVEST} />, { initialJobs: jobs });
+    const jess = { ...harvest.contacts[1], agency: "Northstar Talent" };
+    const trail = createTrail({
+      jobs: [
+        { ...harvest, contacts: [jess] },
+        { ...fernwood, contacts: [jess] },
+        { ...cobalt, contacts: [jess] },
+      ],
+    });
+    renderWithJobs(<JobDetail jobId={HARVEST} />, { trail });
 
     expect(within(contactsRegion()).getByText("Recruiter · Northstar Talent")).toBeInTheDocument();
     expect(
@@ -60,11 +65,8 @@ describe("the job page's Contacts card (ticket 14)", () => {
   });
 
   it("CON-J2: linking is search-first, and an existing contact is linked rather than re-created", async () => {
-    const contactsClient = createFakeContactsClient({
-      jobs: SEED_JOBS,
-      contacts: [{ id: "priya", name: "Priya Raman", kind: "referrer", agency: "" }],
-    });
-    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { contactsClient });
+    const trail = createTrail({ jobs: SEED_JOBS, contacts: [priya] });
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { trail });
 
     await user.click(within(contactsRegion()).getByRole("button", { name: "Add contact" }));
     const dialog = screen.getByRole("dialog", { name: "Add a contact" });
@@ -73,17 +75,14 @@ describe("the job page's Contacts card (ticket 14)", () => {
     await user.click(await within(dialog).findByRole("button", { name: /Priya Raman/ }));
 
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
-    expect(contactsClient.link).toHaveBeenCalledWith(HARVEST, "priya");
-    expect(contactsClient.createForJob).not.toHaveBeenCalled();
+    expect(trail.contacts.link).toHaveBeenCalledWith(HARVEST, "priya");
+    expect(trail.contacts.createForJob).not.toHaveBeenCalled();
     expect(within(contactsRegion()).getByRole("link", { name: "Priya Raman" })).toBeInTheDocument();
   });
 
   it("CON-J3: offers no Create option for a name that is already saved", async () => {
-    const contactsClient = createFakeContactsClient({
-      jobs: SEED_JOBS,
-      contacts: [{ id: "priya", name: "Priya Raman", kind: "referrer" }],
-    });
-    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { contactsClient });
+    const trail = createTrail({ jobs: SEED_JOBS, contacts: [priya] });
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { trail });
 
     await user.click(within(contactsRegion()).getByRole("button", { name: "Add contact" }));
     const dialog = screen.getByRole("dialog", { name: "Add a contact" });
@@ -94,8 +93,8 @@ describe("the job page's Contacts card (ticket 14)", () => {
   });
 
   it("CON-J4: creating from a job asks only for name and kind, defaulting to Recruiter, then links", async () => {
-    const contactsClient = createFakeContactsClient({ jobs: SEED_JOBS });
-    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { contactsClient });
+    const trail = createTrail({ jobs: SEED_JOBS });
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { trail });
 
     await user.click(within(contactsRegion()).getByRole("button", { name: "Add contact" }));
     await user.type(screen.getByLabelText("Search your contacts"), "Morgan Lee");
@@ -109,7 +108,7 @@ describe("the job page's Contacts card (ticket 14)", () => {
     await user.click(within(dialog).getByRole("button", { name: "Create and add" }));
 
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
-    expect(contactsClient.createForJob).toHaveBeenCalledWith(HARVEST, {
+    expect(trail.contacts.createForJob).toHaveBeenCalledWith(HARVEST, {
       name: "Morgan Lee",
       kind: "recruiter",
     });
@@ -117,8 +116,8 @@ describe("the job page's Contacts card (ticket 14)", () => {
   });
 
   it("CON-J5: removing a contact from a job unlinks it and leaves the contact alone", async () => {
-    const contactsClient = createFakeContactsClient({ jobs: SEED_JOBS });
-    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { contactsClient });
+    const trail = createTrail({ jobs: SEED_JOBS });
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { trail });
 
     await user.click(
       within(contactsRegion()).getByRole("button", { name: "Remove Tom Okafor from this job" }),
@@ -127,19 +126,16 @@ describe("the job page's Contacts card (ticket 14)", () => {
     await waitFor(() =>
       expect(within(contactsRegion()).queryByRole("link", { name: "Tom Okafor" })).toBeNull(),
     );
-    expect(contactsClient.unlink).toHaveBeenCalledWith(HARVEST, "c1");
-    expect(contactsClient.remove).not.toHaveBeenCalled();
+    expect(trail.contacts.unlink).toHaveBeenCalledWith(HARVEST, "c1");
+    expect(trail.contacts.remove).not.toHaveBeenCalled();
   });
 
   it("CON-J6: a refused link shows the reason where the user is looking, and changes nothing", async () => {
-    const contactsClient = createFakeContactsClient({
-      jobs: SEED_JOBS,
-      contacts: [{ id: "priya", name: "Priya Raman", kind: "referrer" }],
-    });
-    contactsClient.link.mockRejectedValueOnce(
+    const trail = createTrail({ jobs: SEED_JOBS, contacts: [priya] });
+    trail.contacts.link.mockRejectedValueOnce(
       new ActionError("failed", "Something went wrong on our side."),
     );
-    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { contactsClient });
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { trail });
 
     await user.click(within(contactsRegion()).getByRole("button", { name: "Add contact" }));
     const dialog = screen.getByRole("dialog", { name: "Add a contact" });
@@ -164,6 +160,22 @@ describe("the job page's Contacts card (ticket 14)", () => {
     await screen.findByRole("dialog", { name: "Add a contact" });
     expect(await axe(document.body, AXE_OPTIONS)).toHaveNoViolations();
   });
+
+  it("CON-J8: a contact linked on a job is on the job and in their own count of roles (architecture ticket 05)", async () => {
+    const trail = createTrail({ jobs: SEED_JOBS, contacts: [priya] });
+    const jobPage = renderWithJobs(<JobDetail jobId={HARVEST} />, { trail });
+
+    await jobPage.user.click(within(contactsRegion()).getByRole("button", { name: "Add contact" }));
+    const dialog = screen.getByRole("dialog", { name: "Add a contact" });
+    await jobPage.user.click(await within(dialog).findByRole("button", { name: /Priya Raman/ }));
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    expect(within(contactsRegion()).getByRole("link", { name: "Priya Raman" })).toBeInTheDocument();
+    jobPage.unmount();
+
+    renderWithJobs(<ContactsShell>detail</ContactsShell>, { trail });
+
+    expect(await screen.findByRole("link", { name: /Priya Raman/ })).toHaveTextContent("On 1 role");
+  });
 });
 
 const dana = {
@@ -175,22 +187,21 @@ const dana = {
 };
 
 /** Dana linked to Harvest (interviewing) and Fernwood (applied). */
-function danaClient() {
+function danaTrail() {
   const jobs: Job[] = [
     { ...harvest, contacts: [] },
     { ...fernwood, contacts: [] },
   ];
-  const client = createFakeContactsClient({ jobs, contacts: [dana] });
-  void client.link(HARVEST, "dana");
-  void client.link(FERNWOOD, "dana");
-  client.link.mockClear();
-  return { jobs, client };
+  const trail = createTrail({ jobs, contacts: [dana] });
+  void trail.contacts.link(HARVEST, "dana");
+  void trail.contacts.link(FERNWOOD, "dana");
+  trail.contacts.link.mockClear();
+  return trail;
 }
 
 describe("a Contact's own page (ticket 14)", () => {
   it("CON-D1: groups the roles with this contact by stage, in pipeline order", async () => {
-    const { jobs, client } = danaClient();
-    renderWithJobs(<ContactDetailView contactId="dana" />, { initialJobs: jobs, contactsClient: client });
+    renderWithJobs(<ContactDetailView contactId="dana" />, { trail: danaTrail() });
 
     const roles = await screen.findByRole("region", { name: "Roles with Dana Whitfield" });
     const headings = within(roles).getAllByRole("heading", { level: 3 });
@@ -202,11 +213,8 @@ describe("a Contact's own page (ticket 14)", () => {
   });
 
   it("CON-D2: saves edits, including a change of kind, to the same record", async () => {
-    const { jobs, client } = danaClient();
-    const { user } = renderWithJobs(<ContactDetailView contactId="dana" />, {
-      initialJobs: jobs,
-      contactsClient: client,
-    });
+    const trail = danaTrail();
+    const { user } = renderWithJobs(<ContactDetailView contactId="dana" />, { trail });
 
     const agency = await screen.findByLabelText("Agency");
     await user.clear(agency);
@@ -216,24 +224,21 @@ describe("a Contact's own page (ticket 14)", () => {
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
     expect(await screen.findByText("Saved.")).toBeInTheDocument();
-    expect(client.update).toHaveBeenCalledWith(
+    expect(trail.contacts.update).toHaveBeenCalledWith(
       "dana",
       expect.objectContaining({ agency: "Harbor Search", kind: "hiring_manager" }),
     );
-    expect(client.create).not.toHaveBeenCalled();
+    expect(trail.contacts.create).not.toHaveBeenCalled();
   });
 
   it("CON-D3: shows the server's message beside the field it is about", async () => {
-    const { jobs, client } = danaClient();
-    client.update.mockRejectedValueOnce(
+    const trail = danaTrail();
+    trail.contacts.update.mockRejectedValueOnce(
       new ActionError("invalid", "Check the highlighted fields.", {
         email: "Enter an email address like name@example.com",
       }),
     );
-    const { user } = renderWithJobs(<ContactDetailView contactId="dana" />, {
-      initialJobs: jobs,
-      contactsClient: client,
-    });
+    const { user } = renderWithJobs(<ContactDetailView contactId="dana" />, { trail });
 
     const email = await screen.findByLabelText("Email");
     await user.clear(email);
@@ -246,36 +251,30 @@ describe("a Contact's own page (ticket 14)", () => {
   });
 
   it("CON-D4: 'Spoke today' records today's date in one click", async () => {
-    const { jobs, client } = danaClient();
-    const { user } = renderWithJobs(<ContactDetailView contactId="dana" />, {
-      initialJobs: jobs,
-      contactsClient: client,
-    });
+    const trail = danaTrail();
+    const { user } = renderWithJobs(<ContactDetailView contactId="dana" />, { trail });
 
     await user.click(await screen.findByRole("button", { name: "Spoke today" }));
 
-    expect(client.update).toHaveBeenCalledWith("dana", { lastSpokenOn: "2026-07-25" });
+    expect(trail.contacts.update).toHaveBeenCalledWith("dana", { lastSpokenOn: "2026-07-25" });
     expect(await screen.findByText("Recorded that you spoke today.")).toBeInTheDocument();
     expect(screen.getByLabelText("Last spoke")).toHaveValue("2026-07-25");
     expect(screen.getByLabelText("Last spoke")).toHaveAttribute("max", "2026-07-25");
   });
 
   it("CON-D5: deleting asks first, names the jobs it touches, then returns to the list", async () => {
-    const { jobs, client } = danaClient();
-    const { user } = renderWithJobs(<ContactDetailView contactId="dana" />, {
-      initialJobs: jobs,
-      contactsClient: client,
-    });
+    const trail = danaTrail();
+    const { user } = renderWithJobs(<ContactDetailView contactId="dana" />, { trail });
 
     await user.click(await screen.findByRole("button", { name: "Delete contact" }));
     const confirm = screen.getByRole("dialog", { name: "Delete Dana Whitfield?" });
     expect(confirm).toHaveTextContent("removed from 2 jobs");
-    expect(client.remove).not.toHaveBeenCalled();
+    expect(trail.contacts.remove).not.toHaveBeenCalled();
 
     await user.click(within(confirm).getByRole("button", { name: "Delete contact" }));
 
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith("/contacts"));
-    expect(client.remove).toHaveBeenCalledWith("dana");
+    expect(trail.contacts.remove).toHaveBeenCalledWith("dana");
   });
 
   it("CON-D6: an unknown or foreign contact id explains itself", async () => {
@@ -287,11 +286,7 @@ describe("a Contact's own page (ticket 14)", () => {
   });
 
   it("CON-D7: the page has no structural axe violations", async () => {
-    const { jobs, client } = danaClient();
-    const { container } = renderWithJobs(<ContactDetailView contactId="dana" />, {
-      initialJobs: jobs,
-      contactsClient: client,
-    });
+    const { container } = renderWithJobs(<ContactDetailView contactId="dana" />, { trail: danaTrail() });
     await screen.findByRole("heading", { level: 1, name: "Dana Whitfield" });
 
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
@@ -300,9 +295,8 @@ describe("a Contact's own page (ticket 14)", () => {
 
 describe("the contacts list (ticket 14)", () => {
   it("CON-L1: lists contacts with kind, agency, and how many roles each is on", async () => {
-    const { jobs, client } = danaClient();
     navigation.segment = "dana";
-    renderWithJobs(<ContactsShell>detail</ContactsShell>, { initialJobs: jobs, contactsClient: client });
+    renderWithJobs(<ContactsShell>detail</ContactsShell>, { trail: danaTrail() });
 
     const link = await screen.findByRole("link", { name: /Dana Whitfield/ });
     expect(link).toHaveAttribute("href", "/contacts/dana");
@@ -312,8 +306,8 @@ describe("the contacts list (ticket 14)", () => {
   });
 
   it("CON-L2: adding a contact asks for name and kind, then opens their page", async () => {
-    const client = createFakeContactsClient({ jobs: SEED_JOBS });
-    const { user } = renderWithJobs(<ContactsShell>detail</ContactsShell>, { contactsClient: client });
+    const trail = createTrail({ jobs: SEED_JOBS });
+    const { user } = renderWithJobs(<ContactsShell>detail</ContactsShell>, { trail });
 
     await user.click(screen.getAllByRole("button", { name: "Add contact" })[0]);
     const dialog = screen.getByRole("dialog", { name: "Add a contact" });
@@ -321,22 +315,17 @@ describe("the contacts list (ticket 14)", () => {
     await user.click(within(dialog).getByRole("button", { name: "Save contact" }));
 
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith("/contacts/contact-1"));
-    expect(client.create).toHaveBeenCalledWith({ name: "Sam Ortiz", kind: "recruiter" });
+    expect(trail.contacts.create).toHaveBeenCalledWith({ name: "Sam Ortiz", kind: "recruiter" });
   });
 
   it("CON-L3: an empty list says what contacts are for", async () => {
-    const client = createFakeContactsClient({ jobs: [] });
-    renderWithJobs(<ContactsShell>detail</ContactsShell>, { initialJobs: [], contactsClient: client });
+    renderWithJobs(<ContactsShell>detail</ContactsShell>, { trail: createTrail() });
 
     expect(await screen.findByRole("heading", { name: "No contacts yet" })).toBeInTheDocument();
   });
 
   it("CON-L4: the list has no structural axe violations", async () => {
-    const { jobs, client } = danaClient();
-    const { container } = renderWithJobs(<ContactsShell>detail</ContactsShell>, {
-      initialJobs: jobs,
-      contactsClient: client,
-    });
+    const { container } = renderWithJobs(<ContactsShell>detail</ContactsShell>, { trail: danaTrail() });
     await screen.findByRole("link", { name: /Dana Whitfield/ });
 
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();

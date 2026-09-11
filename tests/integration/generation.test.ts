@@ -1,9 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+
+import Anthropic from "@anthropic-ai/sdk";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { signInAs, signOut } from "./session-mock";
 
-import { POST } from "@/app/api/jobs/[id]/cover-letter/route";
-import type { GenerationResponse } from "@/lib/generation";
+import { UnauthenticatedError } from "@/server/auth/session";
 import { createJob } from "@/server/data/jobs";
 import {
   coverLetterInputs,
@@ -15,29 +18,62 @@ import { NotFoundError, RuleError } from "@/server/data/errors";
 import { setJobDocument } from "@/server/data/documents";
 import { prisma } from "@/server/db/prisma";
 import { withTenant } from "@/server/db/tenant";
+import { COVER_LETTER_MODEL } from "@/server/generation/cover-letter";
+import { generateCoverLetter } from "@/server/generation/generate-cover-letter";
 
 import { newUserId, resetTables } from "./helpers";
 
 /**
- * The Claude call is the one thing replaced: every other layer — the route, the data layer, the
- * quota upsert, the policies — runs for real. What comes back from Claude is set per test.
+ * Nothing is mocked but the session. The Claude call goes through a real SDK client — the seam the
+ * generation module takes — to a local fake of the Messages API, so every other layer runs for real:
+ * the quota upsert, the policies, the refunds. What the fake answers is set per test.
  */
-const claude = vi.hoisted(() => ({
-  outcome: { ok: true, letter: "Dear Hiring Team," } as { ok: true; letter: string } | { ok: false; reason: string },
-  calls: 0,
-  throws: false,
-  available: true,
-}));
+type Reply = { status?: number; delayMs?: number; body: unknown; onRequest?: () => void };
 
-vi.mock("@/server/generation/cover-letter", () => ({
-  generationAvailable: () => claude.available,
-  createClaudeClient: () => (claude.available ? {} : null),
-  writeCoverLetter: async () => {
-    claude.calls += 1;
-    if (claude.throws) throw new Error("something unexpected");
-    return claude.outcome;
-  },
-}));
+let reply: Reply;
+let requests = 0;
+let server: Server;
+let baseURL: string;
+
+const message = (overrides: Record<string, unknown>) => ({
+  id: "msg_test",
+  type: "message",
+  role: "assistant",
+  model: COVER_LETTER_MODEL,
+  content: [],
+  stop_reason: "end_turn",
+  stop_sequence: null,
+  stop_details: null,
+  usage: { input_tokens: 900, output_tokens: 400 },
+  ...overrides,
+});
+
+const LETTER = message({ content: [{ type: "text", text: "Dear Hiring Team," }] });
+
+beforeAll(async () => {
+  server = createServer((request, response) => {
+    request.resume();
+    request.on("end", () => {
+      requests += 1;
+      reply.onRequest?.();
+      setTimeout(() => {
+        if (response.destroyed) return;
+        response.writeHead(reply.status ?? 200, { "content-type": "application/json" });
+        response.end(JSON.stringify(reply.body));
+      }, reply.delayMs ?? 0);
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  baseURL = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+});
+
+afterAll(async () => {
+  server.closeAllConnections();
+  await new Promise((resolve) => server.close(resolve));
+});
+
+/** A real SDK client, pointed at the fake. */
+const claude = (timeout = 5_000) => new Anthropic({ apiKey: "test-key", baseURL, maxRetries: 0, timeout });
 
 const MONDAY = new Date("2026-07-20T09:00:00Z");
 const SUNDAY_NIGHT = new Date("2026-07-26T23:59:00Z");
@@ -66,13 +102,6 @@ async function jobWithResume(userId: string, description = "A long and specific 
   return job;
 }
 
-async function post(jobId: string) {
-  const response = await POST(new Request(`http://app/api/jobs/${jobId}/cover-letter`, { method: "POST" }), {
-    params: Promise.resolve({ id: jobId }),
-  });
-  return { status: response.status, body: (await response.json()) as GenerationResponse };
-}
-
 async function tableCounts(userId: string) {
   return withTenant(userId, async (tx) => ({
     jobs: await tx.job.count(),
@@ -85,11 +114,10 @@ async function tableCounts(userId: string) {
 beforeEach(async () => {
   await resetTables();
   signOut();
-  claude.outcome = { ok: true, letter: "Dear Hiring Team," };
-  claude.calls = 0;
-  claude.throws = false;
-  claude.available = true;
+  reply = { body: LETTER };
+  requests = 0;
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe("ticket 18: the quota", () => {
@@ -132,129 +160,185 @@ describe("ticket 18: the quota", () => {
   });
 });
 
-describe("ticket 18: the route", () => {
-  // The route reads the clock for the quota week; pin it, so a run at midnight on a Sunday cannot
-  // split one test across two weeks.
+describe("writing a cover letter (tickets 18, 19; architecture ticket 04)", () => {
+  // The quota week is read from the clock; pin it, so a run at midnight on a Sunday cannot split one
+  // test across two weeks.
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(MONDAY);
   });
 
-  it("writes a letter, persists nothing but the quota counter, and reports what is left", async () => {
+  it("GEN-1: writes a letter, persists nothing but the quota counter, and reports what is left", async () => {
     const user = newUserId();
     const job = await jobWithResume(user);
     const before = await tableCounts(user);
 
-    const { status, body } = await post(job.id);
-
-    expect(status).toBe(200);
-    expect(body).toMatchObject({ ok: true, letter: "Dear Hiring Team,", quota: { used: 1, remaining: 4 } });
+    expect(await generateCoverLetter(job.id, { client: claude() })).toEqual({
+      ok: true,
+      letter: "Dear Hiring Team,",
+      quota: { limit: 5, used: 1, remaining: 4, resetsOn: "2026-07-27" },
+    });
+    expect(requests).toBe(1);
     expect(await tableCounts(user)).toEqual(before);
     expect(await withTenant(user, (tx) => tx.generationQuota.findMany({ select: { used: true } }))).toEqual([
       { used: 1 },
     ]);
   });
 
-  it("enforces the quota server-side: calling the handler directly past the limit never reaches Claude", async () => {
+  it("GEN-2: allows five letters a week even when requests race, and a sixth never reaches Claude", async () => {
     const user = newUserId();
     const job = await jobWithResume(user);
-    for (let i = 0; i < 5; i += 1) expect((await post(job.id)).status).toBe(200);
-    expect(claude.calls).toBe(5);
 
-    const sixth = await post(job.id);
+    const outcomes = await Promise.all(
+      Array.from({ length: 7 }, () => generateCoverLetter(job.id, { client: claude() })),
+    );
 
-    expect(sixth.status).toBe(429);
-    expect(sixth.body).toMatchObject({ ok: false, error: "quota", quota: { remaining: 0 } });
-    expect(claude.calls).toBe(5);
+    expect(outcomes.filter((outcome) => outcome.ok)).toHaveLength(5);
+    expect(outcomes.filter((outcome) => !outcome.ok)).toEqual([
+      expect.objectContaining({ ok: false, reason: "quota", refunded: false }),
+      expect.objectContaining({ ok: false, reason: "quota", refunded: false }),
+    ]);
+    expect(requests).toBe(5);
+    expect(await generationQuota()).toMatchObject({ used: 5, remaining: 0 });
   });
 
-  it("a failed generation does not burn quota — refusal, error, timeout, and truncation all give it back", async () => {
+  it("GEN-3: a used-up week opens again on Monday, UTC", async () => {
     const user = newUserId();
     const job = await jobWithResume(user);
+    for (let i = 0; i < 5; i += 1) expect((await generateCoverLetter(job.id, { client: claude() })).ok).toBe(true);
 
-    for (const [reason, status] of [
-      ["refused", 422],
-      ["failed", 502],
-      ["timed-out", 504],
-      ["truncated", 502],
-    ] as const) {
-      claude.outcome = { ok: false, reason };
-      const result = await post(job.id);
-      expect(result.status, reason).toBe(status);
-      expect(result.body, reason).toMatchObject({
+    vi.setSystemTime(SUNDAY_NIGHT);
+    expect(await generateCoverLetter(job.id, { client: claude() })).toMatchObject({
+      ok: false,
+      reason: "quota",
+      quota: { remaining: 0 },
+    });
+
+    vi.setSystemTime(NEXT_MONDAY);
+    expect(await generateCoverLetter(job.id, { client: claude() })).toMatchObject({
+      ok: true,
+      quota: { used: 1, remaining: 4 },
+    });
+    expect(requests).toBe(6);
+  });
+
+  it("GEN-4: a refusal, an API error, a timeout, and a truncated letter all give the letter back", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const user = newUserId();
+    const job = await jobWithResume(user);
+    const answers: { reason: string; answer: Reply; timeout?: number }[] = [
+      {
+        reason: "refused",
+        answer: {
+          body: message({
+            stop_reason: "refusal",
+            stop_details: { type: "refusal", category: null, explanation: "Declined." },
+            content: [{ type: "text", text: "Dear" }],
+          }),
+        },
+      },
+      { reason: "failed", answer: { status: 529, body: { type: "error", error: { type: "overloaded_error", message: "Overloaded" } } } },
+      { reason: "timed-out", answer: { delayMs: 1_000, body: LETTER }, timeout: 200 },
+      {
+        reason: "truncated",
+        answer: { body: message({ stop_reason: "max_tokens", content: [{ type: "text", text: "Dear Hiring Team, I" }] }) },
+      },
+    ];
+
+    for (const { reason, answer, timeout } of answers) {
+      reply = answer;
+      expect(await generateCoverLetter(job.id, { client: claude(timeout) }), reason).toEqual({
         ok: false,
-        error: reason,
+        reason,
         refunded: true,
-        quota: { used: 0, remaining: 5 },
+        quota: { limit: 5, used: 0, remaining: 5, resetsOn: "2026-07-27" },
       });
     }
   });
 
-  it("a crash after the letter was reserved gives it back, and says so", async () => {
+  it("GEN-5: a crash after the letter was reserved gives it back, and says so", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const user = newUserId();
     const job = await jobWithResume(user);
-    claude.throws = true;
+    // A 200 with no content at all: reading a letter out of it throws.
+    reply = { body: { id: "msg_test", type: "message", role: "assistant", model: COVER_LETTER_MODEL, stop_reason: "end_turn" } };
 
-    const result = await post(job.id);
-
-    expect(result.status).toBe(500);
-    expect(result.body).toMatchObject({ ok: false, error: "failed", refunded: true, quota: { used: 0 } });
-    expect(JSON.stringify(result.body)).not.toContain("something unexpected");
+    expect(await generateCoverLetter(job.id, { client: claude() })).toEqual({
+      ok: false,
+      reason: "failed",
+      unexpected: true,
+      refunded: true,
+      quota: expect.objectContaining({ used: 0 }),
+    });
   });
 
-  it("user B cannot generate against user A's job or document, and takes no quota trying", async () => {
-    const userA = newUserId();
-    const jobA = await jobWithResume(userA);
+  it("GEN-6: if giving the letter back fails, the outcome says so — and the letter stays counted", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const user = newUserId();
+    const job = await jobWithResume(user);
+    // The session ends while Claude is answering, so the letter cannot be given back as this user.
+    reply = { body: message({ stop_reason: "refusal" }), onRequest: signOut };
 
-    signInAs(newUserId());
-    const foreign = await post(jobA.id);
-    const missing = await post("does-not-exist");
+    expect(await generateCoverLetter(job.id, { client: claude() })).toEqual({
+      ok: false,
+      reason: "refused",
+      refunded: false,
+      quota: undefined,
+    });
 
-    expect(foreign.status).toBe(404);
-    expect(foreign.body).toEqual(missing.body);
-    await expect(coverLetterInputs(jobA.id)).rejects.toBeInstanceOf(NotFoundError);
-    expect(await generationQuota()).toMatchObject({ used: 0 });
-    expect(claude.calls).toBe(0);
+    signInAs(user);
+    expect(await generationQuota()).toMatchObject({ used: 1 });
   });
 
-  it("refuses a job with no resume before taking quota, and asks for a session", async () => {
+  it("GEN-7: a Job with no resume, or no description, is refused before any quota is taken, and never reaches Claude", async () => {
     const user = newUserId();
     signInAs(user);
     const bare = await createJob(
-      { company: "Cobalt", role: "Staff UX", location: "Remote", salaryMin: null, salaryMax: null, postingUrl: "", description: "" },
+      { company: "Cobalt", role: "Staff UX", location: "Remote", salaryMin: null, salaryMax: null, postingUrl: "", description: "A real posting." },
       MONDAY,
     );
+    const undescribed = await jobWithResume(user, "");
 
-    const noResume = await post(bare.id);
-    expect(noResume.status).toBe(409);
-    expect(noResume.body).toMatchObject({ error: "no-resume", quota: { used: 0 } });
-
-    signOut();
-    expect((await post(bare.id)).status).toBe(401);
-    expect(claude.calls).toBe(0);
+    expect(await generateCoverLetter(bare.id, { client: claude() })).toEqual({
+      ok: false,
+      reason: "no-resume",
+      refunded: false,
+      quota: expect.objectContaining({ used: 0 }),
+    });
+    expect(await generateCoverLetter(undescribed.id, { client: claude() })).toEqual({
+      ok: false,
+      reason: "no-description",
+      refunded: false,
+      quota: expect.objectContaining({ used: 0 }),
+    });
+    expect(requests).toBe(0);
   });
 
-  it("says generation is unavailable before reading the job, when no API key is configured", async () => {
+  it("GEN-8: another Tenant's Job is the same not-found as a missing one, and takes no quota trying", async () => {
+    const jobA = await jobWithResume(newUserId());
     signInAs(newUserId());
-    claude.available = false;
 
-    // There is no such job: a route that read the job first would answer 404.
-    const response = await post("no-such-job");
-
-    expect(response.status).toBe(503);
-    expect(response.body).toMatchObject({ ok: false, error: "unavailable" });
-    expect(claude.calls).toBe(0);
+    await expect(generateCoverLetter(jobA.id, { client: claude() })).rejects.toBeInstanceOf(NotFoundError);
+    await expect(generateCoverLetter("does-not-exist", { client: claude() })).rejects.toBeInstanceOf(NotFoundError);
+    await expect(coverLetterInputs(jobA.id)).rejects.toBeInstanceOf(NotFoundError);
+    expect(await generationQuota()).toMatchObject({ used: 0 });
+    expect(requests).toBe(0);
   });
 
-  it("refuses a job with no description before taking quota — there is nothing to write the letter from", async () => {
-    const user = newUserId();
-    const job = await jobWithResume(user, "");
+  it("GEN-9: with no Claude client it is unavailable, before the Job is read", async () => {
+    signInAs(newUserId());
 
-    const response = await post(job.id);
-    expect(response.status).toBe(409);
-    expect(response.body).toMatchObject({ error: "no-description", refunded: false, quota: { used: 0 } });
+    // There is no such job: a module that read the job first would throw not-found.
+    expect(await generateCoverLetter("no-such-job", { client: null })).toEqual({
+      ok: false,
+      reason: "unavailable",
+      refunded: false,
+    });
     expect(await generationQuota()).toMatchObject({ used: 0 });
-    expect(claude.calls).toBe(0);
+  });
+
+  it("GEN-10: without a session it throws, and nothing is attempted", async () => {
+    await expect(generateCoverLetter("any-job", { client: claude() })).rejects.toBeInstanceOf(UnauthenticatedError);
+    expect(requests).toBe(0);
   });
 });

@@ -1,10 +1,19 @@
-import { ACCENTS, STAGE_META, type Accent, type ActivityEntry, type Job, type Stage } from "@/lib/jobs";
+import {
+  ACCENTS,
+  STAGE_META,
+  type Accent,
+  type ActivityEntry,
+  type Contact,
+  type Job,
+  type Stage,
+} from "@/lib/jobs";
 
 /**
- * The Phase-1 rules for how a job changes, as pure functions. Both the optimistic update in the
- * browser and the fixture client use these, so what the user sees the instant they act is what the
- * server will confirm. The server re-derives the same rules in the data layer; a divergence shows
- * up as a visible correction after the round trip, which is the point.
+ * The rules for how a Job comes to be and how it changes, as pure functions. They answer with the
+ * whole next Job, so a store that holds Jobs in memory — the browser's optimistic update, and the
+ * in-memory store the component tests run against — applies them as they are and cannot assemble a
+ * different Job. The data layer writes what the same rules decide from what the database holds; a
+ * divergence shows up as a visible correction after the round trip, which is the point.
  */
 
 const ACCENT_KEYS = Object.keys(ACCENTS) as Accent[];
@@ -18,6 +27,54 @@ export const OPENING_ACTIVITY_LABEL = "Added to board — Interested";
 
 export function movedToLabel(stage: Stage): string {
   return `Moved to ${STAGE_META[stage].label}`;
+}
+
+/** What the user types when adding a Job. Everything else about a new Job is decided here. */
+export type NewJobFields = Pick<
+  Job,
+  "company" | "role" | "location" | "salaryMin" | "salaryMax" | "postingUrl" | "description"
+>;
+
+/** A new Job apart from what the user typed and the ids a store assigns. */
+export type NewJobFacts = {
+  stage: "interested";
+  addedOn: string;
+  appliedOn: null;
+  notes: string;
+  resume: null;
+  coverLetter: null;
+  contacts: Contact[];
+  accent: Accent;
+  /** The one Activity entry a new Job starts with. */
+  opening: Omit<ActivityEntry, "id">;
+};
+
+/**
+ * A new Job starts at `interested`, dated today, with no applied date, no notes, an empty application
+ * kit, no Contacts, and one opening Activity entry. Its accent comes round-robin from how many Jobs
+ * the user already has.
+ */
+export function newJobFacts(today: string, existingCount: number): NewJobFacts {
+  return {
+    stage: "interested",
+    addedOn: today,
+    appliedOn: null,
+    notes: "",
+    resume: null,
+    coverLetter: null,
+    contacts: [],
+    accent: nextAccent(existingCount),
+    opening: { label: OPENING_ACTIVITY_LABEL, date: today },
+  };
+}
+
+/** The whole new Job, for a store that holds Jobs in memory and assigns its own ids. */
+export function newJob(
+  fields: NewJobFields,
+  { today, existingCount, newId }: { today: string; existingCount: number; newId: () => string },
+): Job {
+  const { opening, ...facts } = newJobFacts(today, existingCount);
+  return { ...fields, ...facts, id: newId(), activity: [{ id: newId(), ...opening }] };
 }
 
 export type StageChange = {
@@ -45,5 +102,20 @@ export function stageChange(
     stage,
     appliedOn: job.appliedOn ?? (stage === "interested" ? null : today),
     entry: { label: movedToLabel(stage), date: today },
+  };
+}
+
+/**
+ * The whole Job after moving it to `stage` on `today`: the Stage and applied date `stageChange`
+ * decides, with its "Moved to …" entry prepended. Re-selecting the current Stage returns the same Job.
+ */
+export function movedJob(job: Job, stage: Stage, today: string, newId: () => string): Job {
+  const change = stageChange(job, stage, today);
+  if (!change.entry) return job;
+  return {
+    ...job,
+    stage: change.stage,
+    appliedOn: change.appliedOn,
+    activity: [{ id: newId(), ...change.entry }, ...job.activity],
   };
 }

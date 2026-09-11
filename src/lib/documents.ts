@@ -106,3 +106,9 @@ export const UPLOAD_REFUSALS = {
 } as const;
 
 export type UploadRefusal = keyof typeof UPLOAD_REFUSALS;
+
+/** Why a Document cannot fill a Job's slot for the other kind, keyed by the slot (ticket 17). */
+export const WRONG_KIND_REFUSALS: Record<DocumentKind, string> = {
+  resume: "That is a cover letter, so it cannot be sent as this job’s resume.",
+  cover_letter: "That is a resume, so it cannot be sent as this job’s cover letter.",
+};

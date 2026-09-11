@@ -5,7 +5,7 @@ import { JobDetail } from "@/components/job/job-detail";
 import { ActionError } from "@/components/action-client";
 import type { Job } from "@/lib/jobs";
 import { SEED_JOBS } from "../fixtures/jobs";
-import { createFakeDocumentsClient, summary } from "../fakes/documents-client";
+import { createTrail, summary } from "../fakes/trail";
 import { freezeClock, renderWithJobs, screen, waitFor, within } from "../test-utils";
 
 vi.mock("next/navigation", () => ({
@@ -23,17 +23,21 @@ const harvest: Job = {
   coverLetter: null,
 };
 
-const growth = summary({ id: "growth", fileName: "resume_growth_v2.pdf", jobs: [{ id: "x", company: "Fernwood", role: "PD" }] });
+const growth = summary({ id: "growth", fileName: "resume_growth_v2.pdf" });
 const staff = summary({ id: "staff", fileName: "resume_staff_v1.pdf" });
 const letter = summary({ id: "letter", kind: "cover_letter", fileName: "letter_harvest.docx" });
 
+/** Fernwood already sends the growth resume, so that one is "On 1 job" before anything is chosen. */
+const fernwood: Job = {
+  ...SEED_JOBS.find((job) => job.id === "fernwood-product-designer-growth")!,
+  resume: { id: "growth", fileName: "resume_growth_v2.pdf" },
+  contacts: [],
+};
+
 function renderKit(documents = [growth, staff, letter], job: Job = harvest) {
-  const client = createFakeDocumentsClient(documents, { jobs: [job] });
-  const rendered = renderWithJobs(<JobDetail jobId={job.id} />, {
-    initialJobs: [job],
-    documentsClient: client,
-  });
-  return { client, ...rendered };
+  const trail = createTrail({ jobs: [job, fernwood], documents });
+  const rendered = renderWithJobs(<JobDetail jobId={job.id} />, { trail });
+  return { client: trail.documents, ...rendered };
 }
 
 const kit = () => screen.getByRole("region", { name: "Application kit" });
@@ -172,6 +176,18 @@ describe("the application kit (ticket 17)", () => {
 
     expect(await within(upload).findByText("resume_new.pdf is ready.")).toBeInTheDocument();
     expect(within(group("Resume")).getByRole("radio", { name: /resume_new\.pdf/ })).toBeChecked();
+  });
+
+  it("KIT-11: an attached document shows on the job and in the document's own count of jobs (architecture ticket 05)", async () => {
+    const { user } = renderKit();
+    await within(kit()).findByRole("group", { name: "Resume" });
+    const staffRadio = () => within(group("Resume")).getByRole("radio", { name: /resume_staff_v1\.pdf/ });
+    expect(staffRadio().closest("label")).toHaveTextContent("Not on any job yet");
+
+    await user.click(staffRadio());
+
+    await waitFor(() => expect(staffRadio().closest("label")).toHaveTextContent("On 1 job"));
+    expect(staffRadio()).toBeChecked();
   });
 
   it("KIT-8: the kit has no structural axe violations", async () => {

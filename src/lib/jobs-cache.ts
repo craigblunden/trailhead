@@ -25,8 +25,3 @@ export const jobsCache = {
       staleTime: jobsCache.staleTime,
     }),
 };
-
-/** The cached list with one Job swapped for the server's copy of it. */
-export function replaceJob(jobs: Job[] | undefined, job: Job): Job[] | undefined {
-  return jobs?.map((candidate) => (candidate.id === job.id ? job : candidate));
-}

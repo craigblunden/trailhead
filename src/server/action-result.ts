@@ -3,7 +3,7 @@ import "server-only";
 import { UnauthenticatedError, getOptionalSession } from "@/server/auth/session";
 import { NotFoundError, RuleError } from "@/server/data/errors";
 import { logError } from "@/server/log";
-import type { FieldErrors } from "@/server/validation";
+import { idSchema, parseInput, type FieldErrors } from "@/server/validation";
 
 /**
  * What every Server Action returns, and the one place a thrown error becomes something a client
@@ -36,6 +36,19 @@ export function invalid(fields: FieldErrors): ActionFailure {
   return { ok: false, error: "invalid", message: ACTION_MESSAGES.invalid, fields };
 }
 
+/** What an id is meant to name, for the answer a malformed one gets. */
+export type IdOf = "job" | "contact" | "document";
+
+/**
+ * The one way an action reads an id it was sent. Ids are opaque, so a malformed one is nothing the
+ * user can fix in a form: every action answers it with the same `invalid` result, naming what the id
+ * was meant to be, and never reaches the data layer.
+ */
+export function parseId(id: unknown, what: IdOf): { ok: true; id: string } | { ok: false; failure: ActionFailure } {
+  const parsed = parseInput(idSchema, id);
+  return parsed.ok ? { ok: true, id: parsed.data } : { ok: false, failure: invalid({ id: `Unknown ${what}` }) };
+}
+
 /** Runs a data-layer call and turns whatever it throws into a result the client may see. */
 export async function runAction<T>(
   operation: string,
@@ -50,7 +63,7 @@ export async function runAction<T>(
     }
     if (error instanceof NotFoundError) {
       // The same message for a missing id and a foreign one — see NotFoundError.
-      return { ok: false, error: "not-found", message: `${error.message}.` };
+      return { ok: false, error: "not-found", message: error.shown };
     }
     if (error instanceof RuleError) {
       return { ok: false, error: "rejected", code: error.code, message: error.message };

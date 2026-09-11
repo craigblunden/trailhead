@@ -7,6 +7,19 @@ import { prisma } from "./prisma";
 /** A Prisma client scoped to one tenant for the life of one transaction. */
 export type TenantClient = Prisma.TransactionClient;
 
+/**
+ * One tenant's transaction: the client, and whose rows it can see. Only `withTenant()` makes one, so a
+ * function that takes a `Tenant` can only be called from inside a tenant transaction the data layer
+ * opened — never with an owner a caller chose.
+ */
+declare const madeByWithTenant: unique symbol;
+export type Tenant = {
+  readonly tx: TenantClient;
+  readonly userId: string;
+  /** Not a value: a brand, so only `withTenant()` can produce a `Tenant`. */
+  readonly [madeByWithTenant]: true;
+};
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
@@ -23,7 +36,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  */
 export async function withTenant<T>(
   userId: string,
-  fn: (tx: TenantClient) => Promise<T>,
+  fn: (tx: TenantClient, tenant: Tenant) => Promise<T>,
 ): Promise<T> {
   if (!UUID.test(userId)) {
     // A non-uuid would fail the policy's cast anyway; failing here names the real problem.
@@ -31,6 +44,6 @@ export async function withTenant<T>(
   }
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw`select set_config('app.tenant_id', ${userId}, true)`;
-    return fn(tx);
+    return fn(tx, { tx, userId } as Tenant);
   });
 }

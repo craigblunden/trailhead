@@ -1,11 +1,12 @@
 import "server-only";
 
+import type { Prisma } from "@/generated/prisma/client";
 import type { Job, Stage } from "@/lib/jobs";
-import { OPENING_ACTIVITY_LABEL, nextAccent, stageChange } from "@/lib/jobs-rules";
+import { newJobFacts, stageChange } from "@/lib/jobs-rules";
 import { requireSession } from "@/server/auth/session";
 import { todayUtc } from "@/lib/dates";
 import { toDateColumn, toIsoDate, toJobDto, type JobRow } from "@/server/db/mappers";
-import { withTenant } from "@/server/db/tenant";
+import { withTenant, type Tenant } from "@/server/db/tenant";
 import type { JobPatchInput, NewJobInput } from "@/server/validation";
 
 import { NotFoundError } from "./errors";
@@ -18,15 +19,48 @@ import { NotFoundError } from "./errors";
  *   post-fetch comparison — a query that CAN return another user's row is a bug even when a
  *   check follows;
  * - returns DTOs from the mappers and throws typed domain errors. Prisma types stop here.
+ *
+ * It is also the one module that reads a Job back (architecture ticket 06). A data module whose write
+ * hangs off a Job — a Contact link, a kit slot, a letter's sources — asks it, inside its own tenant
+ * transaction, whether the Job is the Tenant's (`ownJob`) and for the Job as the board sees it
+ * (`readJob`). The Job's query shape never leaves this file.
  */
 
-/** The relations a Job DTO is built from. Contacts carry their link count for "Also on N other jobs". */
-export const JOB_INCLUDE = {
+/** The relations a Job DTO is built from — what `JobRow` describes. Contacts carry their link count for "Also on N other jobs". */
+const JOB_INCLUDE = {
   activity: true,
   contacts: { include: { contact: { include: { _count: { select: { jobs: true } } } } } },
   resume: { select: { id: true, fileName: true } },
   coverLetter: { select: { id: true, fileName: true } },
 } as const;
+
+/**
+ * For a write that hangs off a Job, inside the caller's tenant transaction: the fields `select` asks
+ * for, if the Job is this Tenant's. A missing id and another user's id are the same `NotFoundError`.
+ */
+export async function ownJob<S extends Prisma.JobSelect>(
+  tenant: Tenant,
+  jobId: string,
+  select: S,
+): Promise<Prisma.JobGetPayload<{ select: S }>> {
+  const job = await tenant.tx.job.findFirst({
+    where: { id: jobId, userId: tenant.userId },
+    select: select as Prisma.JobSelect,
+  });
+  if (!job) throw new NotFoundError();
+  // Prisma cannot carry a generic `select` through to its result type; the row is what `select` asked for.
+  return job as unknown as Prisma.JobGetPayload<{ select: S }>;
+}
+
+/** The Job as the board sees it, read inside the caller's tenant transaction — for a write that returns it. */
+export async function readJob(tenant: Tenant, jobId: string): Promise<Job> {
+  const row = await tenant.tx.job.findFirst({
+    where: { id: jobId, userId: tenant.userId },
+    include: JOB_INCLUDE,
+  });
+  if (!row) throw new NotFoundError();
+  return toJobDto(row);
+}
 
 /** The board lists jobs in creation order, so reloads never reshuffle. */
 export async function listJobs(): Promise<Job[]> {
@@ -48,15 +82,15 @@ export async function getJob(id: string): Promise<Job | null> {
 
 /**
  * One transaction writes the job and its single opening activity entry together: a crash between
- * them must not leave a job with no history. Starts at `interested`, dated today, with no applied
- * date, and its accent assigned by round-robin so the board keeps its Phase-1 variety.
+ * them must not leave a job with no history. What a new Job is — its Stage, dates, notes, accent,
+ * and opening entry — is `newJobFacts`, the rule the board's optimistic update applies too.
  */
 export async function createJob(input: NewJobInput, now: Date = new Date()): Promise<Job> {
   const { userId } = await requireSession();
-  const today = toDateColumn(todayUtc(now));
 
   const row = await withTenant(userId, async (tx) => {
     const existing = await tx.job.count({ where: { userId } });
+    const { opening, ...facts } = newJobFacts(todayUtc(now), existing);
     return tx.job.create({
       data: {
         userId,
@@ -67,12 +101,13 @@ export async function createJob(input: NewJobInput, now: Date = new Date()): Pro
         salaryMax: input.salaryMax,
         postingUrl: input.postingUrl,
         description: input.description,
-        stage: "interested",
-        addedOn: today,
-        appliedOn: null,
-        accent: nextAccent(existing),
+        stage: facts.stage,
+        notes: facts.notes,
+        addedOn: toDateColumn(facts.addedOn),
+        appliedOn: facts.appliedOn,
+        accent: facts.accent,
         activity: {
-          create: { userId, label: OPENING_ACTIVITY_LABEL, date: today },
+          create: { userId, label: opening.label, date: toDateColumn(opening.date) },
         },
       },
       include: JOB_INCLUDE,
@@ -84,18 +119,18 @@ export async function createJob(input: NewJobInput, now: Date = new Date()): Pro
 /** The patch has already been through the allowlist; only its fields are written. */
 export async function updateJob(id: string, patch: JobPatchInput): Promise<Job> {
   const { userId } = await requireSession();
-  const row = await withTenant(userId, async (tx) => {
+  return withTenant(userId, async (tx, tenant) => {
     const { count } = await tx.job.updateMany({ where: { id, userId }, data: patch });
     if (count === 0) throw new NotFoundError();
-    return tx.job.findFirstOrThrow({ where: { id, userId }, include: JOB_INCLUDE });
+    return readJob(tenant, id);
   });
-  return toJobDto(row);
 }
 
 /**
- * The read, the write, and the activity insert happen in one transaction. Re-selecting the
- * current stage writes nothing; a move prepends "Moved to …" dated today; leaving `interested`
- * with no applied date backfills one; moving to `interested` never sets one.
+ * The read, the write, and the activity insert happen in one transaction. What changes is
+ * `stageChange`'s decision: re-selecting the current stage writes nothing; a move adds "Moved to …"
+ * dated today; leaving `interested` with no applied date backfills one; moving to `interested`
+ * never sets one.
  */
 export async function setJobStage(id: string, stage: Stage, now: Date = new Date()): Promise<Job> {
   const { userId } = await requireSession();

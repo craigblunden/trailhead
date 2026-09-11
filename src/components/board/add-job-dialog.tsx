@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { locationOrFallback, salaryFromText } from "@/lib/job-fields";
 
 type AddJobDialogProps = {
   open: boolean;
@@ -25,14 +26,6 @@ type AddJobDialogProps = {
    */
   returnFocusTo?: React.RefObject<HTMLElement | null>;
 };
-
-/** Blank string or a non-numeric entry both mean "not specified". */
-function parseSalary(value: FormDataEntryValue | null): number | null {
-  const text = String(value ?? "").trim();
-  if (text === "") return null;
-  const parsed = Number(text);
-  return Number.isNaN(parsed) ? null : parsed;
-}
 
 export function AddJobDialog({
   open,
@@ -46,12 +39,13 @@ export function AddJobDialog({
     event.preventDefault();
     const data = new FormData(event.currentTarget);
 
+    // Salary and a blank location are read exactly as validation reads them.
     addJob({
       company: String(data.get("company") ?? "").trim(),
       role: String(data.get("role") ?? "").trim(),
-      location: String(data.get("location") ?? "").trim() || "Location TBD",
-      salaryMin: parseSalary(data.get("salaryMin")),
-      salaryMax: parseSalary(data.get("salaryMax")),
+      location: locationOrFallback(String(data.get("location") ?? "")),
+      salaryMin: salaryFromText(data.get("salaryMin")),
+      salaryMax: salaryFromText(data.get("salaryMax")),
       postingUrl: String(data.get("postingUrl") ?? "").trim(),
       description: String(data.get("description") ?? "").trim(),
     });

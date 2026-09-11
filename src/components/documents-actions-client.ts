@@ -1,4 +1,4 @@
-import { ActionError, unwrap } from "@/components/action-client";
+import { ActionError, unwrap, unwrapping } from "@/components/action-client";
 import { DOCUMENTS_BUCKET, UPLOAD_REFUSALS } from "@/lib/documents";
 import type { DocumentsClient } from "@/lib/documents-client";
 import { supabasePublicEnv } from "@/lib/supabase-env";
@@ -25,10 +25,12 @@ function storageRefusal(error: { status?: number; statusCode?: string; message?:
  * Documents over Server Actions, with the upload's bytes going from this browser straight to
  * Storage through the signed upload URL the server minted. No action and no route handler ever
  * receives the file: a request body through Vercel is capped below the 5 MB this app accepts.
+ *
+ * The upload is the one method that is more than a Server Action read through `unwrapping`.
  */
 export function createActionsDocumentsClient(): DocumentsClient {
   return {
-    list: async () => unwrap(await listDocumentsAction()),
+    list: unwrapping(listDocumentsAction),
 
     upload: async (file, kind, onStage) => {
       const ticket = unwrap(await startUploadAction({ kind, fileName: file.name, sizeBytes: file.size }));
@@ -52,13 +54,10 @@ export function createActionsDocumentsClient(): DocumentsClient {
       return unwrap(await finishUploadAction(ticket.documentId));
     },
 
-    remove: async (id) => {
-      unwrap(await deleteDocumentAction(id));
-    },
+    remove: unwrapping(deleteDocumentAction),
 
-    link: async (id) => unwrap(await documentLinkAction(id)),
+    link: unwrapping(documentLinkAction),
 
-    attach: async (jobId, kind, documentId) =>
-      unwrap(await setJobDocumentAction(jobId, kind, documentId)),
+    attach: unwrapping(setJobDocumentAction),
   };
 }

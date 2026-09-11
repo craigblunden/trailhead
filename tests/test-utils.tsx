@@ -8,13 +8,10 @@ import { DocumentsProvider } from "@/components/documents/documents-provider";
 import { JobsProvider } from "@/components/jobs-provider";
 import { SessionProvider } from "@/components/session-provider";
 import type { Job } from "@/lib/jobs";
-import { SEED_JOBS } from "./fixtures/jobs";
 import { jobsCache } from "@/lib/jobs-cache";
-import type { ContactsClient } from "@/lib/contacts-client";
-import type { DocumentsClient } from "@/lib/documents-client";
-import { createFixtureJobsClient, type JobsClient } from "@/lib/jobs-client";
-import { createFakeContactsClient } from "./fakes/contacts-client";
-import { createFakeDocumentsClient } from "./fakes/documents-client";
+import type { JobsClient } from "@/lib/jobs-client";
+import { createTrail, type Trail } from "./fakes/trail";
+import { SEED_JOBS } from "./fixtures/jobs";
 
 /** The signed-in user every board test renders as. */
 export const TEST_USER = { name: "Sam Rivera", email: "sam.rivera@example.com" };
@@ -43,43 +40,41 @@ export function createTestQueryClient() {
 }
 
 type Options = Omit<RenderOptions, "wrapper"> & {
+  /** The Jobs the store starts with, when no `trail` is given. */
   initialJobs?: Job[];
-  /** Overrides the fixture client — e.g. one whose mutations reject. */
+  /** The one in-memory store behind the jobs, contacts, and documents clients. */
+  trail?: Trail;
+  /** Replaces the store's jobs client — e.g. one whose writes reject. */
   client?: JobsClient;
   /** Set false to leave the cache empty, so the provider has to fetch (loading and error states). */
   seedCache?: boolean;
-  /** Overrides the in-memory contacts client built over `initialJobs`. */
-  contactsClient?: ContactsClient;
-  /** Overrides the empty in-memory documents client. */
-  documentsClient?: DocumentsClient;
 };
 
 /**
- * Renders inside the job store, and hands back a bound user-event instance.
+ * Renders inside the job store, and hands back a bound user-event instance and the store.
  *
- * The cache is seeded with `initialJobs` before the first render, which is what hydration does in
- * the real app: the board never shows a loading state in these tests unless a test asks for one.
+ * The cache is seeded with the store's Jobs before the first render, which is what hydration does
+ * in the real app: the board never shows a loading state in these tests unless a test asks for one.
  */
 export function renderWithJobs(
   ui: React.ReactElement,
-  { initialJobs = SEED_JOBS, client, seedCache = true, contactsClient, documentsClient, ...options }: Options = {},
+  { initialJobs = SEED_JOBS, trail, client, seedCache = true, ...options }: Options = {},
 ) {
   const queryClient = createTestQueryClient();
-  if (seedCache) queryClient.setQueryData(jobsCache.key, initialJobs);
-  const jobsClient = client ?? createFixtureJobsClient(initialJobs);
-  const contacts = contactsClient ?? createFakeContactsClient({ jobs: initialJobs });
-  const documents = documentsClient ?? createFakeDocumentsClient();
+  const store = trail ?? createTrail({ jobs: initialJobs });
+  if (seedCache) queryClient.setQueryData(jobsCache.key, store.jobsNow());
 
   return {
     user: userEvent.setup(),
     queryClient,
+    trail: store,
     ...render(ui, {
       wrapper: ({ children }) => (
         <SessionProvider user={TEST_USER}>
           <QueryClientProvider client={queryClient}>
-            <ContactsProvider client={contacts}>
-              <DocumentsProvider client={documents}>
-                <JobsProvider client={jobsClient}>{children}</JobsProvider>
+            <ContactsProvider client={store.contacts}>
+              <DocumentsProvider client={store.documents}>
+                <JobsProvider client={client ?? store.jobs}>{children}</JobsProvider>
               </DocumentsProvider>
             </ContactsProvider>
           </QueryClientProvider>

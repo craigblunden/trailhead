@@ -3,7 +3,7 @@ import { isoDate } from "@/lib/dates";
 import { ACCEPTED_TYPES, DOCUMENT_CAP, DOCUMENT_KIND_LABEL, extensionOf, type DocumentKind } from "@/lib/documents";
 import { COVER_LETTER_QUOTA } from "@/lib/generation";
 import type { Accent, ActivityEntry, Stage } from "@/lib/jobs";
-import { OPENING_ACTIVITY_LABEL, nextAccent, stageChange } from "@/lib/jobs-rules";
+import { newJobFacts, stageChange } from "@/lib/jobs-rules";
 import {
   jobPatchSchema,
   newContactSchema,
@@ -219,9 +219,12 @@ function planJob(
   checkValid(at, edit.ok ? null : edit.errors);
 
   const addedOn = daysBefore(today, job.addedDaysAgo);
-  let current: { stage: Stage; appliedOn: string | null } = { stage: "interested", appliedOn: null };
+  // What adding it wrote: the app's own new-Job facts, dated the day it was added, with the accent
+  // the board assigns round-robin in the order jobs were added.
+  const facts = newJobFacts(addedOn, index);
+  let current: { stage: Stage; appliedOn: string | null } = { stage: facts.stage, appliedOn: facts.appliedOn };
   let lastDaysAgo = job.addedDaysAgo;
-  const activity: PlannedJob["activity"] = [{ label: OPENING_ACTIVITY_LABEL, date: addedOn }];
+  const activity: PlannedJob["activity"] = [facts.opening];
 
   for (const move of job.moves ?? []) {
     checkDaysAgo(at, move.daysAgo);
@@ -264,8 +267,7 @@ function planJob(
     stage: current.stage,
     addedOn,
     appliedOn: current.appliedOn,
-    // The board assigns accents round-robin in the order jobs were added.
-    accent: nextAccent(index),
+    accent: facts.accent,
     activity,
     contacts: [...(job.contacts ?? [])],
     resume: job.resume ?? null,

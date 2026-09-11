@@ -1,7 +1,7 @@
-import { unwrap } from "@/components/action-client";
+import { unwrapping } from "@/components/action-client";
 import { SESSION_ENDED_PATH } from "@/lib/auth-routing";
 import type { GenerationResponse } from "@/lib/generation";
-import { generationStatusAction, type GenerationStatus } from "@/server/actions/generation";
+import { generationStatusAction } from "@/server/actions/generation";
 
 /**
  * How the cover-letter card reaches the server. Generation is a plain POST to the Route Handler —
@@ -9,7 +9,7 @@ import { generationStatusAction, type GenerationStatus } from "@/server/actions/
  * status read is an ordinary action. Component tests replace this module.
  */
 export const coverLetterClient = {
-  status: async (): Promise<GenerationStatus> => unwrap(await generationStatusAction()),
+  status: unwrapping(generationStatusAction),
 
   generate: async (jobId: string): Promise<GenerationResponse> => {
     let response: Response;

@@ -3,12 +3,12 @@ import "server-only";
 import type { ContactDetail, ContactListItem } from "@/lib/contacts";
 import type { Job } from "@/lib/jobs";
 import { requireSession } from "@/server/auth/session";
-import { toContactDetail, toContactListItem, toDateColumn, toJobDto } from "@/server/db/mappers";
-import { withTenant, type TenantClient } from "@/server/db/tenant";
+import { toContactDetail, toContactListItem, toDateColumn } from "@/server/db/mappers";
+import { withTenant } from "@/server/db/tenant";
 import type { ContactPatchInput, NewContactInput } from "@/server/validation";
 
 import { NotFoundError } from "./errors";
-import { JOB_INCLUDE } from "./jobs";
+import { ownJob, readJob } from "./jobs";
 
 /**
  * The data access layer for Contacts, on the same terms as jobs: the session supplies the owner,
@@ -16,7 +16,8 @@ import { JOB_INCLUDE } from "./jobs";
  * id and another user's id throw the same `NotFoundError`.
  *
  * A Contact belongs to the user, not to a Job. Linking is a row in `JobContact`; unlinking removes
- * that row and nothing else, so the Contact and its other links survive.
+ * that row and nothing else, so the Contact and its other links survive. A write from a Job asks the
+ * jobs module whether the Job is the Tenant's, and for the Job it returns.
  */
 
 const DETAIL_INCLUDE = {
@@ -85,20 +86,11 @@ export async function deleteContact(id: string): Promise<void> {
   });
 }
 
-async function requireJob(tx: TenantClient, userId: string, jobId: string) {
-  const job = await tx.job.findFirst({ where: { id: jobId, userId }, select: { id: true } });
-  if (!job) throw new NotFoundError();
-}
-
-async function readJob(tx: TenantClient, userId: string, jobId: string) {
-  return tx.job.findFirstOrThrow({ where: { id: jobId, userId }, include: JOB_INCLUDE });
-}
-
 /** Links an existing Contact to a Job. Linking twice is harmless: there is one link row. */
 export async function linkContact(jobId: string, contactId: string): Promise<Job> {
   const { userId } = await requireSession();
-  const row = await withTenant(userId, async (tx) => {
-    await requireJob(tx, userId, jobId);
+  return withTenant(userId, async (tx, tenant) => {
+    await ownJob(tenant, jobId, { id: true });
     const contact = await tx.contact.findFirst({
       where: { id: contactId, userId },
       select: { id: true },
@@ -108,20 +100,18 @@ export async function linkContact(jobId: string, contactId: string): Promise<Job
       data: [{ jobId, contactId, userId }],
       skipDuplicates: true,
     });
-    return readJob(tx, userId, jobId);
+    return readJob(tenant, jobId);
   });
-  return toJobDto(row);
 }
 
 /** Removes one link. The Contact and its links to other Jobs stay. */
 export async function unlinkContact(jobId: string, contactId: string): Promise<Job> {
   const { userId } = await requireSession();
-  const row = await withTenant(userId, async (tx) => {
-    await requireJob(tx, userId, jobId);
+  return withTenant(userId, async (tx, tenant) => {
+    await ownJob(tenant, jobId, { id: true });
     await tx.jobContact.deleteMany({ where: { jobId, contactId, userId } });
-    return readJob(tx, userId, jobId);
+    return readJob(tenant, jobId);
   });
-  return toJobDto(row);
 }
 
 /**
@@ -133,12 +123,11 @@ export async function createContactForJob(
   input: Pick<NewContactInput, "name" | "kind">,
 ): Promise<Job> {
   const { userId } = await requireSession();
-  const row = await withTenant(userId, async (tx) => {
-    await requireJob(tx, userId, jobId);
+  return withTenant(userId, async (tx, tenant) => {
+    await ownJob(tenant, jobId, { id: true });
     await tx.contact.create({
       data: { userId, name: input.name, kind: input.kind, jobs: { create: { jobId, userId } } },
     });
-    return readJob(tx, userId, jobId);
+    return readJob(tenant, jobId);
   });
-  return toJobDto(row);
 }

@@ -1,17 +1,9 @@
 "use server";
 
 import type { Job } from "@/lib/jobs";
-import { invalid, runAction as run, type ActionResult } from "@/server/action-result";
+import { invalid, parseId, runAction as run, type ActionResult } from "@/server/action-result";
 import { createJob, listJobs, setJobStage, updateJob } from "@/server/data/jobs";
-import {
-  idSchema,
-  jobPatchSchema,
-  newJobSchema,
-  parseInput,
-  stageSchema,
-} from "@/server/validation";
-
-export type { ActionFailure, ActionResult } from "@/server/action-result";
+import { jobPatchSchema, newJobSchema, parseInput, stageSchema } from "@/server/validation";
 
 /**
  * Server Actions are the only write path from the client, and they are public POST endpoints:
@@ -31,17 +23,17 @@ export async function createJobAction(input: unknown): Promise<ActionResult<Job>
 }
 
 export async function updateJobAction(id: unknown, patch: unknown): Promise<ActionResult<Job>> {
-  const parsedId = parseInput(idSchema, id);
-  if (!parsedId.ok) return invalid({ id: "Unknown job" });
+  const job = parseId(id, "job");
+  if (!job.ok) return job.failure;
   const parsedPatch = parseInput(jobPatchSchema, patch);
   if (!parsedPatch.ok) return invalid(parsedPatch.errors);
-  return run("jobs.update", () => updateJob(parsedId.data, parsedPatch.data));
+  return run("jobs.update", () => updateJob(job.id, parsedPatch.data));
 }
 
 export async function setJobStageAction(id: unknown, stage: unknown): Promise<ActionResult<Job>> {
-  const parsedId = parseInput(idSchema, id);
-  if (!parsedId.ok) return invalid({ id: "Unknown job" });
+  const job = parseId(id, "job");
+  if (!job.ok) return job.failure;
   const parsedStage = parseInput(stageSchema, stage);
   if (!parsedStage.ok) return invalid({ stage: "Unknown stage" });
-  return run("jobs.setStage", () => setJobStage(parsedId.data, parsedStage.data));
+  return run("jobs.setStage", () => setJobStage(job.id, parsedStage.data));
 }

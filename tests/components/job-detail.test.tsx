@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ActionError } from "@/components/action-client";
 import { JobDetail } from "@/components/job/job-detail";
 import type { Job } from "@/lib/jobs";
+import type { JobPatch } from "@/lib/jobs-client";
+import { createTrail } from "../fakes/trail";
 import { SEED_JOBS } from "../fixtures/jobs";
 import { freezeClock, renderWithJobs, screen, within } from "../test-utils";
 
@@ -228,6 +231,28 @@ describe("the posting link", () => {
 
     expect(screen.queryByRole("link", { name: /posting/i })).toBeNull();
     expect(screen.getByRole("button", { name: /No posting link/ })).toBeDisabled();
+  });
+});
+
+describe("a refused edit (architecture ticket 01)", () => {
+  it("DET-12: a salary the server refuses says why, in the server's own words", async () => {
+    const trail = createTrail({ jobs: SEED_JOBS });
+    const update = vi.fn<(id: string, patch: JobPatch) => Promise<Job>>().mockRejectedValue(
+      new ActionError("invalid", "Check the highlighted fields.", {
+        salaryMin: "Enter a whole number of thousands",
+      }),
+    );
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { trail, client: { ...trail.jobs, update } });
+    const minimum = screen.getByLabelText("Minimum salary expectation, in thousands");
+
+    await user.clear(minimum);
+    await user.type(minimum, "1.5");
+    await user.tab();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Enter a whole number of thousands");
+    expect(alert).not.toHaveTextContent("Check the highlighted fields");
+    expect(update).toHaveBeenLastCalledWith(HARVEST, { salaryMin: 1.5 });
   });
 });
 

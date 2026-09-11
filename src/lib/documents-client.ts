@@ -17,7 +17,8 @@ export type DocumentsClient = {
   list(): Promise<DocumentSummary[]>;
   /** Starts the upload, puts the bytes in Storage, and waits for the text to be read. */
   upload(file: File, kind: DocumentKind, onStage?: (stage: UploadStage) => void): Promise<DocumentSummary>;
-  remove(id: string): Promise<void>;
+  /** Resolves once the Document is gone from the user's list. */
+  remove(id: string): Promise<unknown>;
   /** A short-lived download link for one view. */
   link(id: string): Promise<string>;
   /** Sets a Job's resume or cover letter; `null` clears it. Returns the Job as the server wrote it. */

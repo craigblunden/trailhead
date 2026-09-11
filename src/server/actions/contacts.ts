@@ -2,7 +2,7 @@
 
 import type { ContactDetail, ContactListItem } from "@/lib/contacts";
 import type { Job } from "@/lib/jobs";
-import { invalid, runAction, type ActionResult } from "@/server/action-result";
+import { invalid, parseId, runAction, type ActionResult } from "@/server/action-result";
 import {
   createContact,
   createContactForJob,
@@ -14,12 +14,7 @@ import {
   updateContact,
 } from "@/server/data/contacts";
 import { NotFoundError } from "@/server/data/errors";
-import {
-  contactPatchSchema,
-  idSchema,
-  newContactSchema,
-  parseInput,
-} from "@/server/validation";
+import { contactPatchSchema, newContactSchema, parseInput } from "@/server/validation";
 
 /**
  * Contact actions: validate, call the data layer, translate. Public POST endpoints like every
@@ -31,12 +26,12 @@ export async function listContactsAction(): Promise<ActionResult<ContactListItem
 }
 
 export async function getContactAction(id: unknown): Promise<ActionResult<ContactDetail>> {
-  const parsedId = parseInput(idSchema, id);
-  if (!parsedId.ok) return invalid({ id: "Unknown contact" });
+  const contact = parseId(id, "contact");
+  if (!contact.ok) return contact.failure;
   return runAction("contacts.get", async () => {
-    const contact = await getContact(parsedId.data);
-    if (!contact) throw new NotFoundError("contact");
-    return contact;
+    const found = await getContact(contact.id);
+    if (!found) throw new NotFoundError("contact");
+    return found;
   });
 }
 
@@ -50,18 +45,18 @@ export async function updateContactAction(
   id: unknown,
   patch: unknown,
 ): Promise<ActionResult<ContactDetail>> {
-  const parsedId = parseInput(idSchema, id);
-  if (!parsedId.ok) return invalid({ id: "Unknown contact" });
+  const contact = parseId(id, "contact");
+  if (!contact.ok) return contact.failure;
   const parsedPatch = parseInput(contactPatchSchema, patch);
   if (!parsedPatch.ok) return invalid(parsedPatch.errors);
-  return runAction("contacts.update", () => updateContact(parsedId.data, parsedPatch.data));
+  return runAction("contacts.update", () => updateContact(contact.id, parsedPatch.data));
 }
 
 export async function deleteContactAction(id: unknown): Promise<ActionResult<null>> {
-  const parsedId = parseInput(idSchema, id);
-  if (!parsedId.ok) return invalid({ id: "Unknown contact" });
+  const contact = parseId(id, "contact");
+  if (!contact.ok) return contact.failure;
   return runAction("contacts.delete", async () => {
-    await deleteContact(parsedId.data);
+    await deleteContact(contact.id);
     return null;
   });
 }
@@ -70,20 +65,22 @@ export async function linkContactAction(
   jobId: unknown,
   contactId: unknown,
 ): Promise<ActionResult<Job>> {
-  const parsedJob = parseInput(idSchema, jobId);
-  const parsedContact = parseInput(idSchema, contactId);
-  if (!parsedJob.ok || !parsedContact.ok) return invalid({ id: "Unknown job or contact" });
-  return runAction("contacts.link", () => linkContact(parsedJob.data, parsedContact.data));
+  const job = parseId(jobId, "job");
+  if (!job.ok) return job.failure;
+  const contact = parseId(contactId, "contact");
+  if (!contact.ok) return contact.failure;
+  return runAction("contacts.link", () => linkContact(job.id, contact.id));
 }
 
 export async function unlinkContactAction(
   jobId: unknown,
   contactId: unknown,
 ): Promise<ActionResult<Job>> {
-  const parsedJob = parseInput(idSchema, jobId);
-  const parsedContact = parseInput(idSchema, contactId);
-  if (!parsedJob.ok || !parsedContact.ok) return invalid({ id: "Unknown job or contact" });
-  return runAction("contacts.unlink", () => unlinkContact(parsedJob.data, parsedContact.data));
+  const job = parseId(jobId, "job");
+  if (!job.ok) return job.failure;
+  const contact = parseId(contactId, "contact");
+  if (!contact.ok) return contact.failure;
+  return runAction("contacts.unlink", () => unlinkContact(job.id, contact.id));
 }
 
 /** From a Job: name and kind only, then linked (ticket 13). */
@@ -91,9 +88,9 @@ export async function createContactForJobAction(
   jobId: unknown,
   input: unknown,
 ): Promise<ActionResult<Job>> {
-  const parsedJob = parseInput(idSchema, jobId);
-  if (!parsedJob.ok) return invalid({ id: "Unknown job" });
+  const job = parseId(jobId, "job");
+  if (!job.ok) return job.failure;
   const parsed = parseInput(newContactSchema.pick({ name: true, kind: true }), input);
   if (!parsed.ok) return invalid(parsed.errors);
-  return runAction("contacts.createForJob", () => createContactForJob(parsedJob.data, parsed.data));
+  return runAction("contacts.createForJob", () => createContactForJob(job.id, parsed.data));
 }

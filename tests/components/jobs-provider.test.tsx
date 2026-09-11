@@ -3,9 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BoardView } from "@/components/board/board-view";
 import { JobDetail } from "@/components/job/job-detail";
 import { getQueryClient } from "@/components/providers";
-import { SEED_JOBS } from "../fixtures/jobs";
 import { jobsCache } from "@/lib/jobs-cache";
-import { createFixtureJobsClient, type JobsClient } from "@/lib/jobs-client";
+import type { JobsClient } from "@/lib/jobs-client";
+import { createTrail } from "../fakes/trail";
+import { SEED_JOBS } from "../fixtures/jobs";
 import { freezeClock, renderWithJobs, screen, waitFor, within } from "../test-utils";
 
 const HARVEST = "harvest-lead-product-designer";
@@ -15,12 +16,12 @@ const HARVEST = "harvest-lead-product-designer";
  * state is on screen long enough to be seen (and asserted) before it is rolled back.
  */
 function rejectingClient(): JobsClient {
-  const fixture = createFixtureJobsClient(SEED_JOBS);
+  const store = createTrail({ jobs: SEED_JOBS });
   const reject = () =>
     new Promise<never>((_, fail) =>
       setTimeout(() => fail(new Error("503 from the server")), 150),
     );
-  return { list: fixture.list, add: reject, update: reject, setStage: reject };
+  return { list: store.jobs.list, add: reject, update: reject, setStage: reject };
 }
 
 async function selectStage(user: ReturnType<typeof renderWithJobs>["user"], stage: string) {
@@ -100,17 +101,17 @@ describe("rollback", () => {
 
   it("TSQ-5: a successful add replaces the optimistic card with what the server returned", async () => {
     // A server that assigns its own id — and, like a real one, lists what it assigned.
-    const fixture = createFixtureJobsClient(SEED_JOBS);
+    const store = createTrail({ jobs: SEED_JOBS });
     const assigned = new Map<string, string>();
     const client: JobsClient = {
-      ...fixture,
+      ...store.jobs,
       add: async (input) => {
-        const saved = await fixture.add(input);
+        const saved = await store.jobs.add(input);
         assigned.set(saved.id, "server-assigned-id");
         return { ...saved, id: "server-assigned-id" };
       },
       list: async () =>
-        (await fixture.list()).map((job) => ({ ...job, id: assigned.get(job.id) ?? job.id })),
+        (await store.jobs.list()).map((job) => ({ ...job, id: assigned.get(job.id) ?? job.id })),
     };
     const { user } = renderWithJobs(<BoardView />, { client });
 
@@ -134,7 +135,7 @@ describe("loading and failure", () => {
   it("TSQ-6: shows a loading state while the list is in flight, then the board", async () => {
     let resolve!: (jobs: typeof SEED_JOBS) => void;
     const client: JobsClient = {
-      ...createFixtureJobsClient(SEED_JOBS),
+      ...createTrail({ jobs: SEED_JOBS }).jobs,
       list: () => new Promise((r) => (resolve = r)),
     };
     renderWithJobs(<BoardView />, { client, seedCache: false });
@@ -148,7 +149,7 @@ describe("loading and failure", () => {
   it("TSQ-7: a failed list renders a designed error state with a way to retry", async () => {
     let attempts = 0;
     const client: JobsClient = {
-      ...createFixtureJobsClient(SEED_JOBS),
+      ...createTrail({ jobs: SEED_JOBS }).jobs,
       list: async () => {
         attempts += 1;
         if (attempts === 1) throw new Error("database unreachable");

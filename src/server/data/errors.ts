@@ -13,6 +13,11 @@ export class NotFoundError extends Error {
     super(`This ${what} isn't on your trail`);
     this.name = "NotFoundError";
   }
+
+  /** The sentence a client is shown for it: by every action, the cover-letter route, and the test store. */
+  get shown(): string {
+    return `${this.message}.`;
+  }
 }
 
 /**

@@ -1,26 +1,46 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createContext, useCallback, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
-import { createActionsContactsClient } from "@/components/contacts-actions-client";
-import { ActionError, describeFailure } from "@/components/action-client";
+import { ActionError, unwrapping } from "@/components/action-client";
+import { jobCache } from "@/components/job-cache";
 import type { ContactDetail } from "@/lib/contacts";
 import { contactsCache, type ContactFields, type ContactsClient } from "@/lib/contacts-client";
 import type { Job } from "@/lib/jobs";
-import { jobsCache, replaceJob } from "@/lib/jobs-cache";
+import {
+  createContactAction,
+  createContactForJobAction,
+  deleteContactAction,
+  getContactAction,
+  linkContactAction,
+  listContactsAction,
+  unlinkContactAction,
+  updateContactAction,
+} from "@/server/actions/contacts";
 
 /**
  * Contacts state lives in TanStack Query under `contactsCache`, like jobs. This provider only
- * says where contacts come from and go to — Server Actions by default, a fake in tests. The hooks
- * below are the whole client-side surface.
+ * says where contacts come from and go to — Server Actions by default, an in-memory store in tests.
+ * The hooks below are the whole client-side surface.
  *
  * Contacts writes are not optimistic. They are rare, deliberate, and each one changes two caches
  * at once (a Job's contacts and the contact list), so the UI shows a pending state and then what
- * the server actually wrote.
+ * the server actually wrote — into the jobs cache through the Job cache module, like every write to
+ * a Job.
  */
 
-const defaultClient: ContactsClient = createActionsContactsClient();
+/** Contacts over Server Actions — the only write path from the browser. */
+const defaultClient: ContactsClient = {
+  list: unwrapping(listContactsAction),
+  get: unwrapping(getContactAction),
+  create: unwrapping(createContactAction),
+  update: unwrapping(updateContactAction),
+  remove: unwrapping(deleteContactAction),
+  link: unwrapping(linkContactAction),
+  unlink: unwrapping(unlinkContactAction),
+  createForJob: unwrapping(createContactForJobAction),
+};
 
 const ContactsClientContext = createContext<ContactsClient>(defaultClient);
 
@@ -67,54 +87,39 @@ const LINK_FAILED = "That change wasn't saved. Check your connection and try aga
 
 /**
  * Linking, unlinking, and creating-then-linking from a Job. Each returns the Job as the server
- * wrote it, which replaces that Job in the jobs cache; the contact list is refetched because its
- * role counts changed.
+ * wrote it, which the Job cache module swaps in; the contact list is refetched because its role
+ * counts changed.
  */
 export function useJobContactLinks(jobId: string) {
   const client = useContactsClient();
   const queryClient = useQueryClient();
+  const cache = useMemo(() => jobCache(queryClient), [queryClient]);
   const [error, setError] = useState<string | null>(null);
+  const [inFlight, setInFlight] = useState(0);
 
-  const onSuccess = useCallback(
-    (job: Job) => {
+  /** Sends one change and says whether it was saved; a failure's message is already set. */
+  const write = useCallback(
+    async (send: () => Promise<Job>) => {
+      setInFlight((count) => count + 1);
+      const result = await cache.update(jobId, { send, fallback: LINK_FAILED });
+      setInFlight((count) => count - 1);
+      if (!result.ok) {
+        setError(result.message);
+        return false;
+      }
       setError(null);
-      queryClient.setQueryData<Job[]>(jobsCache.key, (jobs) => replaceJob(jobs, job));
       void queryClient.invalidateQueries({ queryKey: contactsCache.listKey });
+      return true;
     },
-    [queryClient],
+    [cache, jobId, queryClient],
   );
-  const onError = useCallback((failure: unknown) => setError(describeFailure(failure, LINK_FAILED)), []);
-
-  const link = useMutation({
-    mutationFn: (contactId: string) => client.link(jobId, contactId),
-    onSuccess,
-    onError,
-  });
-  const unlink = useMutation({
-    mutationFn: (contactId: string) => client.unlink(jobId, contactId),
-    onSuccess,
-    onError,
-  });
-  const create = useMutation({
-    mutationFn: (input: Pick<ContactFields, "name" | "kind">) => client.createForJob(jobId, input),
-    onSuccess,
-    onError,
-  });
 
   return {
     /** Resolves true once linked; false if it failed (the error is already set). */
-    link: (contactId: string) =>
-      link.mutateAsync(contactId).then(
-        () => true,
-        () => false,
-      ),
-    unlink: (contactId: string) => unlink.mutate(contactId),
-    create: (input: Pick<ContactFields, "name" | "kind">) =>
-      create.mutateAsync(input).then(
-        () => true,
-        () => false,
-      ),
-    pending: link.isPending || unlink.isPending || create.isPending,
+    link: (contactId: string) => write(() => client.link(jobId, contactId)),
+    unlink: (contactId: string) => void write(() => client.unlink(jobId, contactId)),
+    create: (input: Pick<ContactFields, "name" | "kind">) => write(() => client.createForJob(jobId, input)),
+    pending: inFlight > 0,
     error,
     dismissError: () => setError(null),
   };
@@ -124,12 +129,13 @@ export function useJobContactLinks(jobId: string) {
 export function useContactMutations() {
   const client = useContactsClient();
   const queryClient = useQueryClient();
+  const cache = useMemo(() => jobCache(queryClient), [queryClient]);
 
   const refreshLists = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: contactsCache.listKey, exact: true });
     // A Job's contact rows show the name and kind, so they may have changed too.
-    void queryClient.invalidateQueries({ queryKey: jobsCache.key });
-  }, [queryClient]);
+    cache.refresh();
+  }, [cache, queryClient]);
 
   const remember = useCallback(
     (detail: ContactDetail) => {

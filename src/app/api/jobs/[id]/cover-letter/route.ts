@@ -1,24 +1,12 @@
 import { NextResponse } from "next/server";
 
-import {
-  GENERATION_FAILURES,
-  REFUNDED_FAILURES,
-  type GenerationFailure,
-  type GenerationResponse,
-  type QuotaStatus,
-} from "@/lib/generation";
-import { ACTION_MESSAGES } from "@/server/action-result";
+import { GENERATION_FAILURES, type GenerationFailure, type GenerationResponse } from "@/lib/generation";
+import { ACTION_MESSAGES, parseId } from "@/server/action-result";
 import { UnauthenticatedError, getOptionalSession } from "@/server/auth/session";
-import { NotFoundError, RuleError } from "@/server/data/errors";
-import {
-  coverLetterInputs,
-  generationQuota,
-  refundCoverLetter,
-  reserveCoverLetter,
-} from "@/server/data/generation";
-import { createClaudeClient, writeCoverLetter } from "@/server/generation/cover-letter";
+import { NotFoundError } from "@/server/data/errors";
+import { createClaudeClient } from "@/server/generation/cover-letter";
+import { generateCoverLetter } from "@/server/generation/generate-cover-letter";
 import { logError } from "@/server/log";
-import { idSchema, parseInput } from "@/server/validation";
 
 /**
  * POST /api/jobs/:id/cover-letter — writes a cover letter from the Job's description and its
@@ -28,6 +16,10 @@ import { idSchema, parseInput } from "@/server/validation";
  * a time, and a 10–25 second generation as an action would hold every other edit on the page behind
  * it. This does not breach "Server Actions are the only write path": generation writes nothing but
  * the quota counter, through the data layer, under the same session and tenant rules as any action.
+ *
+ * Everything about the quota — reserving, giving back, and saying honestly which happened — is the
+ * generation module's (architecture ticket 04). This handler checks the session and the id, makes
+ * one call, and says what the outcome means in HTTP.
  */
 
 /** Seconds. The Claude call gives up well before this, so the handler always answers. */
@@ -44,9 +36,6 @@ const STATUS: Record<GenerationFailure, number> = {
   "no-description": 409,
 };
 
-/** Refusals that happen before a letter is reserved, so there is nothing to give back. */
-const BEFORE_RESERVING: readonly GenerationFailure[] = ["quota", "no-resume", "no-description"];
-
 const reply = (status: number, body: GenerationResponse) => NextResponse.json(body, { status });
 
 const UNAUTHENTICATED = {
@@ -56,85 +45,32 @@ const UNAUTHENTICATED = {
 } as const;
 
 /** The same words an action uses for a missing or foreign job. */
-const NOT_FOUND = { ok: false, error: "not-found", message: `${new NotFoundError().message}.` } as const;
-
-/** Gives a reserved letter back. Reports whether it worked, so the user is never told so wrongly. */
-async function giveBack(weekStart: string, tenant: string): Promise<{ refunded: boolean; quota?: QuotaStatus }> {
-  try {
-    return { refunded: true, quota: await refundCoverLetter(weekStart) };
-  } catch (error) {
-    logError({ operation: "generation.refund", tenant }, error);
-    return { refunded: false, quota: await generationQuota().catch(() => undefined) };
-  }
-}
+const NOT_FOUND = { ok: false, error: "not-found", message: new NotFoundError().shown } as const;
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getOptionalSession();
   if (!session) return reply(401, UNAUTHENTICATED);
 
-  const parsedId = parseInput(idSchema, (await params).id);
-  if (!parsedId.ok) return reply(404, NOT_FOUND);
-
-  // Set while a letter is taken from the quota and not yet delivered, so every way out of this
-  // handler — a failure outcome or an exception — can give it back.
-  let reservedWeek: string | null = null;
+  const job = parseId((await params).id, "job");
+  if (!job.ok) return reply(404, NOT_FOUND);
 
   try {
-    // 1. Whether a letter can be written at all. A deployment with no API key says so without
-    //    reading anything.
-    const client = createClaudeClient();
-    if (!client) {
-      return reply(503, { ok: false, error: "unavailable", message: GENERATION_FAILURES.unavailable });
-    }
-
-    // 2. What the letter is written from. A foreign job, a missing resume, or an empty description
-    //    stops here, before any quota is taken.
-    const inputs = await coverLetterInputs(parsedId.data);
-
-    // 3. One letter from this week's quota, atomically. Calling this handler directly meets the same
-    //    rule: there is no path to Claude that does not pass through the reservation.
-    reservedWeek = (await reserveCoverLetter()).weekStart;
-
-    // 4. The call, outside any transaction.
-    const outcome = await writeCoverLetter(inputs, { client, tenant: session.userId });
-    if (outcome.ok) {
-      reservedWeek = null; // Delivered: this letter is used.
-      // A written letter is returned even if the count cannot be read back.
-      const quota = await generationQuota().catch(() => undefined);
-      return reply(200, { ok: true, letter: outcome.letter, quota });
-    }
-
-    // 5. No letter was delivered, so the reservation is given back.
-    const week = reservedWeek;
-    reservedWeek = null;
-    const { refunded, quota } = REFUNDED_FAILURES.includes(outcome.reason)
-      ? await giveBack(week, session.userId)
-      : { refunded: false, quota: await generationQuota().catch(() => undefined) };
-    return reply(STATUS[outcome.reason], {
+    const outcome = await generateCoverLetter(job.id, { client: createClaudeClient() });
+    if (outcome.ok) return reply(200, { ok: true, letter: outcome.letter, quota: outcome.quota });
+    // An error of this application's own is a 500, whatever the letter's failure code says.
+    return reply(outcome.unexpected ? 500 : STATUS[outcome.reason], {
       ok: false,
       error: outcome.reason,
       message: GENERATION_FAILURES[outcome.reason],
-      quota,
-      refunded,
+      quota: outcome.quota,
+      refunded: outcome.refunded,
     });
   } catch (error) {
     if (error instanceof UnauthenticatedError) return reply(401, UNAUTHENTICATED);
     if (error instanceof NotFoundError) return reply(404, NOT_FOUND);
-    const rule = error instanceof RuleError ? error.code : null;
-    const code = BEFORE_RESERVING.find((failure) => failure === rule);
-    if (code) {
-      return reply(STATUS[code], {
-        ok: false,
-        error: code,
-        message: GENERATION_FAILURES[code],
-        quota: await generationQuota().catch(() => undefined),
-        refunded: false,
-      });
-    }
+    // Anything else is this application's own error, before a letter could be reserved (the module
+    // catches everything after). The card still gets the shape it reads, never a framework error page.
     logError({ operation: "generation.route", tenant: session.userId }, error);
-    const { refunded, quota } = reservedWeek
-      ? await giveBack(reservedWeek, session.userId)
-      : { refunded: false, quota: undefined };
-    return reply(500, { ok: false, error: "failed", message: GENERATION_FAILURES.failed, quota, refunded });
+    return reply(500, { ok: false, error: "failed", message: GENERATION_FAILURES.failed, refunded: false });
   }
 }

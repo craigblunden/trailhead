@@ -66,9 +66,9 @@ by `tests/server/boundaries.test.ts`, not just described.
 ```mermaid
 flowchart TB
   component["Client Component<br/>e.g. the job page"]
-  cache["TanStack Query cache<br/>optimistic update, visible rollback"]
-  client["Actions client<br/>unwrap result → ActionError"]
-  action["Server Action — public POST endpoint<br/>zod validation, no queries"]
+  cache["Job cache module → TanStack Query cache<br/>shown at once; a refusal rolls back only its own fields"]
+  client["Actions client<br/>one mapping: result → ActionError"]
+  action["Server Action — public POST endpoint<br/>zod validation, one id check, no queries"]
   result["action-result.ts<br/>domain errors → safe messages"]
   data["src/server/data/*<br/>requireSession(); owner in every where"]
   tenant["withTenant()<br/>transaction · set_config app.tenant_id"]
@@ -149,27 +149,33 @@ sequenceDiagram
   autonumber
   participant B as Browser (card)
   participant R as Route Handler
+  participant G as Generation module
   participant D as Data layer
   participant PG as Postgres
   participant C as Anthropic API
 
   B->>R: POST /api/jobs/:id/cover-letter
-  R->>D: coverLetterInputs(job) — 404 if not yours, 409 if no resume or description
-  R->>D: reserveCoverLetter() — upsert, only while used < 5 this week
+  R->>G: generateCoverLetter(job, Claude client)
+  G->>D: coverLetterInputs(job) — not yours, or no resume or description
+  G->>D: reserveCoverLetter() — upsert, only while used < 5 this week
   D->>PG: quota row under RLS
-  R->>C: messages.create (claude-opus-5, adaptive thinking, refusal fallback)
+  G->>C: messages.create (claude-opus-5, adaptive thinking, refusal fallback)
   alt stop_reason end_turn
-    C-->>R: letter text
+    C-->>G: letter text
+    G-->>R: letter · letters left
     R-->>B: 200 · letter · letters left
   else refusal, error, timeout, truncated, crash
-    R->>D: refundCoverLetter()
-    R-->>B: failure · refunded: true · letters left
+    G->>D: refundCoverLetter()
+    G-->>R: failure · refunded only if the refund worked
+    R-->>B: 4xx or 5xx · refunded · letters left
   end
 ```
 
 It is a Route Handler, not a Server Action, because Next runs a page's Server Actions one at a time:
 a 10–25 second generation as an action would hold every other edit on the page behind it. Nothing is
-stored except the quota counter.
+stored except the quota counter. The order — inputs, reservation, call, refund — and whether a refund
+really happened belong to the generation module (`src/server/generation/generate-cover-letter.ts`);
+the Route Handler checks the session and the id, makes one call, and maps the outcome to a status.
 
 ## The data model
 

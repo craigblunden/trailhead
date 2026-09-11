@@ -8,6 +8,7 @@ import {
   DOWNLOAD_URL_TTL_SECONDS,
   MAX_UPLOAD_BYTES,
   UPLOAD_REFUSALS,
+  WRONG_KIND_REFUSALS,
   extensionOf,
   type DocumentKind,
   type DocumentSummary,
@@ -16,7 +17,7 @@ import {
 } from "@/lib/documents";
 import type { Job } from "@/lib/jobs";
 import { requireSession } from "@/server/auth/session";
-import { DOCUMENT_SUMMARY_INCLUDE, toDocumentSummary, toJobDto } from "@/server/db/mappers";
+import { DOCUMENT_SUMMARY_INCLUDE, toDocumentSummary } from "@/server/db/mappers";
 import { withTenant } from "@/server/db/tenant";
 import { extractDocumentText } from "@/server/ingest/extract";
 import { logError } from "@/server/log";
@@ -24,7 +25,7 @@ import { documentsBucket } from "@/server/storage/documents-bucket";
 import type { StartUploadInput } from "@/server/validation";
 
 import { NotFoundError, RuleError } from "./errors";
-import { JOB_INCLUDE } from "./jobs";
+import { ownJob, readJob } from "./jobs";
 
 /**
  * The data access layer for Documents. Two systems hold a Document — a row in Postgres and an
@@ -299,11 +300,6 @@ export async function documentDownloadUrl(id: string): Promise<string> {
   return data.signedUrl;
 }
 
-const WRONG_KIND: Record<DocumentKind, string> = {
-  resume: "That is a cover letter, so it cannot be sent as this job’s resume.",
-  cover_letter: "That is a resume, so it cannot be sent as this job’s cover letter.",
-};
-
 /**
  * Attaches one of the user’s ready Documents to a Job as its resume or its cover letter, or clears
  * that slot with `null` (ticket 17). The two are separate references, so setting one never touches
@@ -316,9 +312,8 @@ export async function setJobDocument(
   documentId: string | null,
 ): Promise<Job> {
   const { userId } = await requireSession();
-  const row = await withTenant(userId, async (tx) => {
-    const job = await tx.job.findFirst({ where: { id: jobId, userId }, select: { id: true } });
-    if (!job) throw new NotFoundError();
+  return withTenant(userId, async (tx, tenant) => {
+    const job = await ownJob(tenant, jobId, { id: true });
     if (documentId !== null) {
       // FOR UPDATE, like `tombstone`: a delete of this Document either waits for this attach (and then
       // detaches it) or finishes first (and this finds nothing). Never a Job pointing at a tombstone.
@@ -328,13 +323,12 @@ export async function setJobDocument(
            and "deletedAt" is null and ingestion = 'ready'
          for update`;
       if (!document) throw new NotFoundError("document");
-      if (document.kind !== kind) throw new RuleError("wrong-kind", WRONG_KIND[kind]);
+      if (document.kind !== kind) throw new RuleError("wrong-kind", WRONG_KIND_REFUSALS[kind]);
     }
-    return tx.job.update({
+    await tx.job.update({
       where: { id: job.id, userId },
       data: kind === "resume" ? { resumeId: documentId } : { coverLetterId: documentId },
-      include: JOB_INCLUDE,
     });
+    return readJob(tenant, job.id);
   });
-  return toJobDto(row);
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { LOCATION_FALLBACK, locationOrFallback, salaryFromText } from "@/lib/job-fields";
 import {
   JOB_LIMITS,
   jobPatchSchema,
@@ -139,6 +140,24 @@ describe("jobPatchSchema", () => {
 
   it("VAL-8: an empty patch is valid and changes nothing", () => {
     expect(parseInput(jobPatchSchema, {})).toEqual({ ok: true, data: {} });
+  });
+});
+
+describe("the forms read what validation reads (architecture ticket 01)", () => {
+  it("VAL-10: a salary the form sends parses exactly as the text it was read from", () => {
+    for (const text of ["", "  ", "120", " 150 ", "0", "abc", "12abc", "1e6", "1.5", "-3", "1000000"]) {
+      const fromText = parseInput(jobPatchSchema, { salaryMin: text });
+      const fromForm = parseInput(jobPatchSchema, { salaryMin: salaryFromText(text) });
+      expect(fromForm, JSON.stringify(text)).toEqual(fromText);
+    }
+  });
+
+  it("VAL-10: a blank location reads as the default on both sides", () => {
+    for (const text of ["", "   ", "Remote (US)", "  Austin  "]) {
+      const parsed = parseInput(newJobSchema, { ...valid, location: text });
+      expect(parsed.ok && parsed.data.location, JSON.stringify(text)).toBe(locationOrFallback(text));
+    }
+    expect(locationOrFallback(" ")).toBe(LOCATION_FALLBACK);
   });
 });
 

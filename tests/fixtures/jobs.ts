@@ -45,7 +45,7 @@ export const SEED_JOBS: Job[] = [
     notes: "Recruiter said they move fast — expect a screen within a week.",
     contacts: [
       {
-        id: "c1",
+        id: "c3",
         name: "Dana Whitfield",
         kind: "recruiter",
         title: "Recruiter",
@@ -151,7 +151,7 @@ export const SEED_JOBS: Job[] = [
     notes: "No band posted. Ask the recruiter before the second round.",
     contacts: [
       {
-        id: "c1",
+        id: "c4",
         name: "Ravi Menon",
         kind: "hiring_manager",
         title: "Head of Design",
@@ -189,7 +189,7 @@ export const SEED_JOBS: Job[] = [
     notes: "Offer verbal on Jul 21. Written offer expected this week — compare against Harvest.",
     contacts: [
       {
-        id: "c1",
+        id: "c5",
         name: "Alex Chen",
         kind: "hiring_manager",
         title: "Design Director",
