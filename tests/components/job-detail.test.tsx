@@ -46,7 +46,7 @@ describe("rendering a job", () => {
     ).toBeInTheDocument();
   });
 
-  it("DET-1: shows the salary band, applied date and resume on file", () => {
+  it("DET-1: shows the salary band, applied date and resume on file", async () => {
     renderWithJobs(<JobDetail jobId={HARVEST} />);
 
     expect(
@@ -56,7 +56,8 @@ describe("rendering a job", () => {
       screen.getByLabelText("Maximum salary expectation, in thousands"),
     ).toHaveValue(165);
     expect(screen.getByText("June 30, 2026")).toBeInTheDocument();
-    expect(screen.getByText("resume_lead_v1.pdf")).toBeInTheDocument();
+    // The application kit reads the document list first.
+    expect(await screen.findByText("resume_lead_v1.pdf")).toBeInTheDocument();
   });
 
   it("DET-1: labels the date as 'Added' for a job never applied to", () => {
@@ -64,7 +65,6 @@ describe("rendering a job", () => {
 
     expect(within(detailsPanel()).getByText("Added")).toBeInTheDocument();
     expect(within(detailsPanel()).getByText("July 22, 2026")).toBeInTheDocument();
-    expect(screen.getByText("No resume attached yet.")).toBeInTheDocument();
   });
 
   it("DET-2: explains an unknown job rather than crashing", () => {

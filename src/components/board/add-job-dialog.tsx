@@ -1,9 +1,8 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId } from "react";
 
 import { useJobs } from "@/components/jobs-provider";
-import { ResumeField } from "@/components/board/resume-field";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,11 +41,6 @@ export function AddJobDialog({
 }: AddJobDialogProps) {
   const { addJob } = useJobs();
   const fieldId = useId();
-  const [resumeName, setResumeName] = useState<string | null>(null);
-
-  function reset() {
-    setResumeName(null);
-  }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,21 +53,16 @@ export function AddJobDialog({
       salaryMin: parseSalary(data.get("salaryMin")),
       salaryMax: parseSalary(data.get("salaryMax")),
       postingUrl: String(data.get("postingUrl") ?? "").trim(),
-      resumeFile: resumeName,
       description: String(data.get("description") ?? "").trim(),
     });
 
-    reset();
     onOpenChange(false);
   }
 
   return (
     <Dialog
       open={open}
-      onOpenChange={(next) => {
-        if (!next) reset();
-        onOpenChange(next);
-      }}
+      onOpenChange={onOpenChange}
     >
       <DialogContent
         aria-describedby={undefined}
@@ -169,12 +158,6 @@ export function AddJobDialog({
               className="h-10"
             />
           </div>
-
-          <ResumeField
-            id={`${fieldId}-resume`}
-            value={resumeName}
-            onChange={setResumeName}
-          />
 
           <div className="space-y-1.5">
             <Label htmlFor={`${fieldId}-description`}>Job description</Label>

@@ -7,6 +7,7 @@ import { createActionsDocumentsClient } from "@/components/documents-actions-cli
 import { ActionError } from "@/components/jobs-actions-client";
 import { UPLOAD_REFUSALS, type DocumentKind, type DocumentSummary } from "@/lib/documents";
 import { documentsCache, precheckFile, type DocumentsClient } from "@/lib/documents-client";
+import type { Job } from "@/lib/jobs";
 import { jobsCache } from "@/lib/jobs-cache";
 
 const defaultClient: DocumentsClient = createActionsDocumentsClient();
@@ -83,6 +84,81 @@ export function useDocumentUpload({ onUploaded }: { onUploaded?: (document: Docu
   );
 
   return { state, upload, reset: () => setState({ phase: "idle" }) };
+}
+
+const ATTACH_FAILED = "That change wasn’t saved. Check your connection and try again.";
+
+/** One choice in the kit, carrying the jobs cache as it was, to restore if the server refuses. */
+type Choice = { kind: DocumentKind; documentId: string | null; previous: Job[] | undefined };
+
+/**
+ * A Job's application kit: its resume and its cover letter, each set independently (ticket 17).
+ * Optimistic, like the rest of the job page: the choice shows at once and rolls back visibly if the
+ * server refuses it.
+ */
+export function useJobDocuments(jobId: string) {
+  const client = useDocumentsClient();
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  // The pick the user just made, per kind, held in React state so the radio moves within the click
+  // itself; the jobs cache notifies a tick later. Cleared when the server settles.
+  const [picked, setPicked] = useState<Partial<Record<DocumentKind, string | null>>>({});
+
+  const choose = useMutation({
+    mutationFn: async ({ kind, documentId }: Choice) => {
+      await queryClient.cancelQueries({ queryKey: jobsCache.key });
+      return client.attach(jobId, kind, documentId);
+    },
+    onError: (failure, { previous }) => {
+      queryClient.setQueryData(jobsCache.key, previous);
+      setError(describeFailure(failure, ATTACH_FAILED));
+    },
+    onSuccess: (job) => {
+      queryClient.setQueryData<Job[]>(jobsCache.key, (jobs) =>
+        jobs?.map((candidate) => (candidate.id === job.id ? job : candidate)),
+      );
+    },
+    onSettled: (_job, _failure, { kind }) => {
+      setPicked((current) => {
+        const next = { ...current };
+        delete next[kind];
+        return next;
+      });
+      // "On N jobs" changed.
+      void queryClient.invalidateQueries({ queryKey: documentsCache.key });
+    },
+  });
+
+  return {
+    /**
+     * Shows the choice synchronously — a controlled radio that waits even a microtask looks, to the
+     * user and to assistive tech, as if the click did nothing — then asks the server.
+     */
+    choose: (kind: DocumentKind, documentId: string | null) => {
+      setError(null);
+      setPicked((current) => ({ ...current, [kind]: documentId }));
+      const previous = queryClient.getQueryData<Job[]>(jobsCache.key);
+      const document = queryClient
+        .getQueryData<DocumentSummary[]>(documentsCache.key)
+        ?.find((candidate) => candidate.id === documentId);
+      const attached = documentId && document ? { id: documentId, fileName: document.fileName } : null;
+      queryClient.setQueryData<Job[]>(jobsCache.key, (jobs) =>
+        jobs?.map((job) =>
+          job.id !== jobId
+            ? job
+            : kind === "resume"
+              ? { ...job, resume: attached }
+              : { ...job, coverLetter: attached },
+        ),
+      );
+      choose.mutate({ kind, documentId, previous });
+    },
+    /** What the kit should show as chosen for `kind`: the pending pick, else what is attached. */
+    selected: (kind: DocumentKind, attachedId: string | null) =>
+      picked[kind] !== undefined ? (picked[kind] ?? null) : attachedId,
+    error,
+    dismissError: () => setError(null),
+  };
 }
 
 /** Delete and download. Deleting detaches the Document from its Jobs, so jobs are refetched too. */

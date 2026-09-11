@@ -50,6 +50,9 @@ export type Contact = {
   otherJobCount: number;
 };
 
+/** A Document as a Job refers to it. */
+export type AttachedDocument = { id: string; fileName: string };
+
 export type ActivityEntry = {
   id: string;
   label: string;
@@ -72,7 +75,10 @@ export type Job = {
   addedOn: string;
   /** ISO `YYYY-MM-DD`, or `null` while the role is only a lead. */
   appliedOn: string | null;
-  resumeFile: string | null;
+  /** The resume sent with this Job, if one is attached. */
+  resume: AttachedDocument | null;
+  /** The cover letter sent with this Job, if one is attached. Separate from the resume (ticket 17). */
+  coverLetter: AttachedDocument | null;
   description: string;
   notes: string;
   contacts: Contact[];
@@ -92,7 +98,8 @@ export const SEED_JOBS: Job[] = [
     postingUrl: "https://meridianlabs.example.com/careers/senior-product-designer",
     addedOn: "2026-07-22",
     appliedOn: null,
-    resumeFile: null,
+    resume: null,
+    coverLetter: null,
     description:
       "Meridian Labs is building measurement tooling for climate teams. We're looking for a Senior Product Designer to own the analytics surface end to end.",
     notes:
@@ -112,7 +119,8 @@ export const SEED_JOBS: Job[] = [
     postingUrl: "https://fernwood.example.com/jobs/product-designer-growth",
     addedOn: "2026-07-11",
     appliedOn: "2026-07-15",
-    resumeFile: "resume_growth_v2.pdf",
+    resume: { id: "seed-resume_growth_v2.pdf", fileName: "resume_growth_v2.pdf" },
+    coverLetter: null,
     description:
       "Fernwood is a subscription plant company. The Growth design team owns onboarding, pricing, and the referral loop.",
     notes: "Recruiter said they move fast — expect a screen within a week.",
@@ -148,7 +156,8 @@ export const SEED_JOBS: Job[] = [
     postingUrl: "https://cobaltsystems.example.com/careers/staff-ux-designer",
     addedOn: "2026-07-02",
     appliedOn: "2026-07-09",
-    resumeFile: "resume_staff_v1.pdf",
+    resume: { id: "seed-resume_staff_v1.pdf", fileName: "resume_staff_v1.pdf" },
+    coverLetter: null,
     description:
       "Cobalt Systems sells infrastructure monitoring to platform teams. The Staff UX role leads design for the incident response product.",
     notes:
@@ -171,7 +180,8 @@ export const SEED_JOBS: Job[] = [
     postingUrl: "https://harvest.example.com/careers/lead-product-designer",
     addedOn: "2026-06-26",
     appliedOn: "2026-06-30",
-    resumeFile: "resume_lead_v1.pdf",
+    resume: { id: "seed-resume_lead_v1.pdf", fileName: "resume_lead_v1.pdf" },
+    coverLetter: null,
     description:
       "Harvest & Co is a food-tech company hiring a Lead Product Designer to build out our merchant experience.",
     notes:
@@ -215,7 +225,8 @@ export const SEED_JOBS: Job[] = [
     postingUrl: "https://northbeam.example.com/jobs/product-designer-ii",
     addedOn: "2026-06-28",
     appliedOn: "2026-07-04",
-    resumeFile: "resume_generalist_v3.pdf",
+    resume: { id: "seed-resume_generalist_v3.pdf", fileName: "resume_generalist_v3.pdf" },
+    coverLetter: null,
     description:
       "Northbeam builds route planning for regional freight. This role sits on the dispatcher tools team.",
     notes: "No band posted. Ask the recruiter before the second round.",
@@ -252,7 +263,8 @@ export const SEED_JOBS: Job[] = [
     postingUrl: "https://bramble.example.com/careers/senior-ux-designer",
     addedOn: "2026-06-08",
     appliedOn: "2026-06-14",
-    resumeFile: "resume_senior_v4.pdf",
+    resume: { id: "seed-resume_senior_v4.pdf", fileName: "resume_senior_v4.pdf" },
+    coverLetter: null,
     description:
       "Bramble is a family scheduling app. The Senior UX role owns the shared-calendar experience across web and mobile.",
     notes: "Offer verbal on Jul 21. Written offer expected this week — compare against Harvest.",
@@ -286,7 +298,8 @@ export const SEED_JOBS: Job[] = [
     postingUrl: "https://quillhealth.example.com/jobs/product-designer",
     addedOn: "2026-06-19",
     appliedOn: "2026-06-24",
-    resumeFile: "resume_generalist_v3.pdf",
+    resume: { id: "seed-resume_generalist_v3.pdf", fileName: "resume_generalist_v3.pdf" },
+    coverLetter: null,
     description:
       "Quill Health builds intake software for small clinics. The role covers patient-facing forms and scheduling.",
     notes: "Passed after the screen — they wanted more healthcare domain depth.",

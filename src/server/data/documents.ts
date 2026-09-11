@@ -9,11 +9,13 @@ import {
   MAX_UPLOAD_BYTES,
   UPLOAD_REFUSALS,
   extensionOf,
+  type DocumentKind,
   type DocumentSummary,
   type UploadTicket,
 } from "@/lib/documents";
+import type { Job } from "@/lib/jobs";
 import { requireSession } from "@/server/auth/session";
-import { DOCUMENT_SUMMARY_INCLUDE, toDocumentSummary } from "@/server/db/mappers";
+import { DOCUMENT_SUMMARY_INCLUDE, toDocumentSummary, toJobDto } from "@/server/db/mappers";
 import { withTenant } from "@/server/db/tenant";
 import { extractDocumentText } from "@/server/ingest/extract";
 import { logError } from "@/server/log";
@@ -21,6 +23,7 @@ import { documentsBucket } from "@/server/storage/documents-bucket";
 import type { StartUploadInput } from "@/server/validation";
 
 import { NotFoundError, RuleError } from "./errors";
+import { JOB_INCLUDE } from "./jobs";
 
 /**
  * The data access layer for Documents. Two systems hold a Document — a row in Postgres and an
@@ -185,7 +188,8 @@ async function tombstone(userId: string, id: string): Promise<Tombstoned> {
       select: { id: true, storageKey: true },
     });
     if (!row) throw new NotFoundError("document");
-    await tx.job.updateMany({ where: { userId, documentId: id }, data: { documentId: null } });
+    await tx.job.updateMany({ where: { userId, resumeId: id }, data: { resumeId: null } });
+    await tx.job.updateMany({ where: { userId, coverLetterId: id }, data: { coverLetterId: null } });
     await tx.document.update({ where: { id: row.id }, data: { deletedAt: new Date() } });
     return row;
   });
@@ -261,4 +265,41 @@ export async function documentDownloadUrl(id: string): Promise<string> {
   });
   if (error || !data) throw new Error(`Signing a download URL failed: ${error?.message ?? "no data"}`);
   return data.signedUrl;
+}
+
+const WRONG_KIND: Record<DocumentKind, string> = {
+  resume: "That is a cover letter, so it cannot be sent as this job’s resume.",
+  cover_letter: "That is a resume, so it cannot be sent as this job’s cover letter.",
+};
+
+/**
+ * Attaches one of the user’s ready Documents to a Job as its resume or its cover letter, or clears
+ * that slot with `null` (ticket 17). The two are separate references, so setting one never touches
+ * the other. A Document of the other kind is refused by name; another user’s Document is the same
+ * `NotFoundError` as a missing one — and the tenant policy on "Job" refuses both again in Postgres.
+ */
+export async function setJobDocument(
+  jobId: string,
+  kind: DocumentKind,
+  documentId: string | null,
+): Promise<Job> {
+  const { userId } = await requireSession();
+  const row = await withTenant(userId, async (tx) => {
+    const job = await tx.job.findFirst({ where: { id: jobId, userId }, select: { id: true } });
+    if (!job) throw new NotFoundError();
+    if (documentId !== null) {
+      const document = await tx.document.findFirst({
+        where: { id: documentId, userId, deletedAt: null, ingestion: "ready" },
+        select: { kind: true },
+      });
+      if (!document) throw new NotFoundError("document");
+      if (document.kind !== kind) throw new RuleError("wrong-kind", WRONG_KIND[kind]);
+    }
+    return tx.job.update({
+      where: { id: job.id },
+      data: kind === "resume" ? { resumeId: documentId } : { coverLetterId: documentId },
+      include: JOB_INCLUDE,
+    });
+  });
+  return toJobDto(row);
 }

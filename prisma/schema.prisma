@@ -79,9 +79,13 @@ model Job {
   description String    @default("")
   notes       String    @default("")
   accent      Accent
-  /// The Document sent with this Job, if any. Deleting the Document leaves the Job intact.
-  documentId  String?
-  document    Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  /// The resume sent with this Job, if any. Deleting the Document leaves the Job intact.
+  /// Renamed from `documentId` when cover letters got their own reference (ticket 17).
+  resumeId      String?
+  resume        Document? @relation("JobResume", fields: [resumeId], references: [id], onDelete: SetNull)
+  /// The cover letter sent with this Job, if any. The tenant policy checks both kinds.
+  coverLetterId String?
+  coverLetter   Document? @relation("JobCoverLetter", fields: [coverLetterId], references: [id], onDelete: SetNull)
   contacts    JobContact[]
   activity    ActivityEntry[]
   createdAt   DateTime  @default(now())
@@ -89,7 +93,8 @@ model Job {
 
   /// The board lists a user's jobs in creation order, so reloads never reshuffle.
   @@index([userId, createdAt])
-  @@index([documentId])
+  @@index([resumeId])
+  @@index([coverLetterId])
 }
 
 /// A dated line in a Job's history, written by the system as a side effect of change.
@@ -168,7 +173,8 @@ model Document {
   ingestionError String?
   /// Tombstone (ticket 16): set first, then the object is removed, then the row is hard-deleted.
   deletedAt      DateTime?
-  jobs           Job[]
+  resumeFor      Job[]          @relation("JobResume")
+  coverLetterFor Job[]          @relation("JobCoverLetter")
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 

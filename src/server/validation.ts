@@ -211,6 +211,13 @@ export type StartUploadInput = z.infer<typeof startUploadSchema>;
 /** Ids are opaque cuids; this only stops a caller handing us a novel. */
 export const idSchema = z.string().trim().min(1).max(64);
 
+/** Setting a Job’s resume or cover letter; `null` clears that slot. */
+export const jobDocumentSchema = z.object({
+  jobId: idSchema,
+  kind: z.enum(DOCUMENT_KINDS),
+  documentId: idSchema.nullable(),
+});
+
 /** Field name → first message, in the shape the forms render inline. */
 export type FieldErrors = Record<string, string>;
 

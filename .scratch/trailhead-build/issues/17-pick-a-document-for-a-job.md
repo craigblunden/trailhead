@@ -1,6 +1,6 @@
 # 17: Pick an existing document for a job
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 **Blocked by:** 15
 
@@ -43,3 +43,47 @@ uploaded one. It is a record the user keeps on file, and the document kinds alre
 - [ ] A cover letter cannot be set as the job's resume, nor a resume as its cover letter
 - [ ] The picker produces zero axe violations, is keyboard-operable, and does not overflow at 320,
       768, 1024, or 1440px
+
+## Comments
+
+### 2026-09-11 — agent
+
+**Built, as ticket 13 decided.**
+
+- **Migration `20260911120000_job_resume_and_cover_letter`.** `documentId` is **renamed to
+  `resumeId`** (with its index and foreign key), and a nullable `coverLetterId` is added, both
+  `ON DELETE SET NULL`. The call on the rename: the column now means exactly one thing, only the data
+  layer reads it, and `ALTER … RENAME` keeps the data — so the clearer name costs nothing. The tenant
+  policy on `Job` is recreated: a referenced Document must be visible to the tenant (ticket 04's
+  rule), **not tombstoned, and of the right kind**. A cover letter can never be a Job's resume, nor a
+  resume its cover letter, even from a write that skips the data layer.
+- **Data layer:** `setJobDocument(jobId, kind, documentId | null)` in `src/server/data/documents.ts`.
+  Only a ready, live Document of the user's own can be attached; the wrong kind is a `RuleError`
+  (`wrong-kind`) with a message naming the problem; a foreign id is the same `NotFoundError` as a
+  missing one. The delete path's tombstone now detaches from both columns.
+- **Job DTO:** `resumeFile: string | null` is replaced by `resume` and `coverLetter`, each
+  `{ id, fileName } | null`. Document summaries count the Jobs using a Document through either
+  reference.
+- **UI:** the job page's **Application kit** card — per kind, a radio list of Nothing then each ready
+  document with "On N jobs" — with **"Upload another"** as a secondary row beneath it, where a new
+  upload lands attached. At the cap the row reads "All 3 slots used · Manage documents". Delete is not
+  offered here. The choice is optimistic and rolls back visibly with the reason. The Details card no
+  longer shows a file name, and the add-job dialog's filename-only resume field is gone: documents
+  are attached from the job's own page.
+
+**Tests:** `tests/integration/job-documents.test.ts` (6): one document on two jobs, detaching one
+leaves the other; resume and cover letter at once; the wrong kind refused by the data layer, by the
+action, and by the policy on a direct write; pending and tombstoned documents cannot be attached;
+user B cannot attach A's document (data layer, action, and a direct write); deleting a cover letter
+leaves the resume. `tests/components/application-kit.test.tsx` (8, including keyboard operation, the
+upload landing attached, the at-cap row, rollback, and axe). `e2e/documents.spec.ts` gains the kit
+journey: upload from the kit, reuse on a second job chosen by keyboard, detach from one, zero axe
+violations, and no overflow at 320/768/1024/1440. Existing tests that named `documentId` or
+`resumeFile` were updated.
+
+**Not committed, flagged:** the uncommitted landing-page rewrite in the working tree
+(`src/components/landing/everything-you-need.tsx`) read `job.resumeFile` from `SEED_JOBS`; its two
+uses now read `job.resume?.fileName` so the working tree still builds. That file is otherwise
+untouched and not part of this commit.
+
+**Status:** ready-for-review

@@ -1,15 +1,22 @@
 "use server";
 
 import type { DocumentSummary, UploadTicket } from "@/lib/documents";
+import type { Job } from "@/lib/jobs";
 import { invalid, runAction, type ActionResult } from "@/server/action-result";
 import {
   deleteDocument,
   documentDownloadUrl,
   finishUpload,
   listDocuments,
+  setJobDocument,
   startUpload,
 } from "@/server/data/documents";
-import { idSchema, parseInput, startUploadSchema } from "@/server/validation";
+import {
+  idSchema,
+  jobDocumentSchema,
+  parseInput,
+  startUploadSchema,
+} from "@/server/validation";
 
 /**
  * Document actions. None of them receives a file: an upload's bytes go from the browser straight
@@ -47,4 +54,16 @@ export async function documentLinkAction(id: unknown): Promise<ActionResult<stri
   const parsedId = parseInput(idSchema, id);
   if (!parsedId.ok) return invalid({ id: "Unknown document" });
   return runAction("documents.link", () => documentDownloadUrl(parsedId.data));
+}
+
+/** Sets a Job's resume or cover letter to one of the user's Documents, or clears it with null. */
+export async function setJobDocumentAction(
+  jobId: unknown,
+  kind: unknown,
+  documentId: unknown,
+): Promise<ActionResult<Job>> {
+  const parsed = parseInput(jobDocumentSchema, { jobId, kind, documentId });
+  if (!parsed.ok) return invalid(parsed.errors);
+  const { jobId: job, kind: slot, documentId: document } = parsed.data;
+  return runAction("documents.attach", () => setJobDocument(job, slot, document));
 }

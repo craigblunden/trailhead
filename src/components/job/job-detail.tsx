@@ -7,6 +7,7 @@ import { AppHeader } from "@/components/app-header";
 import { CompanyAvatar } from "@/components/company-avatar";
 import { useJobs, type JobPatch } from "@/components/jobs-provider";
 import { ActivityCard } from "@/components/job/activity-card";
+import { ApplicationKitCard } from "@/components/job/application-kit";
 import { ContactsCard } from "@/components/job/job-contacts";
 import { CoverLetterCard } from "@/components/job/cover-letter-card";
 import { DetailsCard } from "@/components/job/details-card";
@@ -216,6 +217,7 @@ function JobDetailView({ job, error, dismissError, onPatch, onStage }: JobDetail
 
           <aside className="space-y-6">
             <DetailsCard job={job} onChange={onPatch} />
+            <ApplicationKitCard job={job} />
             <ContactsCard job={job} />
             <ActivityCard entries={job.activity} />
           </aside>

@@ -194,7 +194,7 @@ describe("ticket 04: tenant isolation, proven", () => {
             location: "x",
             addedOn: new Date("2026-07-22"),
             accent: "teal",
-            documentId: document.id,
+            resumeId: document.id,
           },
         }),
       ),

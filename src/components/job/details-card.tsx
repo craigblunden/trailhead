@@ -1,7 +1,6 @@
 "use client";
 
 import { useId } from "react";
-import { FileText } from "lucide-react";
 
 import { useDraft } from "@/components/job/use-draft";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -99,22 +98,6 @@ export function DetailsCard({ job, onChange }: DetailsCardProps) {
           </p>
         </div>
 
-        <div>
-          <FieldLabel>Resume used</FieldLabel>
-          {job.resumeFile ? (
-            <p className="mt-1.5 flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2.5">
-              <FileText
-                className="size-4 shrink-0 text-muted-foreground"
-                aria-hidden="true"
-              />
-              <span className="min-w-0 truncate">{job.resumeFile}</span>
-            </p>
-          ) : (
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              No resume attached yet.
-            </p>
-          )}
-        </div>
       </CardContent>
     </Card>
   );

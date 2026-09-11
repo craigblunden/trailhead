@@ -368,7 +368,7 @@ describe("ticket 16: delete a document", () => {
           location: "Remote",
           addedOn: new Date("2026-07-25"),
           accent: "moss",
-          documentId: summary.id,
+          resumeId: summary.id,
         },
       }),
     );
@@ -379,7 +379,7 @@ describe("ticket 16: delete a document", () => {
     await deleteDocument(summary.id);
 
     const after = await withTenant(alice.userId, (tx) => tx.job.findFirst({ where: { id: job.id } }));
-    expect(after).toMatchObject({ company: "Fernwood", documentId: null });
+    expect(after).toMatchObject({ company: "Fernwood", resumeId: null });
   });
 
   it("user B cannot delete user A's document", async () => {

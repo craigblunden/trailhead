@@ -22,7 +22,8 @@ export type CountedContactRow = ContactRow & { _count: { jobs: number } };
 export type JobRow = JobModel & {
   activity: ActivityEntryRow[];
   contacts: (JobContactRow & { contact: CountedContactRow })[];
-  document: DocumentRow | null;
+  resume: Pick<DocumentRow, "id" | "fileName"> | null;
+  coverLetter: Pick<DocumentRow, "id" | "fileName"> | null;
 };
 
 /** A contact row with the Jobs it is linked to, for its own page. */
@@ -146,7 +147,10 @@ export function toJobDto(row: JobRow): Job {
     postingUrl: row.postingUrl,
     addedOn: toIsoDate(row.addedOn),
     appliedOn: row.appliedOn ? toIsoDate(row.appliedOn) : null,
-    resumeFile: row.document?.fileName ?? null,
+    resume: row.resume ? { id: row.resume.id, fileName: row.resume.fileName } : null,
+    coverLetter: row.coverLetter
+      ? { id: row.coverLetter.id, fileName: row.coverLetter.fileName }
+      : null,
     description: row.description,
     notes: row.notes,
     contacts: sortContacts(row.contacts.map((link) => link.contact)).map(toContactDto),
@@ -155,14 +159,15 @@ export function toJobDto(row: JobRow): Job {
   };
 }
 
-/** The relations a document summary is built from: the Jobs it is attached to. */
+/** The relations a document summary is built from: the Jobs it is attached to, as either kind. */
 export const DOCUMENT_SUMMARY_INCLUDE = {
-  jobs: { select: { id: true, company: true, role: true } },
+  resumeFor: { select: { id: true, company: true, role: true } },
+  coverLetterFor: { select: { id: true, company: true, role: true } },
 } as const;
 
-export type DocumentSummaryRow = DocumentRow & {
-  jobs: Pick<JobModel, "id" | "company" | "role">[];
-};
+type JobLabel = Pick<JobModel, "id" | "company" | "role">;
+
+export type DocumentSummaryRow = DocumentRow & { resumeFor: JobLabel[]; coverLetterFor: JobLabel[] };
 
 /** Only ready and pending Documents reach the user; a failed upload is removed where it failed. */
 export function toDocumentSummary(row: DocumentSummaryRow): DocumentSummary {
@@ -173,7 +178,7 @@ export function toDocumentSummary(row: DocumentSummaryRow): DocumentSummary {
     sizeBytes: row.sizeBytes,
     uploadedOn: toIsoDate(row.createdAt),
     status: row.ingestion === "ready" ? "ready" : "pending",
-    jobs: [...row.jobs]
+    jobs: [...row.resumeFor, ...row.coverLetterFor]
       .sort(
         (a, b) =>
           a.company.localeCompare(b.company, "en") ||

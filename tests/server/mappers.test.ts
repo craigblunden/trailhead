@@ -27,8 +27,10 @@ function row(overrides: Partial<JobRow> = {}): JobRow {
     description: "Harvest & Co is a food-tech company.",
     notes: "Panel is 3 rounds.",
     accent: "wheat",
-    documentId: null,
-    document: null,
+    resumeId: null,
+    resume: null,
+    coverLetterId: null,
+    coverLetter: null,
     createdAt: new Date("2026-06-26T09:00:00.000Z"),
     updatedAt: new Date("2026-06-26T09:00:00.000Z"),
     contacts: [],
@@ -103,7 +105,8 @@ describe("toJobDto", () => {
         "postingUrl",
         "addedOn",
         "appliedOn",
-        "resumeFile",
+        "resume",
+        "coverLetter",
         "description",
         "notes",
         "contacts",
@@ -183,28 +186,20 @@ describe("toJobDto", () => {
     expect(backward).toEqual(forward);
   });
 
-  it("MAP-5: exposes the attached document as its file name, and null when there is none", () => {
-    expect(toJobDto(row()).resumeFile).toBeNull();
+  it("MAP-5: exposes the attached resume and cover letter by id and file name, and null when absent", () => {
+    expect(toJobDto(row()).resume).toBeNull();
+    expect(toJobDto(row()).coverLetter).toBeNull();
 
-    const withDocument = row({
-      documentId: "doc_1",
-      document: {
-        id: "doc_1",
-        userId: "6a0c2e20-0000-4000-8000-000000000001",
-        kind: "resume",
-        fileName: "resume_lead_v1.pdf",
-        storageKey: "6a0c2e20-0000-4000-8000-000000000001/doc_1.pdf",
-        mimeType: "application/pdf",
-        sizeBytes: 1024,
-        text: "…",
-        ingestion: "ready",
-        ingestionError: null,
-        deletedAt: null,
-        createdAt: new Date("2026-06-26T09:00:00.000Z"),
-        updatedAt: new Date("2026-06-26T09:00:00.000Z"),
-      },
+    const withBoth = row({
+      resumeId: "doc_1",
+      resume: { id: "doc_1", fileName: "resume_lead_v1.pdf" },
+      coverLetterId: "doc_2",
+      coverLetter: { id: "doc_2", fileName: "letter_harvest.docx" },
     });
-    expect(toJobDto(withDocument).resumeFile).toBe("resume_lead_v1.pdf");
+    expect(toJobDto(withBoth)).toMatchObject({
+      resume: { id: "doc_1", fileName: "resume_lead_v1.pdf" },
+      coverLetter: { id: "doc_2", fileName: "letter_harvest.docx" },
+    });
   });
 });
 

@@ -9,7 +9,6 @@ export type NewJobInput = {
   salaryMin: number | null;
   salaryMax: number | null;
   postingUrl: string;
-  resumeFile: string | null;
   description: string;
 };
 
@@ -62,6 +61,8 @@ export function createFixtureJobsClient(seed: Job[]): JobsClient {
         addedOn,
         appliedOn: null,
         notes: "",
+        resume: null,
+        coverLetter: null,
         contacts: [],
         activity: [{ id: crypto.randomUUID(), label: OPENING_ACTIVITY_LABEL, date: addedOn }],
         accent: nextAccent(jobs.length),

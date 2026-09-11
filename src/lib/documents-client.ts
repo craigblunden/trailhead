@@ -7,6 +7,7 @@ import {
   type DocumentSummary,
   type UploadRefusal,
 } from "@/lib/documents";
+import type { Job } from "@/lib/jobs";
 
 /** Where an upload is, for the status line that announces it. */
 export type UploadStage = "uploading" | "reading";
@@ -19,6 +20,8 @@ export type DocumentsClient = {
   remove(id: string): Promise<void>;
   /** A short-lived download link for one view. */
   link(id: string): Promise<string>;
+  /** Sets a Job's resume or cover letter; `null` clears it. Returns the Job as the server wrote it. */
+  attach(jobId: string, kind: DocumentKind, documentId: string | null): Promise<Job>;
 };
 
 export const documentsCache = {

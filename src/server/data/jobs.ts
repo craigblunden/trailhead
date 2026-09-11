@@ -23,7 +23,8 @@ import { NotFoundError } from "./errors";
 export const JOB_INCLUDE = {
   activity: true,
   contacts: { include: { contact: { include: { _count: { select: { jobs: true } } } } } },
-  document: true,
+  resume: { select: { id: true, fileName: true } },
+  coverLetter: { select: { id: true, fileName: true } },
 } as const;
 
 /** The board lists jobs in creation order, so reloads never reshuffle. */

@@ -108,6 +108,8 @@ export function JobsProvider({
         addedOn,
         appliedOn: null,
         notes: "",
+        resume: null,
+        coverLetter: null,
         contacts: [],
         activity: [{ id: optimisticId(), label: OPENING_ACTIVITY_LABEL, date: addedOn }],
         accent: nextAccent(previous?.length ?? 0),

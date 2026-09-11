@@ -9,6 +9,7 @@ import {
   documentLinkAction,
   finishUploadAction,
   listDocumentsAction,
+  setJobDocumentAction,
   startUploadAction,
 } from "@/server/actions/documents";
 
@@ -55,5 +56,8 @@ export function createActionsDocumentsClient(): DocumentsClient {
     },
 
     link: async (id) => unwrap(await documentLinkAction(id)),
+
+    attach: async (jobId, kind, documentId) =>
+      unwrap(await setJobDocumentAction(jobId, kind, documentId)),
   };
 }

@@ -82,7 +82,8 @@ describe("ticket 10: the board reads real jobs, and adding one persists", () => 
       appliedOn: null,
       notes: "",
       contacts: [],
-      resumeFile: null,
+      resume: null,
+      coverLetter: null,
       accent: "moss",
     });
     // Round-robin over the accent keys, by how many jobs the user already has.

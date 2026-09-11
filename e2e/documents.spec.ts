@@ -3,7 +3,7 @@ import { join } from "node:path";
 import AxeBuilder from "@axe-core/playwright";
 import type { Page, Request } from "@playwright/test";
 
-import { SIGNED_OUT, expect, signUpAndVerify, test } from "./fixtures";
+import { SIGNED_OUT, createJob, expect, signUpAndVerify, test } from "./fixtures";
 import { BREAKPOINTS } from "./routes";
 
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
@@ -101,6 +101,56 @@ test.describe("tickets 15 and 16: documents", () => {
       await expect(list.getByText(name, { exact: true })).toHaveCount(0);
     }
     await page.reload();
+    await expect(page.getByText(/Nothing on file yet/)).toBeVisible();
+  });
+
+  test("ticket 17: a job's application kit — upload lands attached, pick by keyboard, axe, no overflow", async ({ page }) => {
+    test.setTimeout(120_000);
+    await signUpAndVerify(page);
+    const first = await createJob(page, { company: "Fernwood" });
+
+    // Upload from the kit: it lands attached to the job in hand.
+    const kit = page.getByRole("region", { name: "Application kit" });
+    const upload = kit.getByRole("region", { name: "Upload another" });
+    await upload.getByLabel("Choose a file to upload").setInputFiles(fixture("resume.pdf"));
+    const resumeGroup = kit.getByRole("group", { name: "Resume" });
+    await expect(resumeGroup.getByRole("radio", { name: /resume\.pdf/ })).toBeChecked();
+    // The radio moves at once; the count changes only once the server has saved the choice. Wait
+    // for that before leaving the page, or the navigation races the write.
+    await expect(resumeGroup.getByText("On 1 job")).toBeVisible();
+
+    // A second job reuses the same file without uploading it again, chosen from the keyboard.
+    const second = await createJob(page, { company: "Harvest & Co" });
+    await resumeGroup.getByRole("radio", { name: "Nothing" }).focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(resumeGroup.getByRole("radio", { name: /resume\.pdf/ })).toBeChecked();
+    await expect(resumeGroup.getByText("On 2 jobs")).toBeVisible();
+    await page.reload();
+    await expect(resumeGroup.getByRole("radio", { name: /resume\.pdf/ })).toBeChecked();
+    await expect(resumeGroup.getByText("On 2 jobs")).toBeVisible();
+
+    // Detaching from one job leaves the other.
+    await resumeGroup.getByRole("radio", { name: "Nothing" }).check();
+    await expect(resumeGroup.getByText("On 1 job")).toBeVisible();
+    await page.goto(first.href);
+    await expect(resumeGroup.getByRole("radio", { name: /resume\.pdf/ })).toBeChecked();
+
+    await page.evaluate(() => document.fonts.ready);
+    const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
+    expect(violations.map((v) => v.id)).toEqual([]);
+    for (const width of BREAKPOINTS) {
+      await page.setViewportSize({ width, height: 900 });
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow, `overflow at ${width}px`).toBeLessThanOrEqual(0);
+    }
+    void second;
+
+    // Leave the account's storage empty.
+    await page.goto("/documents");
+    await page.getByRole("button", { name: "Delete resume.pdf" }).click();
+    await page.getByRole("dialog", { name: "Delete resume.pdf?" }).getByRole("button", { name: "Delete document" }).click();
     await expect(page.getByText(/Nothing on file yet/)).toBeVisible();
   });
 });

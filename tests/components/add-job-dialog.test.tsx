@@ -142,29 +142,6 @@ describe("adding a job", () => {
   });
 });
 
-describe("the resume dropzone", () => {
-  it("ADD-5: swaps the dropzone for a removable chip once a file is chosen", async () => {
-    const { user } = renderWithJobs(<BoardView />);
-    const dialog = await openDialog(user);
-
-    const input = within(dialog).getByLabelText(/resume/i, { selector: "input" });
-    await user.upload(
-      input,
-      new File(["cv"], "resume_principal_v2.pdf", { type: "application/pdf" }),
-    );
-
-    expect(within(dialog).getByText("resume_principal_v2.pdf")).toBeInTheDocument();
-    expect(
-      within(dialog).queryByText(/Drop your resume here/i),
-    ).toBeNull();
-
-    await user.click(
-      within(dialog).getByRole("button", { name: /remove resume_principal_v2\.pdf/i }),
-    );
-    expect(within(dialog).getByText(/Drop your resume here/i)).toBeInTheDocument();
-  });
-});
-
 describe("dismissing the dialog", () => {
   it("ADD-6: Cancel closes without adding anything", async () => {
     const { user } = renderWithJobs(<BoardView />);
@@ -190,19 +167,21 @@ describe("dismissing the dialog", () => {
     expect(trigger).toHaveFocus();
   });
 
-  it("ADD-6: the close button also dismisses, and clears a staged resume", async () => {
+  it("ADD-6: the close button also dismisses", async () => {
     const { user } = renderWithJobs(<BoardView />);
-    let dialog = await openDialog(user);
+    const dialog = await openDialog(user);
 
-    await user.upload(
-      within(dialog).getByLabelText(/resume/i, { selector: "input" }),
-      new File(["cv"], "stale.pdf", { type: "application/pdf" }),
-    );
+    await user.type(within(dialog).getByLabelText("Company"), "Discarded Co");
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
-    expect(screen.queryByRole("dialog")).toBeNull();
 
-    dialog = await openDialog(user);
-    expect(within(dialog).queryByText("stale.pdf")).toBeNull();
-    expect(within(dialog).getByText(/Drop your resume here/i)).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByText("Discarded Co")).toBeNull();
+  });
+
+  it("ADD-7: asks for no file — documents are attached from the job's own page (ticket 17)", async () => {
+    const { user } = renderWithJobs(<BoardView />);
+    const dialog = await openDialog(user);
+
+    expect(dialog.querySelector('input[type="file"]')).toBeNull();
   });
 });
