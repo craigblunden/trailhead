@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 
-import { ActionError } from "@/components/jobs-actions-client";
+import { ActionError } from "@/components/action-client";
 import type { ContactDetail, ContactListItem } from "@/lib/contacts";
 import type { ContactFields, ContactsClient } from "@/lib/contacts-client";
 import type { Job } from "@/lib/jobs";

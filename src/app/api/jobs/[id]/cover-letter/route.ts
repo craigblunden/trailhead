@@ -41,7 +41,11 @@ const STATUS: Record<GenerationFailure, number> = {
   unavailable: 503,
   quota: 429,
   "no-resume": 409,
+  "no-description": 409,
 };
+
+/** Refusals that happen before a letter is reserved, so there is nothing to give back. */
+const BEFORE_RESERVING: readonly GenerationFailure[] = ["quota", "no-resume", "no-description"];
 
 const reply = (status: number, body: GenerationResponse) => NextResponse.json(body, { status });
 
@@ -76,8 +80,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   let reservedWeek: string | null = null;
 
   try {
-    // 1. What the letter is written from. A foreign job or a missing resume stops here, before
-    //    any quota is taken.
+    // 1. What the letter is written from. A foreign job, a missing resume, or an empty description
+    //    stops here, before any quota is taken.
     const inputs = await coverLetterInputs(parsedId.data);
 
     const client = createClaudeClient();
@@ -114,8 +118,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   } catch (error) {
     if (error instanceof UnauthenticatedError) return reply(401, UNAUTHENTICATED);
     if (error instanceof NotFoundError) return reply(404, NOT_FOUND);
-    if (error instanceof RuleError && (error.code === "quota" || error.code === "no-resume")) {
-      const code = error.code as GenerationFailure;
+    const rule = error instanceof RuleError ? error.code : null;
+    const code = BEFORE_RESERVING.find((failure) => failure === rule);
+    if (code) {
       return reply(STATUS[code], {
         ok: false,
         error: code,

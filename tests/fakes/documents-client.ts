@@ -1,9 +1,9 @@
 import { vi } from "vitest";
 
-import { ActionError } from "@/components/jobs-actions-client";
+import { ActionError } from "@/components/action-client";
 import type { DocumentKind, DocumentSummary } from "@/lib/documents";
 import type { DocumentsClient, UploadStage } from "@/lib/documents-client";
-import type { Job } from "@/lib/jobs";
+import { withKitSlot, type Job } from "@/lib/jobs";
 
 /**
  * An in-memory DocumentsClient. `upload` walks through the same stages as the real one; a test can
@@ -50,7 +50,7 @@ export function createFakeDocumentsClient(
         throw new ActionError("rejected", "That is the wrong kind of document.", {}, "wrong-kind");
       }
       const attached = document ? { id: document.id, fileName: document.fileName } : null;
-      const updated: Job = kind === "resume" ? { ...job, resume: attached } : { ...job, coverLetter: attached };
+      const updated = withKitSlot(job, kind, attached);
       jobsById.set(jobId, updated);
       documents = documents.map((candidate) => {
         const others = candidate.jobs.filter((entry) => entry.id !== jobId);

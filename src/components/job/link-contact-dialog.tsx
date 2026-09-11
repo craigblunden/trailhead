@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DEFAULT_CONTACT_KIND, kindLine, type ContactKind } from "@/lib/contacts";
+import { CONTACT_LIMITS, DEFAULT_CONTACT_KIND, kindLine, type ContactKind } from "@/lib/contacts";
 import { pluralize } from "@/lib/jobs";
 
 type LinkContactDialogProps = {
@@ -124,7 +124,7 @@ export function LinkContactDialog({
                 id={`${fieldId}-name`}
                 value={name}
                 onChange={(event) => setName(event.target.value)}
-                maxLength={120}
+                maxLength={CONTACT_LIMITS.name}
                 required
                 autoFocus
                 className="h-10"

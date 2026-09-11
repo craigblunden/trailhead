@@ -1,9 +1,11 @@
 import { join } from "node:path";
 
-import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 
-import { SIGNED_OUT, createJob, expect, signUpAndVerify, test } from "./fixtures";
+import { nextWeekStart, weekStartOf } from "../src/lib/generation";
+
+import { expectNoAxeViolations } from "./checks";
+import { SIGNED_OUT, createJob, expect, signUpAndVerify, test, waitForActionAnswer } from "./fixtures";
 
 /**
  * Ticket 18 (and 19's failure paths) end to end, against the fake Anthropic API Playwright starts
@@ -32,8 +34,7 @@ async function saveDescription(page: Page, text: string) {
 
 /** A job with a description and an attached resume, ready to write from. */
 async function jobReadyToWrite(page: Page, description: string) {
-  const job = await createJob(page, { company: "Fernwood" });
-  await saveDescription(page, description);
+  const job = await createJob(page, { company: "Fernwood", description });
   const kit = page.getByRole("region", { name: "Application kit" });
   await kit
     .getByRole("region", { name: "Upload another" })
@@ -48,6 +49,14 @@ const card = (page: Page) => page.getByRole("region", { name: "Cover letter" });
 test.describe("ticket 18: generate a cover letter", () => {
   // The quota is per account, so each journey owns a fresh one.
   test.use({ storageState: SIGNED_OUT });
+
+  // Letter counts are per quota week. A journey that straddled Monday 00:00 UTC would watch its count
+  // reset part-way through, so it is skipped rather than failed; the integration suite pins the clock
+  // and proves the week boundary itself.
+  test.beforeEach(() => {
+    const untilNextWeek = Date.parse(`${nextWeekStart(weekStartOf())}T00:00:00.000Z`) - Date.now();
+    test.skip(untilNextWeek < 5 * 60_000, "The quota week turns over during this journey.");
+  });
 
   // Each journey uploads a resume; take it back out of storage so runs leave no files behind.
   test.afterEach(async ({ page }) => {
@@ -76,12 +85,7 @@ test.describe("ticket 18: generate a cover letter", () => {
     // On this same page, while the letter is being written. Server Actions from one page run one at a
     // time, so if generation were an action this save would wait for the letter. Its answer must
     // arrive while the letter is still being written.
-    const samePageSave = page.waitForResponse(
-      (response) =>
-        response.request().method() === "POST" &&
-        Boolean(response.request().headers()["next-action"]) &&
-        (response.request().postData() ?? "").includes("Prep the growth case study."),
-    );
+    const samePageSave = waitForActionAnswer(page, "Prep the growth case study.");
     await page.getByRole("textbox", { name: "Notes" }).fill("Prep the growth case study.");
     await page.getByRole("textbox", { name: "Notes" }).blur();
     await samePageSave;
@@ -90,16 +94,8 @@ test.describe("ticket 18: generate a cover letter", () => {
     // Another tab, while the letter is still being written.
     const other = await context.newPage();
     await other.goto(job.href);
-    // The screen updates optimistically, so the proof is the server's answer to each write. Other
-    // actions run too (the job list refetches when the tab gains focus), so each write is picked out
-    // by what it sends.
-    const answered = (marker: string) =>
-      other.waitForResponse(
-        (response) =>
-          response.request().method() === "POST" &&
-          Boolean(response.request().headers()["next-action"]) &&
-          (response.request().postData() ?? "").includes(marker),
-      );
+    // The screen updates optimistically, so the proof is the server's answer to each write.
+    const answered = (marker: string) => waitForActionAnswer(other, marker);
     const notes = other.getByRole("textbox", { name: "Notes" });
     const notesSaved = answered("Asked about the size of the growth team.");
     await notes.fill("Asked about the size of the growth team.");
@@ -130,10 +126,7 @@ test.describe("ticket 18: generate a cover letter", () => {
     expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("Dear Hiring Team,");
 
     // The whole job page, with a written letter and its copy status on it.
-    const { violations } = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-      .analyze();
-    expect(violations.map((v) => v.id)).toEqual([]);
+    await expectNoAxeViolations(page);
   });
 
   test("ticket 19: a refusal and a timeout are explained and use no letter; at the quota the card says why and when", async ({

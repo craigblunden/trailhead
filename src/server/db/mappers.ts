@@ -6,6 +6,7 @@ import type {
   JobContact as JobContactRow,
 } from "@/generated/prisma/client";
 import type { ContactDetail, ContactListItem } from "@/lib/contacts";
+import { isoDate } from "@/lib/dates";
 import type { DocumentSummary } from "@/lib/documents";
 import { STAGES, type ActivityEntry, type Contact, type Job } from "@/lib/jobs";
 
@@ -37,7 +38,7 @@ export type ContactDetailRow = ContactRow & {
  * identical.
  */
 export function toIsoDate(value: Date): string {
-  return value.toISOString().slice(0, 10);
+  return isoDate(value);
 }
 
 /** The inverse: a `YYYY-MM-DD` string to the `Date` a `date` column expects. */
@@ -45,14 +46,9 @@ export function toDateColumn(iso: string): Date {
   return new Date(`${iso}T00:00:00.000Z`);
 }
 
-/**
- * Today as a UTC calendar date — the same convention the Phase-1 prototype used, and the one the
- * formatters render in. Takes the clock as an argument so callers are testable without fake
- * timers.
- */
-export function todayIso(now: Date = new Date()): string {
-  return toIsoDate(now);
-}
+
+/** The last tiebreak in every order: ids are unique, so an order that ends here is total. */
+const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 /**
  * Newest first by the user-visible date, then by creation time — the tiebreak that makes "newest
@@ -65,7 +61,7 @@ export function sortActivity<T extends Pick<ActivityEntryRow, "id" | "date" | "c
     (a, b) =>
       b.date.getTime() - a.date.getTime() ||
       b.createdAt.getTime() - a.createdAt.getTime() ||
-      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      byId(a, b),
   );
 }
 
@@ -76,7 +72,7 @@ export function toActivityDto(row: ActivityEntryRow): ActivityEntry {
 /** Stable: by name, then id, so the detail view never reshuffles across reloads. */
 export function sortContacts<T extends Pick<ContactRow, "id" | "name">>(rows: readonly T[]): T[] {
   return [...rows].sort(
-    (a, b) => a.name.localeCompare(b.name, "en") || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    (a, b) => a.name.localeCompare(b.name, "en") || byId(a, b),
   );
 }
 
@@ -116,7 +112,7 @@ export function toContactDetail(row: ContactDetailRow): ContactDetail {
         STAGES.indexOf(a.stage) - STAGES.indexOf(b.stage) ||
         a.company.localeCompare(b.company, "en") ||
         a.role.localeCompare(b.role, "en") ||
-        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+        byId(a, b),
     )
     .map((job) => ({ id: job.id, company: job.company, role: job.role, stage: job.stage }));
 
@@ -183,7 +179,7 @@ export function toDocumentSummary(row: DocumentSummaryRow): DocumentSummary {
         (a, b) =>
           a.company.localeCompare(b.company, "en") ||
           a.role.localeCompare(b.role, "en") ||
-          (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+          byId(a, b),
       )
       .map((job) => ({ id: job.id, company: job.company, role: job.role })),
   };

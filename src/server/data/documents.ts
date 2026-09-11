@@ -11,6 +11,7 @@ import {
   extensionOf,
   type DocumentKind,
   type DocumentSummary,
+  type UploadRefusal,
   type UploadTicket,
 } from "@/lib/documents";
 import type { Job } from "@/lib/jobs";
@@ -126,21 +127,19 @@ export async function finishUpload(id: string): Promise<DocumentSummary> {
   const extension = extensionOf(row.storageKey);
   const bucket = await documentsBucket();
   const { data: blob, error } = await bucket.download(row.storageKey);
-  if (error || !blob || !extension) {
-    await refuse(userId, id, "upload-missing");
-  }
-  if (blob!.size > MAX_UPLOAD_BYTES) await refuse(userId, id, "too-large");
+  if (error || !blob || !extension) return refuse(userId, id, "upload-missing");
+  if (blob.size > MAX_UPLOAD_BYTES) return refuse(userId, id, "too-large");
 
-  const extraction = await extractDocumentText(new Uint8Array(await blob!.arrayBuffer()), extension!);
-  if (!extraction.ok) await refuse(userId, id, extraction.reason);
+  const extraction = await extractDocumentText(new Uint8Array(await blob.arrayBuffer()), extension);
+  if (!extraction.ok) return refuse(userId, id, extraction.reason);
 
   const saved = await withTenant(userId, async (tx) => {
     const { count } = await tx.document.updateMany({
       where: { id, userId, deletedAt: null },
       data: {
         ingestion: "ready",
-        text: extraction.ok ? extraction.text : "",
-        sizeBytes: blob!.size,
+        text: extraction.text,
+        sizeBytes: blob.size,
         ingestionError: null,
       },
     });
@@ -151,9 +150,7 @@ export async function finishUpload(id: string): Promise<DocumentSummary> {
   return toDocumentSummary(saved);
 }
 
-type Refusal = keyof typeof UPLOAD_REFUSALS;
-
-async function refuse(userId: string, id: string, reason: Refusal): Promise<never> {
+async function refuse(userId: string, id: string, reason: UploadRefusal): Promise<never> {
   await withTenant(userId, (tx) =>
     tx.document.updateMany({
       where: { id, userId, deletedAt: null },

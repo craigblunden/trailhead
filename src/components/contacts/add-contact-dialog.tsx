@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { ContactKindSelect } from "@/components/contacts/contact-kind-select";
-import { failureMessage, useContactMutations } from "@/components/contacts/contacts-provider";
-import { ActionError } from "@/components/jobs-actions-client";
+import { useContactMutations } from "@/components/contacts/contacts-provider";
+import { ActionError, describeFailure } from "@/components/action-client";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DEFAULT_CONTACT_KIND, type ContactKind } from "@/lib/contacts";
+import { CONTACT_LIMITS, DEFAULT_CONTACT_KIND, type ContactKind } from "@/lib/contacts";
 
 type AddContactDialogProps = {
   open: boolean;
@@ -52,7 +52,7 @@ export function AddContactDialog({ open, onOpenChange, returnFocusTo }: AddConta
       setError(
         failure instanceof ActionError && failure.fields.name
           ? failure.fields.name
-          : failureMessage(failure, "That contact wasn't saved. Check your connection and try again."),
+          : describeFailure(failure, "That contact wasn't saved. Check your connection and try again."),
       );
     }
   }
@@ -86,7 +86,7 @@ export function AddContactDialog({ open, onOpenChange, returnFocusTo }: AddConta
               id={`${fieldId}-name`}
               value={name}
               onChange={(event) => setName(event.target.value)}
-              maxLength={120}
+              maxLength={CONTACT_LIMITS.name}
               required
               className="h-10"
               aria-invalid={error ? true : undefined}

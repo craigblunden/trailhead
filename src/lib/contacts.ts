@@ -61,7 +61,16 @@ export function kindLine(contact: { kind: ContactKind; agency: string }): string
     : CONTACT_KIND_LABEL[contact.kind];
 }
 
-/** Today as a UTC calendar date — the convention every date in the app uses. */
-export function todayUtc(now: Date = new Date()): string {
-  return now.toISOString().slice(0, 10);
-}
+/**
+ * Ticket 13 decided these bounds, enforced by the server's schema and mirrored by the forms. Name and kind are required; everything else is optional and
+ * stored blank. Last spoken is set by the user, never derived, and never in the future.
+ */
+export const CONTACT_LIMITS = {
+  name: 120,
+  title: 120,
+  agency: 120,
+  email: 254,
+  phone: 40,
+  notes: 2_000,
+  linkedinUrl: 2048,
+} as const;

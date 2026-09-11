@@ -37,6 +37,14 @@ jobs:
         # (the two roles' local development passwords, which .env.example already uses).
         run: npx supabase start
 
+      - name: Check the Auth container can reach the runner
+        # The social-linking suites start a fake OAuth provider on the runner, and Auth (in Docker)
+        # calls it as host.docker.internal. On Linux that name needs a host-gateway mapping; fail here,
+        # with a clear message, rather than as a confusing sign-in test failure later.
+        run: |
+          docker exec supabase_auth_trailhead sh -c 'grep -q "host.docker.internal" /etc/hosts || getent hosts host.docker.internal || nslookup host.docker.internal' \
+            || { echo "::error::The Supabase Auth container cannot resolve host.docker.internal, so the test-only OAuth provider is unreachable. Add a host-gateway mapping for it."; exit 1; }
+
       - name: Use the local environment
         # .env.example carries the local stack's well-known development values; nothing secret.
         run: cp .env.example .env.local

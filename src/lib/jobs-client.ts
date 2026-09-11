@@ -1,3 +1,4 @@
+import { todayUtc } from "@/lib/dates";
 import type { Job, Stage } from "@/lib/jobs";
 import { OPENING_ACTIVITY_LABEL, nextAccent, stageChange } from "@/lib/jobs-rules";
 
@@ -26,10 +27,6 @@ export type JobsClient = {
   setStage(id: string, stage: Stage): Promise<Job>;
 };
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 /**
  * An in-memory client over fixtures, applying the Phase-1 rules. This is what the board runs
  * against until a server exists, and what component tests drive. Every call resolves on a
@@ -53,7 +50,7 @@ export function createFixtureJobsClient(seed: Job[]): JobsClient {
       return jobs;
     },
     async add(input) {
-      const addedOn = today();
+      const addedOn = todayUtc();
       const job: Job = {
         ...input,
         id: crypto.randomUUID(),
@@ -75,7 +72,7 @@ export function createFixtureJobsClient(seed: Job[]): JobsClient {
     },
     async setStage(id, stage) {
       const job = find(id);
-      const change = stageChange(job, stage, today());
+      const change = stageChange(job, stage, todayUtc());
       if (!change.entry) return job;
       return replace({
         ...job,

@@ -212,6 +212,14 @@ describe("ticket 15: upload a resume", () => {
       ),
     );
     expect(policies.rows.map((p) => p.cmd).sort()).toEqual(["DELETE", "INSERT", "SELECT"]);
+
+    // And no policy of any name lets anyone update or overwrite an object, in any bucket.
+    const updates = await asJanitor((client) =>
+      client.query(
+        "select policyname from pg_policies where schemaname = 'storage' and tablename = 'objects' and cmd in ('UPDATE', 'ALL')",
+      ),
+    );
+    expect(updates.rows).toEqual([]);
   });
 
   it("user B cannot list, download, sign a URL for, or remove user A's object", async () => {

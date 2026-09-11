@@ -1,4 +1,5 @@
 import type { ContactKind } from "@/lib/contacts";
+import type { DocumentKind } from "@/lib/documents";
 
 export const STAGES = [
   "interested",
@@ -143,4 +144,14 @@ export function webLink(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+/** What a Job's application kit holds for one kind of Document. */
+export function kitSlot(job: Job, kind: DocumentKind): AttachedDocument | null {
+  return kind === "resume" ? job.resume : job.coverLetter;
+}
+
+/** The Job with one kit slot set, the other left as it was. */
+export function withKitSlot(job: Job, kind: DocumentKind, value: AttachedDocument | null): Job {
+  return kind === "resume" ? { ...job, resume: value } : { ...job, coverLetter: value };
 }

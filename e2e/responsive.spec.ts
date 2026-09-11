@@ -1,42 +1,6 @@
-import type { Page } from "@playwright/test";
-
+import { expectNoHorizontalOverflow } from "./checks";
 import { SIGNED_OUT, createJob, expect, test } from "./fixtures";
 import { BREAKPOINTS, PRIVATE_ROUTES, PUBLIC_ROUTES } from "./routes";
-
-/** Fails if the document scrolls sideways, naming the widest offenders. */
-async function expectNoHorizontalOverflow(page: Page, width: number) {
-  await page.setViewportSize({ width, height: 900 });
-  await page.evaluate(() => document.fonts.ready);
-
-  const { scrollWidth, clientWidth, culprits } = await page.evaluate(() => {
-    const doc = document.documentElement;
-    const culprits: string[] = [];
-
-    if (doc.scrollWidth > doc.clientWidth) {
-      for (const el of document.querySelectorAll("body *")) {
-        // SVG children legitimately extend past the view box, which the
-        // <svg> itself clips — only flag real layout boxes.
-        if (el.closest("svg")) continue;
-        const rect = el.getBoundingClientRect();
-        if (rect.width > 0 && rect.right > doc.clientWidth + 1) {
-          culprits.push(
-            `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 60)} → ${Math.round(rect.right)}px`,
-          );
-        }
-      }
-    }
-
-    return {
-      scrollWidth: doc.scrollWidth,
-      clientWidth: doc.clientWidth,
-      culprits: culprits.slice(0, 5),
-    };
-  });
-
-  expect(scrollWidth, `overflowing elements:\n${culprits.join("\n")}`).toBeLessThanOrEqual(
-    clientWidth,
-  );
-}
 
 test.describe("signed out", () => {
   test.use({ storageState: SIGNED_OUT });

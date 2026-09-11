@@ -232,4 +232,15 @@ describe("ticket 18: the route", () => {
     expect((await post(bare.id)).status).toBe(401);
     expect(claude.calls).toBe(0);
   });
+
+  it("refuses a job with no description before taking quota — there is nothing to write the letter from", async () => {
+    const user = newUserId();
+    const job = await jobWithResume(user, "");
+
+    const response = await post(job.id);
+    expect(response.status).toBe(409);
+    expect(response.body).toMatchObject({ error: "no-description", refunded: false, quota: { used: 0 } });
+    expect(await generationQuota()).toMatchObject({ used: 0 });
+    expect(claude.calls).toBe(0);
+  });
 });

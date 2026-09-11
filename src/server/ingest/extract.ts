@@ -3,7 +3,7 @@ import "server-only";
 import mammoth from "mammoth";
 import { extractText, getDocumentProxy } from "unpdf";
 
-import type { DocumentExtension } from "@/lib/documents";
+import type { DocumentExtension, UploadRefusal } from "@/lib/documents";
 
 /**
  * Turns an uploaded file's bytes into text, at upload, while the user is present (ticket 15).
@@ -30,13 +30,11 @@ export const INGEST_LIMITS = {
   timeoutMs: 20_000,
 } as const;
 
-export type ExtractionFailure =
-  | "no-text-layer"
-  | "password-protected"
-  | "type-mismatch"
-  | "unreadable"
-  | "too-many-pages"
-  | "too-much-text";
+/** The refusals extraction can reach — a subset of `UPLOAD_REFUSALS`, so each has its written message. */
+export type ExtractionFailure = Extract<
+  UploadRefusal,
+  "no-text-layer" | "password-protected" | "type-mismatch" | "unreadable" | "too-many-pages" | "too-much-text"
+>;
 
 export type Extraction = { ok: true; text: string } | { ok: false; reason: ExtractionFailure };
 

@@ -3,7 +3,8 @@ import "server-only";
 import type { Job, Stage } from "@/lib/jobs";
 import { OPENING_ACTIVITY_LABEL, nextAccent, stageChange } from "@/lib/jobs-rules";
 import { requireSession } from "@/server/auth/session";
-import { toDateColumn, toIsoDate, toJobDto, todayIso, type JobRow } from "@/server/db/mappers";
+import { todayUtc } from "@/lib/dates";
+import { toDateColumn, toIsoDate, toJobDto, type JobRow } from "@/server/db/mappers";
 import { withTenant } from "@/server/db/tenant";
 import type { JobPatchInput, NewJobInput } from "@/server/validation";
 
@@ -52,7 +53,7 @@ export async function getJob(id: string): Promise<Job | null> {
  */
 export async function createJob(input: NewJobInput, now: Date = new Date()): Promise<Job> {
   const { userId } = await requireSession();
-  const today = toDateColumn(todayIso(now));
+  const today = toDateColumn(todayUtc(now));
 
   const row = await withTenant(userId, async (tx) => {
     const existing = await tx.job.count({ where: { userId } });
@@ -98,7 +99,7 @@ export async function updateJob(id: string, patch: JobPatchInput): Promise<Job> 
  */
 export async function setJobStage(id: string, stage: Stage, now: Date = new Date()): Promise<Job> {
   const { userId } = await requireSession();
-  const today = todayIso(now);
+  const today = todayUtc(now);
 
   const row = await withTenant(userId, async (tx): Promise<JobRow> => {
     const current = await tx.job.findFirst({ where: { id, userId }, include: JOB_INCLUDE });

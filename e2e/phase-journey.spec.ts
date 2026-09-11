@@ -1,6 +1,6 @@
 import { join } from "node:path";
 
-import { SIGNED_OUT, expect, newAccount, signIn, signOut, signUpAndVerify, test } from "./fixtures";
+import { SIGNED_OUT, expect, newAccount, signIn, signOut, signUpAndVerify, test, waitForActionAnswer } from "./fixtures";
 
 /**
  * Ticket 20: one journey proves the phase. A stranger signs up and verifies, signs in, adds a job,
@@ -37,12 +37,7 @@ test("PHASE-1: sign up → verify → sign in → add → move → reload → up
   await expect(page.getByRole("heading", { level: 1, name: "Lead Product Designer" })).toBeVisible();
 
   // Move it on, and find the move still there after a reload.
-  const stageSaved = page.waitForResponse(
-    (response) =>
-      response.request().method() === "POST" &&
-      Boolean(response.request().headers()["next-action"]) &&
-      (response.request().postData() ?? "").includes('"interviewing"'),
-  );
+  const stageSaved = waitForActionAnswer(page, '"interviewing"');
   await page.getByRole("combobox", { name: "Application stage" }).click();
   await page.getByRole("option", { name: "Interviewing" }).click();
   await stageSaved;

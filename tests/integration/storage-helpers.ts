@@ -4,6 +4,8 @@ import { join } from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import pg from "pg";
 
+import { DOCUMENTS_BUCKET } from "@/lib/documents";
+
 import { signInAs, setSupabaseClient } from "./session-mock";
 import { PASSWORD, authClient, passwordAccount } from "./social-helpers";
 
@@ -28,7 +30,7 @@ export function actAs(user: RealUser) {
   setSupabaseClient(user.client);
 }
 
-export const bucketOf = (user: RealUser) => user.client.storage.from("documents");
+export const bucketOf = (user: RealUser) => user.client.storage.from(DOCUMENTS_BUCKET);
 
 /** Removes every object under the user's prefix, as that user, so runs do not accumulate files. */
 export async function emptyFolder(user: RealUser) {

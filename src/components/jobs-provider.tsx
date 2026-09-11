@@ -3,7 +3,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
-import { ActionError, createActionsJobsClient } from "@/components/jobs-actions-client";
+import { ActionError } from "@/components/action-client";
+import { createActionsJobsClient } from "@/components/jobs-actions-client";
+import { todayUtc } from "@/lib/dates";
 import type { Job, Stage } from "@/lib/jobs";
 import { jobsCache } from "@/lib/jobs-cache";
 import type { JobPatch, JobsClient, NewJobInput } from "@/lib/jobs-client";
@@ -30,10 +32,6 @@ type JobsContextValue = {
 const JobsContext = createContext<JobsContextValue | null>(null);
 
 const defaultClient: JobsClient = createActionsJobsClient();
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /** Optimistic ids are stamped so a stray one is recognisable in a bug report. */
 function optimisticId(): string {
@@ -100,7 +98,7 @@ export function JobsProvider({
     mutationFn: (input: NewJobInput) => client.add(input),
     onMutate: async (input) => {
       const previous = await snapshot();
-      const addedOn = today();
+      const addedOn = todayUtc();
       const optimistic: Job = {
         ...input,
         id: optimisticId(),
@@ -147,7 +145,7 @@ export function JobsProvider({
     onMutate: async ({ id, stage }) => {
       const previous = await snapshot();
       patchCache(id, (job) => {
-        const change = stageChange(job, stage, today());
+        const change = stageChange(job, stage, todayUtc());
         if (!change.entry) return job;
         return {
           ...job,

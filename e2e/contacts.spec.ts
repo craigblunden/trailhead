@@ -1,29 +1,7 @@
-import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 
+import { expectAccessible } from "./checks";
 import { createJob, expect, test } from "./fixtures";
-import { BREAKPOINTS } from "./routes";
-
-const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
-
-async function expectNoAxeViolations(page: Page) {
-  await page.evaluate(() => document.fonts.ready);
-  const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-  expect(
-    violations,
-    violations.map((v) => `[${v.impact}] ${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`).join("\n"),
-  ).toEqual([]);
-}
-
-async function expectNoHorizontalOverflow(page: Page, width: number) {
-  await page.setViewportSize({ width, height: 900 });
-  await page.evaluate(() => document.fonts.ready);
-  const { scrollWidth, clientWidth } = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }));
-  expect(scrollWidth, `overflow at ${width}px`).toBeLessThanOrEqual(clientWidth);
-}
 
 /** Adds a contact to the job page in hand through the search-first dialog, creating it. */
 async function createContactFromJob(page: Page, name: string, kind = "Recruiter") {
@@ -123,11 +101,17 @@ test.describe("ticket 14: contacts", () => {
     const job = await createJob(page);
     await createContactFromJob(page, `Jess Liu ${Math.random().toString(36).slice(2, 6)}`, "Referrer");
 
-    // The job page's card with its dialog open.
+    // The job page's card with its dialog open, at both steps: search, then create.
     await page.getByRole("region", { name: "Contacts" }).getByRole("button", { name: "Add contact" }).click();
-    await expect(page.getByRole("dialog", { name: "Add a contact" })).toBeVisible();
-    await expectNoAxeViolations(page);
+    const search = page.getByRole("dialog", { name: "Add a contact" });
+    await expect(search).toBeVisible();
+    await expectAccessible(page);
+    await search.getByLabel("Search your contacts").fill("Nobody Yet");
+    await search.getByRole("button", { name: "Create “Nobody Yet”" }).click();
+    await expect(page.getByRole("dialog", { name: "Create a contact" })).toBeVisible();
+    await expectAccessible(page);
     await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toBeHidden();
 
     const contactLink = page.getByRole("region", { name: "Contacts" }).getByRole("link").first();
     const contactHref = (await contactLink.getAttribute("href"))!;
@@ -135,10 +119,23 @@ test.describe("ticket 14: contacts", () => {
     for (const path of ["/contacts", contactHref, job.href]) {
       await page.goto(path);
       await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
-      await expectNoAxeViolations(page);
-      for (const width of BREAKPOINTS) {
-        await expectNoHorizontalOverflow(page, width);
-      }
+      await expectAccessible(page);
     }
+
+    // The contacts page's own add dialog, and a contact's delete confirmation.
+    await page.goto("/contacts");
+    await page.getByRole("button", { name: "Add contact" }).first().click();
+    await expect(page.getByRole("dialog", { name: "Add a contact" })).toBeVisible();
+    await expectAccessible(page);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toBeHidden();
+
+    await page.goto(contactHref);
+    await page.getByRole("button", { name: "Delete contact" }).click();
+    const confirm = page.getByRole("dialog", { name: /^Delete .+\?$/ });
+    await expect(confirm).toBeVisible();
+    await expectAccessible(page);
+    await confirm.getByRole("button", { name: "Keep contact" }).click();
+    await expect(confirm).toBeHidden();
   });
 });

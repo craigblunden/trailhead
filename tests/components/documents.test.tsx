@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
 
 import { DocumentsView } from "@/components/documents/documents-view";
-import { ActionError } from "@/components/jobs-actions-client";
+import { ActionError } from "@/components/action-client";
 import { UPLOAD_REFUSALS } from "@/lib/documents";
 import { createFakeDocumentsClient, summary } from "../fakes/documents-client";
 import { freezeClock, renderWithJobs, screen, userEvent, waitFor, within } from "../test-utils";

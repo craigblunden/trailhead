@@ -1,4 +1,4 @@
-import { unwrap } from "@/components/jobs-actions-client";
+import { unwrap } from "@/components/action-client";
 import { SESSION_ENDED_PATH } from "@/lib/auth-routing";
 import type { GenerationResponse } from "@/lib/generation";
 import { generationStatusAction, type GenerationStatus } from "@/server/actions/generation";

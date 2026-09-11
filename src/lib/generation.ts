@@ -1,3 +1,5 @@
+import { isoDate } from "@/lib/dates";
+
 /**
  * Cover-letter generation, the parts both sides of the boundary share (ticket 18). Pure.
  *
@@ -18,20 +20,18 @@ export type QuotaStatus = {
   resetsOn: string;
 };
 
-const iso = (date: Date) => date.toISOString().slice(0, 10);
-
 /** The Monday (UTC) that starts the quota week containing `now`. */
 export function weekStartOf(now: Date = new Date()): string {
   const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const sinceMonday = (day.getUTCDay() + 6) % 7;
   day.setUTCDate(day.getUTCDate() - sinceMonday);
-  return iso(day);
+  return isoDate(day);
 }
 
 export function nextWeekStart(weekStart: string): string {
   const day = new Date(`${weekStart}T00:00:00.000Z`);
   day.setUTCDate(day.getUTCDate() + 7);
-  return iso(day);
+  return isoDate(day);
 }
 
 export function quotaStatus(used: number, weekStart: string): QuotaStatus {
@@ -69,6 +69,7 @@ export const GENERATION_FAILURES = {
   unavailable: "Cover letters aren’t available on this deployment yet.",
   quota: "You’ve used this week’s cover letters.",
   "no-resume": "Attach a resume in this job’s application kit first — the letter is written from it.",
+  "no-description": "Paste the job posting into this job’s description first — the letter is written from it.",
 } as const;
 
 export type GenerationFailure = keyof typeof GENERATION_FAILURES;

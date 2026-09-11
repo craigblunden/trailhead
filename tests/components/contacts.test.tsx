@@ -5,7 +5,7 @@ import { AppNav } from "@/components/app-nav";
 import { ContactDetailView } from "@/components/contacts/contact-detail-view";
 import { ContactsShell } from "@/components/contacts/contacts-shell";
 import { JobDetail } from "@/components/job/job-detail";
-import { ActionError } from "@/components/jobs-actions-client";
+import { ActionError } from "@/components/action-client";
 import type { Job } from "@/lib/jobs";
 import { SEED_JOBS } from "../fixtures/jobs";
 import { createFakeContactsClient } from "../fakes/contacts-client";

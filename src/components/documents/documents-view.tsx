@@ -3,12 +3,9 @@
 import { useState } from "react";
 import { Download, FileText, Trash2 } from "lucide-react";
 
+import { describeFailure } from "@/components/action-client";
 import { AppHeader } from "@/components/app-header";
-import {
-  describeFailure,
-  useDocumentActions,
-  useDocumentList,
-} from "@/components/documents/documents-provider";
+import { useDocumentActions, useDocumentList } from "@/components/documents/documents-provider";
 import { UploadDocument } from "@/components/documents/upload-document";
 import { TrailheadLogo } from "@/components/trailhead-logo";
 import { Button } from "@/components/ui/button";

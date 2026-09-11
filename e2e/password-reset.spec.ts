@@ -1,28 +1,8 @@
-import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 
+import { expectNoAxeViolations, expectNoOverflowAtAnyWidth } from "./checks";
 import { SIGNED_OUT, expect, newAccount, signOut, signUpAndVerify, test } from "./fixtures";
 import { uniqueEmail, waitForMail } from "./mail";
-import { BREAKPOINTS } from "./routes";
-
-const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
-
-async function expectNoAxeViolations(page: Page) {
-  await page.evaluate(() => document.fonts.ready);
-  const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-  expect(violations.map((v) => `${v.id}: ${v.help}`)).toEqual([]);
-}
-
-async function expectNoOverflow(page: Page) {
-  for (const width of BREAKPOINTS) {
-    await page.setViewportSize({ width, height: 900 });
-    const { scrollWidth, clientWidth } = await page.evaluate(() => ({
-      scrollWidth: document.documentElement.scrollWidth,
-      clientWidth: document.documentElement.clientWidth,
-    }));
-    expect(scrollWidth, `${width}px`).toBeLessThanOrEqual(clientWidth);
-  }
-}
 
 async function requestReset(page: Page, email: string) {
   await page.goto("/forgot-password");
@@ -63,7 +43,7 @@ test.describe("forgot and reset password (ticket 06)", () => {
     await page.goto(link);
     await expect(page).toHaveURL(/\/reset-password$/);
     await expectNoAxeViolations(page);
-    await expectNoOverflow(page);
+    await expectNoOverflowAtAnyWidth(page);
 
     const fresh = newAccount();
     const newPassword = `${fresh.password}-changed`;
@@ -111,7 +91,7 @@ test.describe("forgot and reset password (ticket 06)", () => {
   }) => {
     await page.goto("/forgot-password");
     await expectNoAxeViolations(page);
-    await expectNoOverflow(page);
+    await expectNoOverflowAtAnyWidth(page);
 
     await page.getByLabel("Email").fill(uniqueEmail("a11y"));
     await page.getByRole("button", { name: "Send reset link" }).click();

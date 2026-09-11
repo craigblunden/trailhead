@@ -1,6 +1,6 @@
 import { createBrowserClient } from "@supabase/ssr";
 
-import { ActionError, unwrap } from "@/components/jobs-actions-client";
+import { ActionError, unwrap } from "@/components/action-client";
 import { DOCUMENTS_BUCKET, UPLOAD_REFUSALS } from "@/lib/documents";
 import type { DocumentsClient } from "@/lib/documents-client";
 import { supabasePublicEnv } from "@/lib/supabase-env";

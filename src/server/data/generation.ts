@@ -43,7 +43,8 @@ export async function generationQuota(now: Date = new Date()): Promise<QuotaStat
 /**
  * What the letter is written from: the Job's company, role, and description, and its attached
  * resume's extracted text. A missing and a foreign Job are the same `NotFoundError`; a Job with no
- * usable resume is refused with a message saying what to do.
+ * usable resume, or no description, is refused with a message saying what to do — before any quota
+ * is taken, because there is nothing to write the letter from.
  */
 export async function coverLetterInputs(jobId: string): Promise<CoverLetterInputs> {
   const { userId } = await requireSession();
@@ -62,6 +63,9 @@ export async function coverLetterInputs(jobId: string): Promise<CoverLetterInput
   const resume = job.resume;
   if (!resume || resume.ingestion !== "ready" || resume.deletedAt || !resume.text.trim()) {
     throw new RuleError("no-resume", GENERATION_FAILURES["no-resume"]);
+  }
+  if (!job.description.trim()) {
+    throw new RuleError("no-description", GENERATION_FAILURES["no-description"]);
   }
   return { company: job.company, role: job.role, description: job.description, resumeText: resume.text };
 }

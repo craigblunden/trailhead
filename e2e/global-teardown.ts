@@ -5,7 +5,11 @@ import pg from "pg";
 
 import { RUN_STARTED_AT } from "./global-setup";
 
-const LOOPBACK = /@(127\.0\.0\.1|localhost)(:\d+)?\//;
+/** The whole authority, anchored: "@localhost/" inside a password or a query string does not pass. */
+const LOOPBACK = /^postgres(?:ql)?:\/\/[^@/?#]*@(?:127\.0\.0\.1|localhost)(?::\d+)?\//;
+
+/** The same check withTenant() makes before it sets a tenant id. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * The two database URLs, from the environment or `.env.local`. Read by hand: Playwright loads this
@@ -57,6 +61,7 @@ export default async function globalTeardown() {
     );
     const kept: string[] = [];
     for (const { id } of users) {
+      if (!UUID.test(id)) throw new Error(`e2e teardown: ${id} is not a user id`);
       const { rows: objects } = await admin.query(
         "select 1 from storage.objects where bucket_id = 'documents' and name like $1 limit 1",
         [`${id}/%`],

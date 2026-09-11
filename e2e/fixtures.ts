@@ -56,7 +56,7 @@ export async function signOut(page: Page) {
  */
 export async function createJob(
   page: Page,
-  input: { company?: string; role?: string; location?: string } = {},
+  input: { company?: string; role?: string; location?: string; description?: string } = {},
 ): Promise<{ href: string; role: string }> {
   const job = {
     company: input.company ?? "Alpine Robotics",
@@ -69,6 +69,7 @@ export async function createJob(
   await dialog.getByLabel("Company").fill(job.company);
   await dialog.getByLabel("Role title").fill(job.role);
   if (job.location) await dialog.getByLabel("Location").fill(job.location);
+  if (input.description) await dialog.getByLabel("Job description").fill(input.description);
   await dialog.getByRole("button", { name: "Add to board" }).click();
   await expect(dialog).toBeHidden();
 
@@ -126,3 +127,17 @@ export const test = base.extend<Record<never, never>, WorkerFixtures>({
 });
 
 export { expect };
+
+/**
+ * The server's answer to the Server Action whose request carries `marker`. The screen updates
+ * optimistically, so this — not what is drawn — is the proof a write was saved. Other actions run
+ * too (the job list refetches when a tab gains focus), so each write is picked out by what it sends.
+ */
+export function waitForActionAnswer(page: Page, marker: string) {
+  return page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      Boolean(response.request().headers()["next-action"]) &&
+      (response.request().postData() ?? "").includes(marker),
+  );
+}

@@ -60,7 +60,12 @@ describe("storage guards", () => {
       join(ROOT, "supabase", "migrations", "20260911000000_provision_trailhead.sql"),
     );
     expect(provisioning).toMatch(/'documents',\s*'documents',\s*false,\s*5242880/);
-    expect(provisioning).not.toMatch(/on storage\.objects for update/i);
+    for (const file of [
+      ...walk(join(ROOT, "supabase", "migrations"), /\.sql$/),
+      ...walk(join(ROOT, "prisma", "migrations"), /\.sql$/),
+    ]) {
+      expect(read(file), rel(file)).not.toMatch(/on\s+storage\.objects\s+for\s+(update|all)\b/i);
+    }
   });
 
   it("STO-3: signed download URLs live 300 seconds or less, and the cap is a named constant", () => {

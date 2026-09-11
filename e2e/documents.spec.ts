@@ -1,12 +1,10 @@
 import { join } from "node:path";
 
-import AxeBuilder from "@axe-core/playwright";
 import type { Page, Request } from "@playwright/test";
 
+import { expectAccessible } from "./checks";
 import { SIGNED_OUT, createJob, expect, signUpAndVerify, test } from "./fixtures";
-import { BREAKPOINTS } from "./routes";
 
-const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const fixture = (name: string) => join(process.cwd(), "tests", "fixtures", "documents", name);
 
 async function uploadAs(page: Page, name: string, kind: "Resume" | "Cover letter" = "Resume") {
@@ -87,17 +85,7 @@ test.describe("tickets 15 and 16: documents", () => {
     await page.getByRole("button", { name: "Download resume.pdf" }).click();
     expect((await download).suggestedFilename()).toBe("resume.pdf");
 
-    await page.evaluate(() => document.fonts.ready);
-    const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(violations.map((v) => v.id)).toEqual([]);
-    for (const width of BREAKPOINTS) {
-      await page.setViewportSize({ width, height: 900 });
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      );
-      expect(overflow, `overflow at ${width}px`).toBeLessThanOrEqual(0);
-    }
-    await page.setViewportSize({ width: 1280, height: 900 });
+    await expectAccessible(page);
 
     // Delete lives here, behind a confirm; each one frees a slot. Clean up all three.
     for (const name of ["resume_v3.pdf", "resume.docx", "resume.pdf"]) {
@@ -142,16 +130,7 @@ test.describe("tickets 15 and 16: documents", () => {
     await page.goto(first.href);
     await expect(resumeGroup.getByRole("radio", { name: /resume\.pdf/ })).toBeChecked();
 
-    await page.evaluate(() => document.fonts.ready);
-    const { violations } = await new AxeBuilder({ page }).withTags(WCAG).analyze();
-    expect(violations.map((v) => v.id)).toEqual([]);
-    for (const width of BREAKPOINTS) {
-      await page.setViewportSize({ width, height: 900 });
-      const overflow = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      );
-      expect(overflow, `overflow at ${width}px`).toBeLessThanOrEqual(0);
-    }
+    await expectAccessible(page);
     void second;
 
     // Leave the account's storage empty.

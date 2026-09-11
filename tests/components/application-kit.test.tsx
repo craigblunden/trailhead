@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
 
 import { JobDetail } from "@/components/job/job-detail";
-import { ActionError } from "@/components/jobs-actions-client";
+import { ActionError } from "@/components/action-client";
 import type { Job } from "@/lib/jobs";
 import { SEED_JOBS } from "../fixtures/jobs";
 import { createFakeDocumentsClient, summary } from "../fakes/documents-client";

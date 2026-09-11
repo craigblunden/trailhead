@@ -2,16 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { ArrowLeft, CalendarCheck, Trash2 } from "lucide-react";
 
 import { ContactKindSelect } from "@/components/contacts/contact-kind-select";
-import {
-  failureMessage,
-  useContactDetail,
-  useContactMutations,
-} from "@/components/contacts/contacts-provider";
-import { ActionError } from "@/components/jobs-actions-client";
+import { useContactDetail, useContactMutations } from "@/components/contacts/contacts-provider";
+import { ActionError, describeFailure } from "@/components/action-client";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,7 +20,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { kindLine, todayUtc, type ContactDetail } from "@/lib/contacts";
+import { CONTACT_LIMITS, kindLine, type ContactDetail } from "@/lib/contacts";
+import { todayUtc } from "@/lib/dates";
 import type { ContactFields } from "@/lib/contacts-client";
 import { STAGES, STAGE_META, formatLongDate, pluralize, webLink, type Stage } from "@/lib/jobs";
 
@@ -92,6 +89,7 @@ function ContactProfile({ contact }: { contact: ContactDetail }) {
   const [notice, setNotice] = useState("");
   const [failure, setFailure] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const deleteTrigger = useRef<HTMLButtonElement>(null);
 
   const set = <K extends keyof ContactFields>(key: K, value: ContactFields[K]) => {
     setFields((current) => ({ ...current, [key]: value }));
@@ -110,7 +108,7 @@ function ContactProfile({ contact }: { contact: ContactDetail }) {
       if (error instanceof ActionError && error.kind === "invalid") {
         setErrors(error.fields);
       } else {
-        setFailure(failureMessage(error, "Those changes weren't saved. Check your connection and try again."));
+        setFailure(describeFailure(error, "Those changes weren't saved. Check your connection and try again."));
       }
     }
   }
@@ -123,7 +121,7 @@ function ContactProfile({ contact }: { contact: ContactDetail }) {
       router.push("/contacts");
     } catch (error) {
       setConfirmOpen(false);
-      setFailure(failureMessage(error, "That contact wasn't deleted. Check your connection and try again."));
+      setFailure(describeFailure(error, "That contact wasn't deleted. Check your connection and try again."));
     }
   }
 
@@ -234,7 +232,7 @@ function ContactProfile({ contact }: { contact: ContactDetail }) {
           }}
         >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {textField("name", "Name", { maxLength: 120, required: true })}
+            {textField("name", "Name", { maxLength: CONTACT_LIMITS.name, required: true })}
             <div className="space-y-1.5">
               <Label htmlFor={`${fieldId}-kind`}>Kind</Label>
               <ContactKindSelect
@@ -245,16 +243,16 @@ function ContactProfile({ contact }: { contact: ContactDetail }) {
               />
               {errorText("kind")}
             </div>
-            {textField("title", "Title", { maxLength: 120 })}
+            {textField("title", "Title", { maxLength: CONTACT_LIMITS.title })}
             {textField("agency", "Agency", {
-              maxLength: 120,
+              maxLength: CONTACT_LIMITS.agency,
               hint: "Only if they work for a firm other than the company hiring.",
             })}
-            {textField("email", "Email", { type: "email", inputMode: "email", maxLength: 254 })}
-            {textField("phone", "Phone", { type: "tel", inputMode: "tel", maxLength: 40 })}
+            {textField("email", "Email", { type: "email", inputMode: "email", maxLength: CONTACT_LIMITS.email })}
+            {textField("phone", "Phone", { type: "tel", inputMode: "tel", maxLength: CONTACT_LIMITS.phone })}
           </div>
 
-          {textField("linkedinUrl", "LinkedIn", { type: "url", inputMode: "url", maxLength: 2048 })}
+          {textField("linkedinUrl", "LinkedIn", { type: "url", inputMode: "url", maxLength: CONTACT_LIMITS.linkedinUrl })}
 
           <div className="space-y-1.5">
             <Label htmlFor={`${fieldId}-lastSpokenOn`}>Last spoke</Label>
@@ -292,7 +290,7 @@ function ContactProfile({ contact }: { contact: ContactDetail }) {
               id={`${fieldId}-notes`}
               value={fields.notes}
               onChange={(event) => set("notes", event.target.value)}
-              maxLength={2000}
+              maxLength={CONTACT_LIMITS.notes}
               aria-invalid={errors.notes ? true : undefined}
               aria-describedby={describedBy("notes")}
               className="min-h-24 resize-y"
@@ -318,14 +316,27 @@ function ContactProfile({ contact }: { contact: ContactDetail }) {
         <p className="mt-1 text-sm text-muted-foreground">
           Removes {contact.name} from your contacts and from every job. The jobs stay.
         </p>
-        <Button variant="destructive" className="mt-4 h-10 px-4" onClick={() => setConfirmOpen(true)}>
+        <Button
+          ref={deleteTrigger}
+          variant="destructive"
+          className="mt-4 h-10 px-4"
+          onClick={() => setConfirmOpen(true)}
+        >
           <Trash2 aria-hidden="true" />
           Delete contact
         </Button>
       </section>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent className="gap-0 p-6 sm:max-w-md">
+        <DialogContent
+          // Opened without a DialogTrigger, so Radix has nowhere to return focus: send it back to the
+          // button that opened the confirmation.
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            deleteTrigger.current?.focus();
+          }}
+          className="gap-0 p-6 sm:max-w-md"
+        >
           <DialogHeader className="mb-4">
             <DialogTitle className="text-xl">Delete {contact.name}?</DialogTitle>
             <DialogDescription>

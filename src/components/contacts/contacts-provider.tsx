@@ -4,11 +4,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useState } from "react";
 
 import { createActionsContactsClient } from "@/components/contacts-actions-client";
-import { ActionError } from "@/components/jobs-actions-client";
+import { ActionError, describeFailure } from "@/components/action-client";
 import type { ContactDetail } from "@/lib/contacts";
 import { contactsCache, type ContactFields, type ContactsClient } from "@/lib/contacts-client";
 import type { Job } from "@/lib/jobs";
-import { jobsCache } from "@/lib/jobs-cache";
+import { jobsCache, replaceJob } from "@/lib/jobs-cache";
 
 /**
  * Contacts state lives in TanStack Query under `contactsCache`, like jobs. This provider only
@@ -36,11 +36,6 @@ export function ContactsProvider({
 
 function useContactsClient(): ContactsClient {
   return useContext(ContactsClientContext);
-}
-
-/** An action's own message is written to be shown; anything else gets the fallback. */
-export function failureMessage(error: unknown, fallback: string): string {
-  return error instanceof ActionError ? error.message : fallback;
 }
 
 /** Retrying cannot turn "not yours" or "signed out" into anything else. */
@@ -83,14 +78,12 @@ export function useJobContactLinks(jobId: string) {
   const onSuccess = useCallback(
     (job: Job) => {
       setError(null);
-      queryClient.setQueryData<Job[]>(jobsCache.key, (jobs) =>
-        jobs?.map((candidate) => (candidate.id === job.id ? job : candidate)),
-      );
+      queryClient.setQueryData<Job[]>(jobsCache.key, (jobs) => replaceJob(jobs, job));
       void queryClient.invalidateQueries({ queryKey: contactsCache.listKey });
     },
     [queryClient],
   );
-  const onError = useCallback((failure: unknown) => setError(failureMessage(failure, LINK_FAILED)), []);
+  const onError = useCallback((failure: unknown) => setError(describeFailure(failure, LINK_FAILED)), []);
 
   const link = useMutation({
     mutationFn: (contactId: string) => client.link(jobId, contactId),

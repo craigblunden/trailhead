@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { CONTACT_LIMITS } from "@/lib/contacts";
 import {
-  CONTACT_LIMITS,
   contactPatchSchema,
   newContactSchema,
   parseInput,

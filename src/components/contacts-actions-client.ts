@@ -1,4 +1,4 @@
-import { unwrap } from "@/components/jobs-actions-client";
+import { unwrap } from "@/components/action-client";
 import type { ContactsClient } from "@/lib/contacts-client";
 import {
   createContactAction,

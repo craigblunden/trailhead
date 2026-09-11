@@ -1,27 +1,6 @@
-import AxeBuilder from "@axe-core/playwright";
-import type { Page } from "@playwright/test";
-
+import { expectNoAxeViolations } from "./checks";
 import { SIGNED_OUT, createJob, expect, test } from "./fixtures";
 import { PRIVATE_ROUTES, PUBLIC_ROUTES } from "./routes";
-
-const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
-
-function analyse(page: Page) {
-  return new AxeBuilder({ page }).withTags(WCAG).analyze();
-}
-
-/** Renders violations as something readable in the failure output. */
-function describeViolations(violations: Awaited<ReturnType<typeof analyse>>["violations"]) {
-  return violations
-    .map(
-      (v) =>
-        `[${v.impact}] ${v.id}: ${v.help}\n  ${v.nodes
-          .slice(0, 3)
-          .map((n) => n.target.join(" "))
-          .join("\n  ")}`,
-    )
-    .join("\n\n");
-}
 
 test.describe("signed out", () => {
   test.use({ storageState: SIGNED_OUT });
@@ -29,10 +8,7 @@ test.describe("signed out", () => {
   for (const route of PUBLIC_ROUTES) {
     test(`A11Y-1: ${route.name} has no axe violations`, async ({ page }) => {
       await page.goto(route.path);
-      await page.evaluate(() => document.fonts.ready);
-
-      const { violations } = await analyse(page);
-      expect(violations, describeViolations(violations)).toEqual([]);
+      await expectNoAxeViolations(page);
     });
   }
 
@@ -77,19 +53,13 @@ test.describe("signed in", () => {
     test(`A11Y-1: ${route.name} has no axe violations`, async ({ page }) => {
       await page.goto(route.path);
       await expect(page.getByRole("heading", { level: 1, name: route.heading })).toBeVisible();
-      await page.evaluate(() => document.fonts.ready);
-
-      const { violations } = await analyse(page);
-      expect(violations, describeViolations(violations)).toEqual([]);
+      await expectNoAxeViolations(page);
     });
   }
 
   test("A11Y-1: a job detail page has no axe violations", async ({ page }) => {
     await createJob(page);
-    await page.evaluate(() => document.fonts.ready);
-
-    const { violations } = await analyse(page);
-    expect(violations, describeViolations(violations)).toEqual([]);
+    await expectNoAxeViolations(page);
   });
 
   test("A11Y-1: the board with the add-job dialog open has no axe violations", async ({ page }) => {
@@ -97,7 +67,6 @@ test.describe("signed in", () => {
     await page.getByRole("button", { name: /add job/i }).first().click();
     await expect(page.getByRole("dialog", { name: "Add a job" })).toBeVisible();
 
-    const { violations } = await analyse(page);
-    expect(violations, describeViolations(violations)).toEqual([]);
+    await expectNoAxeViolations(page);
   });
 });

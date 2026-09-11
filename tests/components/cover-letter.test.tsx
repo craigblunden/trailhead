@@ -126,7 +126,7 @@ describe("the cover letter card (tickets 13, 18, 19)", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("GEN-U7: needs a resume, warns about a short description, and says when generation is unavailable", async () => {
+  it("GEN-U7: needs a resume and a description, warns about a short one, and says when generation is unavailable", async () => {
     const { unmount } = renderWithJobs(<CoverLetterCard job={{ ...job, resume: null }} />);
     expect(await screen.findByText(/Attach a resume in this job’s application kit/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Write cover letter" })).toBeDisabled();
@@ -135,6 +135,12 @@ describe("the cover letter card (tickets 13, 18, 19)", () => {
     const short = renderWithJobs(<CoverLetterCard job={{ ...job, description: "Design things." }} />);
     expect(await screen.findByText(/Short descriptions make generic letters/)).toBeInTheDocument();
     short.unmount();
+
+    // An empty description has nothing to write from: the button is off, and the card says why.
+    const blank = renderWithJobs(<CoverLetterCard job={{ ...job, description: "   " }} />);
+    expect(await screen.findByText(/Paste the job posting into this job’s description/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Write cover letter" })).toBeDisabled();
+    blank.unmount();
 
     client.status.mockResolvedValue(status(5, false));
     renderWithJobs(<CoverLetterCard job={job} />);

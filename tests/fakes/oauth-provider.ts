@@ -4,7 +4,9 @@ import http from "node:http";
 /**
  * A fake OAuth identity provider for the local Auth server's TEST-ONLY `gitlab` slot
  * (`supabase/config.toml`). Auth, running in Docker, reaches it at `host.docker.internal:54399`;
- * it listens on loopback only, so nothing outside this machine can ask it for an identity.
+ * it listens on loopback only, so nothing outside this machine can ask it for an identity — except
+ * in CI, where a Linux runner's Auth container reaches the host through Docker's host gateway, which
+ * a loopback-only listener cannot answer. The runner is ephemeral and serves nothing else.
  *
  * It speaks just enough of GitLab's OAuth and REST surface for Auth to complete a sign-in, and
  * hands out whichever identity the test chose. What Auth then does with that identity — create a
@@ -122,7 +124,7 @@ export async function startFakeProvider(): Promise<FakeProvider> {
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
-    server.listen(FAKE_PROVIDER_PORT, "127.0.0.1", resolve);
+    server.listen(FAKE_PROVIDER_PORT, process.env.CI ? "0.0.0.0" : "127.0.0.1", resolve);
   });
 
   return {

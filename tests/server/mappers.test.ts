@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { todayUtc } from "@/lib/dates";
 import type { Job } from "@/lib/jobs";
 import {
   toDateColumn,
   toIsoDate,
   toJobDto,
-  todayIso,
   type JobRow,
 } from "@/server/db/mappers";
 import { FROZEN_ISO, FROZEN_NOW } from "../test-utils";
@@ -203,16 +203,16 @@ describe("toJobDto", () => {
   });
 });
 
-describe("todayIso", () => {
+describe("todayUtc", () => {
   it("MAP-6: reads today as a UTC calendar date from a frozen clock", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(FROZEN_NOW);
 
-    expect(todayIso()).toBe(FROZEN_ISO);
+    expect(todayUtc()).toBe(FROZEN_ISO);
   });
 
   it("MAP-6: accepts an explicit clock, so callers can be tested without faking timers", () => {
-    expect(todayIso(new Date("2026-12-31T23:59:59.000Z"))).toBe("2026-12-31");
-    expect(todayIso(new Date("2027-01-01T00:00:00.000Z"))).toBe("2027-01-01");
+    expect(todayUtc(new Date("2026-12-31T23:59:59.000Z"))).toBe("2026-12-31");
+    expect(todayUtc(new Date("2027-01-01T00:00:00.000Z"))).toBe("2027-01-01");
   });
 });

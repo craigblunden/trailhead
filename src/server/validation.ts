@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import { CONTACT_KINDS, todayUtc } from "@/lib/contacts";
+import { CONTACT_KINDS, CONTACT_LIMITS } from "@/lib/contacts";
+import { todayUtc } from "@/lib/dates";
 import { DOCUMENT_KINDS, MAX_UPLOAD_BYTES, UPLOAD_REFUSALS, extensionOf } from "@/lib/documents";
 import { STAGES } from "@/lib/jobs";
 
@@ -115,20 +116,6 @@ export const jobPatchSchema = z.strictObject({
 export type JobPatchInput = z.infer<typeof jobPatchSchema>;
 
 export const stageSchema = z.enum(STAGES);
-
-/**
- * Ticket 13 decided these bounds. Name and kind are required; everything else is optional and
- * stored blank. Last spoken is set by the user, never derived, and never in the future.
- */
-export const CONTACT_LIMITS = {
-  name: 120,
-  title: 120,
-  agency: 120,
-  email: 254,
-  phone: 40,
-  notes: 2_000,
-  linkedinUrl: 2048,
-} as const;
 
 const EMAIL = z.email();
 

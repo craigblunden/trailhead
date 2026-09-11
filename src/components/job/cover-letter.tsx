@@ -44,7 +44,8 @@ export function CoverLetterCard({ job }: { job: Job }) {
   const quota = status.data;
   const atQuota = quota ? quota.remaining === 0 : false;
   const writing = state.phase === "writing";
-  const canWrite = Boolean(quota?.available) && !atQuota && Boolean(job.resume) && !writing;
+  const hasDescription = job.description.trim().length > 0;
+  const canWrite = Boolean(quota?.available) && !atQuota && Boolean(job.resume) && hasDescription && !writing;
 
   async function write() {
     setCopied(false);
@@ -118,6 +119,10 @@ export function CoverLetterCard({ job }: { job: Job }) {
           {!job.resume ? (
             <p className="mt-4 text-sm">
               Attach a resume in this job’s application kit to write a letter from it.
+            </p>
+          ) : !hasDescription ? (
+            <p className="mt-4 text-sm">
+              Paste the job posting into this job’s description to write a letter from it.
             </p>
           ) : job.description.trim().length < SHORT_DESCRIPTION_CHARS ? (
             <p className="mt-4 text-sm">
