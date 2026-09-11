@@ -18,7 +18,7 @@
     "test:e2e:ui": "playwright test --ui",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:reset": "prisma migrate reset --force",
+    "db:reset": "supabase db reset && prisma migrate deploy",
     "db:studio": "prisma studio",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",

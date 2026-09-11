@@ -1,5 +1,14 @@
-// Trailhead schema. Supabase Auth owns the `auth` schema; nothing here models users.
+// Trailhead schema. Supabase Auth owns the `auth` schema; nothing here models users. A row's
+// owner is its `userId` — the Supabase user id — and every table carries one directly, so the
+// tenant policies (see the migrations) test a column rather than reaching through a parent.
+//
 // The datasource URL lives in `prisma.config.ts` — Prisma 7 rejects it here (P1012).
+//
+// Boundaries:
+// - An applied migration is never edited. A change is a new migration.
+// - Only `src/server/db/` imports the generated client. Mappers are the boundary to the app.
+// - The models are Job, Contact, ActivityEntry, Document, and the Job↔Contact link. No Analysis,
+//   Requirement, Evidence, queue, or job-state table: that work left the phase deliberately.
 
 generator client {
   provider = "prisma-client"
@@ -8,4 +17,160 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+/// Members match `STAGES` in `src/lib/jobs.ts` exactly; `src/server/db/enum-assertions.ts`
+/// fails the typecheck if they drift. The board's columns derive from the same set.
+enum Stage {
+  interested
+  applied
+  interviewing
+  offer
+  rejected
+}
+
+/// Members match the keys of `ACCENTS` in `src/lib/jobs.ts`.
+enum Accent {
+  moss
+  forest
+  teal
+  wheat
+  olive
+  slate
+}
+
+/// "Recruiter" is a kind of Contact, not a separate thing (CONTEXT.md).
+enum ContactKind {
+  recruiter
+  hiring_manager
+  referrer
+  other
+}
+
+enum DocumentKind {
+  resume
+  cover_letter
+}
+
+/// Where a Document is in ingestion. `pending`: the row exists, the object may not yet.
+/// `ready`: uploaded and text extracted. `failed`: uploaded but unusable (ticket 19 says why).
+enum IngestionState {
+  pending
+  ready
+  failed
+}
+
+/// One role at one company the user is pursuing, from lead to outcome.
+model Job {
+  id          String    @id @default(cuid(2))
+  userId      String    @db.Uuid
+  company     String
+  role        String
+  /// Free text as it reads on the card, e.g. "Hybrid · Austin".
+  location    String
+  /// Thousands per year. Null on either end means that bound is unknown.
+  salaryMin   Int?
+  salaryMax   Int?
+  stage       Stage     @default(interested)
+  postingUrl  String    @default("")
+  /// Dates, not timestamps: a timestamp reintroduces the timezone drift the string form prevents.
+  addedOn     DateTime  @db.Date
+  appliedOn   DateTime? @db.Date
+  description String    @default("")
+  notes       String    @default("")
+  accent      Accent
+  /// The Document sent with this Job, if any. Deleting the Document leaves the Job intact.
+  documentId  String?
+  document    Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  contacts    JobContact[]
+  activity    ActivityEntry[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  /// The board lists a user's jobs in creation order, so reloads never reshuffle.
+  @@index([userId, createdAt])
+  @@index([documentId])
+}
+
+/// A dated line in a Job's history, written by the system as a side effect of change.
+model ActivityEntry {
+  id        String   @id @default(cuid(2))
+  userId    String   @db.Uuid
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  label     String
+  /// The user-visible date.
+  date      DateTime @db.Date
+  /// The tiebreak: two entries on the same day still have a defined "newest first".
+  createdAt DateTime @default(now())
+
+  @@index([jobId, date(sort: Desc), createdAt(sort: Desc)])
+  @@index([userId])
+}
+
+/// A person the user knows in connection with their search, owned by the user rather than by
+/// any one Job. Agency is a field, not an entity.
+model Contact {
+  id           String      @id @default(cuid(2))
+  userId       String      @db.Uuid
+  name         String
+  kind         ContactKind @default(other)
+  /// Their title where they work, e.g. "Design Manager".
+  title        String      @default("")
+  email        String      @default("")
+  phone        String      @default("")
+  /// The independent firm a recruiter works for, when it differs from the company hiring.
+  agency       String      @default("")
+  notes        String      @default("")
+  /// Set by the user; activity entries are job-scoped, so there is nothing to derive it from.
+  lastSpokenOn DateTime?   @db.Date
+  jobs         JobContact[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  /// The contacts route lists a user's contacts by name.
+  @@index([userId, name])
+}
+
+/// The many-to-many link between Jobs and Contacts. Explicit rather than implicit so it can carry
+/// its own `userId` for the tenant policy, like every other table.
+model JobContact {
+  jobId     String
+  contactId String
+  userId    String   @db.Uuid
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([jobId, contactId])
+  @@index([contactId])
+  @@index([userId])
+}
+
+/// A file the user uploaded — a resume or a cover letter — owned by the user and attachable to
+/// as many Jobs as they like. Never versioned in place: a new upload is a new Document.
+model Document {
+  id             String         @id @default(cuid(2))
+  userId         String         @db.Uuid
+  kind           DocumentKind
+  /// The name the user uploaded it as, for display.
+  fileName       String
+  /// `<userId>/<id>.<ext>` in the private `documents` bucket. The row exists before the object.
+  storageKey     String         @unique
+  mimeType       String
+  sizeBytes      Int            @default(0)
+  /// Extracted at upload. Doubles as the content hash for later comparison.
+  text           String         @default("")
+  ingestion      IngestionState @default(pending)
+  /// Why ingestion failed, as a code the UI can explain (ticket 19). Null unless `failed`.
+  ingestionError String?
+  /// Tombstone (ticket 16): set first, then the object is removed, then the row is hard-deleted.
+  deletedAt      DateTime?
+  jobs           Job[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  /// The documents route lists a user's documents newest-first; the sweep scans tombstones.
+  @@index([userId, createdAt])
+  @@index([deletedAt])
 }

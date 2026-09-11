@@ -1,6 +1,6 @@
 # 04: Tenant isolation, proven
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 **Blocked by:** 03
 
@@ -42,3 +42,38 @@ ownership rule.
 - [ ] A test proves the tenant setting does not leak past the transaction that set it
 - [ ] `npm run test:integration` exists as its own Vitest project and does not slow the unit suite
 - [ ] Tests truncate or roll back between cases, so no test depends on another's leftovers
+
+## Comments
+
+### 2026-09-11 — agent
+
+**Built.**
+
+- `prisma/migrations/20260911003000_tenant_isolation/` — `public.tenant_id()` reads the
+  transaction-local setting (`nullif(current_setting('app.tenant_id', true), '')::uuid`, so both
+  "never set" and "reverted after a transaction" fold to NULL and the query fails **closed**); RLS
+  enabled **and forced** on all five application tables; one `FOR ALL TO trailhead_app` policy per
+  table with both `USING` and `WITH CHECK` over the setting. Policies use the setting, never
+  `auth.uid()`, because Prisma bypasses PostgREST.
+- **Tightened beyond the ticket:** foreign-key checks bypass RLS, so `WITH CHECK` on `JobContact`,
+  `ActivityEntry`, and `Job.documentId` additionally requires the referenced row to be visible
+  under the same tenant. Without that, user B could insert a link row of their own pointing at user
+  A's contact id. Now the database refuses it.
+- `src/server/db/tenant.ts` — `withTenant(userId, fn)`: a Prisma interactive transaction whose
+  first statement is `set_config('app.tenant_id', $1, true)`. Transaction-local, so Postgres
+  reverts it at COMMIT/ROLLBACK before Supavisor can reassign the connection. Refuses a non-uuid.
+  No session-level `SET` anywhere.
+- `tests/integration/helpers.ts` — `resetTables()` truncates as the migrator over `DIRECT_URL`
+  (the app role deliberately lacks TRUNCATE, which RLS does not govern); `newUserId()`.
+- `tests/integration/tenant-isolation.test.ts` — 10 cases: RLS enabled+forced+policy on every
+  table (from `pg_class`/`pg_policies`); unwrapped query → zero rows; B reads nothing of A's in
+  every table; B cannot update/delete/reach A's rows by id; B cannot write a row claiming A's
+  `userId`; B cannot link to A's contact; B cannot attach A's document; the setting does not leak
+  past its transaction (10 parallel plain queries after a tenant transaction all report NULL and
+  see nothing); 8 concurrent transactions across two tenants each see only their own; non-uuid
+  refused.
+
+`npm run test:integration` is its own Vitest project (node, serial files, real database);
+`npm test` stays jsdom-only and does not touch Postgres.
+
+**Status:** ready-for-review
