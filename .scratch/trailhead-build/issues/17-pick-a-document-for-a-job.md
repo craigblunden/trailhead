@@ -87,3 +87,14 @@ uses now read `job.resume?.fileName` so the working tree still builds. That file
 untouched and not part of this commit.
 
 **Status:** ready-for-review
+
+### 2026-09-11 — agent (second review)
+
+**Fixed, each with a test:**
+
+- **A refused choice rolled back the whole jobs cache**, wiping the other slot's saved choice and other Jobs' edits made meanwhile.
+  It now restores only its own slot, and only if that slot still holds its choice (KIT-9).
+- **A new upload briefly showed no choice** until the document list refetched. The upload is written into the list at once and the
+  kit is given its file name (KIT-10).
+- **An attach racing a delete could leave a Job pointing at a tombstone**, after which the tenant policy refused every edit to that
+  Job. Both now take `FOR UPDATE` on the Document row, so one waits for the other; the integration test runs the race 25 times.

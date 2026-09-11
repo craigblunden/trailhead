@@ -73,6 +73,20 @@ test.describe("ticket 18: generate a cover letter", () => {
     const writing = card(page).getByRole("status").filter({ hasText: "Writing your cover letter" });
     await expect(writing).toBeVisible();
 
+    // On this same page, while the letter is being written. Server Actions from one page run one at a
+    // time, so if generation were an action this save would wait for the letter. Its answer must
+    // arrive while the letter is still being written.
+    const samePageSave = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        Boolean(response.request().headers()["next-action"]) &&
+        (response.request().postData() ?? "").includes("Prep the growth case study."),
+    );
+    await page.getByRole("textbox", { name: "Notes" }).fill("Prep the growth case study.");
+    await page.getByRole("textbox", { name: "Notes" }).blur();
+    await samePageSave;
+    await expect(writing).toBeVisible();
+
     // Another tab, while the letter is still being written.
     const other = await context.newPage();
     await other.goto(job.href);

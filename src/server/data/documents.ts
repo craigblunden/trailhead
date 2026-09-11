@@ -53,7 +53,7 @@ export async function listDocuments(): Promise<DocumentSummary[]> {
   const { userId } = await requireSession();
   const rows = await withTenant(userId, (tx) =>
     tx.document.findMany({
-      where: { userId, deletedAt: null },
+      where: { userId, deletedAt: null, ingestion: { not: "failed" } },
       include: DOCUMENT_SUMMARY_INCLUDE,
       orderBy: [{ createdAt: "desc" }, { id: "asc" }],
     }),
@@ -78,7 +78,9 @@ export async function startUpload(input: StartUploadInput): Promise<UploadTicket
 
   const row = await withTenant(userId, async (tx) => {
     await tx.$executeRaw`select pg_advisory_xact_lock(hashtext(${userId}))`;
-    const held = await tx.document.count({ where: { userId, deletedAt: null } });
+    const held = await tx.document.count({
+      where: { userId, deletedAt: null, ingestion: { not: "failed" } },
+    });
     if (held >= DOCUMENT_CAP) throw new RuleError("cap-reached", UPLOAD_REFUSALS["cap-reached"]);
     return tx.document.create({
       data: {
@@ -158,7 +160,12 @@ async function refuse(userId: string, id: string, reason: Refusal): Promise<neve
       data: { ingestion: "failed", ingestionError: reason },
     }),
   );
-  const tombstoned = await tombstone(userId, id).catch(() => null);
+  // If this does not run, the row is `failed`: out of the list, holding no slot, and reclaimed by
+  // the sweep with the other unfinished uploads.
+  const tombstoned = await tombstone(userId, id).catch((error: unknown) => {
+    logError({ operation: "documents.refuseTombstone", tenant: userId }, error);
+    return null;
+  });
   if (tombstoned) await finishDeleting(userId, [tombstoned]);
   throw new RuleError(reason, UPLOAD_REFUSALS[reason]);
 }
@@ -183,6 +190,9 @@ type Tombstoned = { id: string; storageKey: string; ingestion: string; createdAt
  */
 async function tombstone(userId: string, id: string): Promise<Tombstoned> {
   return withTenant(userId, async (tx) => {
+    // FOR UPDATE: an attach of this Document (setJobDocument) takes the same lock, so the two cannot
+    // interleave and leave a Job pointing at a tombstone.
+    await tx.$queryRaw`select id from "Document" where id = ${id} and "userId" = ${userId}::uuid for update`;
     const row = await tx.document.findFirst({
       where: { id, userId, deletedAt: null },
       select: { id: true, storageKey: true, ingestion: true, createdAt: true },
@@ -198,9 +208,9 @@ async function tombstone(userId: string, id: string): Promise<Tombstoned> {
 /**
  * Removes the objects through the Storage API, then the rows. Never throws for the caller.
  *
- * A row that never became `ready` keeps its tombstone until its signed upload URL has expired
- * (`ABANDONED_UPLOAD_MS`): the token stays valid after the row is deleted, and a late upload through
- * it would land an object no row tracks. While the tombstone stays, every sweep removes whatever
+ * Every tombstone is kept until its row's signed upload URL has expired (`ABANDONED_UPLOAD_MS`):
+ * the token stays valid after the Document is deleted — even a Document that was ready — and a late
+ * upload through it would land an object no row tracks. While the tombstone stays, every sweep removes whatever
  * arrived under its key, so the key is only forgotten once nothing more can arrive.
  */
 async function finishDeleting(userId: string, rows: Tombstoned[], now: Date = new Date()): Promise<number> {
@@ -214,9 +224,7 @@ async function finishDeleting(userId: string, rows: Tombstoned[], now: Date = ne
     logError({ operation: "documents.removeObjects", tenant: userId }, error);
     return 0;
   }
-  const settled = rows.filter(
-    (row) => row.ingestion === "ready" || row.createdAt.getTime() < now.getTime() - ABANDONED_UPLOAD_MS,
-  );
+  const settled = rows.filter((row) => row.createdAt.getTime() < now.getTime() - ABANDONED_UPLOAD_MS);
   if (settled.length === 0) return 0;
   const { count } = await withTenant(userId, (tx) =>
     tx.document.deleteMany({
@@ -299,10 +307,13 @@ export async function setJobDocument(
     const job = await tx.job.findFirst({ where: { id: jobId, userId }, select: { id: true } });
     if (!job) throw new NotFoundError();
     if (documentId !== null) {
-      const document = await tx.document.findFirst({
-        where: { id: documentId, userId, deletedAt: null, ingestion: "ready" },
-        select: { kind: true },
-      });
+      // FOR UPDATE, like `tombstone`: a delete of this Document either waits for this attach (and then
+      // detaches it) or finishes first (and this finds nothing). Never a Job pointing at a tombstone.
+      const [document] = await tx.$queryRaw<{ kind: DocumentKind }[]>`
+        select kind::text as kind from "Document"
+         where id = ${documentId} and "userId" = ${userId}::uuid
+           and "deletedAt" is null and ingestion = 'ready'
+         for update`;
       if (!document) throw new NotFoundError("document");
       if (document.kind !== kind) throw new RuleError("wrong-kind", WRONG_KIND[kind]);
     }

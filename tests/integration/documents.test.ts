@@ -334,7 +334,8 @@ describe("ticket 16: delete a document", () => {
     expect(result).toEqual({ ok: true, data: null });
     expect(await listDocuments()).toEqual([]);
     expect((await bucketOf(alice).createSignedUrl(key, 60)).error).not.toBeNull();
-    expect(await storedRow(alice, summary.id)).toBeNull();
+    // Tombstoned until its upload URL expires (see finishDeleting).
+    expect((await storedRow(alice, summary.id))?.deletedAt).toBeInstanceOf(Date);
   });
 
   it("a delete interrupted after the tombstone is finished by the sweep, and the sweep is idempotent", async () => {
@@ -349,11 +350,13 @@ describe("ticket 16: delete a document", () => {
     expect((await storedRow(alice, summary.id))?.deletedAt).toBeInstanceOf(Date);
     expect(await objectExists(alice, key)).toBe(true);
 
-    expect(await sweepMyDocuments()).toEqual({ deleted: 1 });
+    expect(await sweepMyDocuments()).toEqual({ deleted: 0 });
     expect(await objectExists(alice, key)).toBe(false);
+    const afterTheUrlExpires = new Date(Date.now() + ABANDONED_UPLOAD_MS + 60_000);
+    expect(await sweepMyDocuments(afterTheUrlExpires)).toEqual({ deleted: 1 });
     expect(await storedRow(alice, summary.id)).toBeNull();
 
-    expect(await sweepMyDocuments()).toEqual({ deleted: 0 });
+    expect(await sweepMyDocuments(afterTheUrlExpires)).toEqual({ deleted: 0 });
   });
 
   it("the sweep reclaims an abandoned upload, whether or not its object arrived", async () => {
@@ -381,7 +384,10 @@ describe("ticket 16: delete a document", () => {
     const key = (await storedRow(alice, summary.id))!.storageKey;
     await bucketOf(alice).remove([key]);
     await withTenant(alice.userId, (tx) =>
-      tx.document.update({ where: { id: summary.id }, data: { deletedAt: new Date() } }),
+      tx.document.update({
+        where: { id: summary.id },
+        data: { deletedAt: new Date(), createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000) },
+      }),
     );
     // Age the abandoned upload. (The janitor itself may only set `deletedAt`; see the migration.)
     await withTenant(alice.userId, (tx) =>
@@ -433,6 +439,27 @@ describe("ticket 16: delete a document", () => {
 
     const after = await withTenant(alice.userId, (tx) => tx.job.findFirst({ where: { id: job.id } }));
     expect(after).toMatchObject({ company: "Fernwood", resumeId: null });
+  });
+
+  it("a late re-upload through the URL of a deleted ready document is still reclaimed", async () => {
+    const { ticket, summary } = await upload(alice, "resume.pdf");
+    const key = (await storedRow(alice, summary.id))!.storageKey;
+
+    await deleteDocument(summary.id);
+    expect(await listDocuments()).toEqual([]);
+    expect(await objectExists(alice, key)).toBe(false);
+
+    // The upload URL has not expired: the same token puts a file back under the same key.
+    expect((await putObject(alice, ticket, fixture("resume.pdf"))).error).toBeNull();
+    expect(await objectExists(alice, key)).toBe(true);
+
+    // So the tombstone must still be there to find it.
+    expect((await storedRow(alice, summary.id))?.deletedAt).toBeInstanceOf(Date);
+    expect(await sweepMyDocuments()).toEqual({ deleted: 0 });
+    expect(await objectExists(alice, key)).toBe(false);
+    const afterTheUrlExpires = new Date(Date.now() + ABANDONED_UPLOAD_MS + 60_000);
+    expect(await sweepMyDocuments(afterTheUrlExpires)).toEqual({ deleted: 1 });
+    expect(await storedRow(alice, summary.id)).toBeNull();
   });
 
   it("user B cannot delete user A's document", async () => {

@@ -34,10 +34,19 @@ from it.
 | README: "`src/components/jobs-provider.tsx` is the only place that owns job state. Replacing its body with real fetching/mutations leaves every consumer unchanged." | **Void** | TanStack Query owns job state; consumers were free to change and did (09) |
 | Out of scope: drag-and-drop between columns; dark mode as a shipped feature | **Still deferred** | See `docs/deferred.md` |
 
-Every other Phase-1 requirement — the stage model and formatting (DATA-1…10), the landing (LAND-1…3),
-the board and cards (BOARD-1…6, CARD-1…5), stage changes and their history (DET-2…5, DET-8, DET-10,
+Every other Phase-1 requirement — the stage model and formatting (DATA-1…10), the landing (LAND-1…3), the auth forms' fields and links (AUTH-1, AUTH-2, AUTH-4),
+adding a job (ADD-1…4), the board and cards (BOARD-1…6, CARD-1…5), stage changes and their history (DET-2…5, DET-8, DET-10,
 DET-11), accessibility (A11Y-1…5), and responsiveness (RESP-1, RESP-2) — still holds and is still
-tested, now against a real account with data each test creates.
+tested, now against a real account with data each test creates. **One exception today:** RESP-1 fails
+on the committed landing page at 320px, in its "Everything you need for the climb" section, which predates
+this work; the landing rewrite in progress replaces that section.
+
+Also superseded, from the Phase-1 spec's Boundaries and success criteria, each replaced as above:
+"Keep `JobsProvider` the only owner of job state" and "swapping its body requires no changes to any
+consumer" (TanStack Query owns job state, 09); "introducing persistence or a backend" and "wiring a real
+credential check into the prototype auth forms" as things this phase must not do (they are now the
+point, 01–07); and the Commands line `verify # lint + typecheck + unit + e2e`, which also runs the
+integration level now.
 
 ## Phase 2 — the backend spec
 

@@ -93,3 +93,8 @@ from that run and is not this work's to fix: `A11Y-1: landing has no axe violati
 `src/components/landing/everything-you-need.tsx`); the committed landing page is unaffected.
 
 **Status:** ready-for-review
+
+### 2026-09-11 — agent (correction)
+
+The comment above says two e2e checks that raced the server were fixed in this ticket. They were fixed earlier, in the ticket 17 and
+18 commits (`f4f02b2`, `e3c0ef4`); this ticket's own wait for a Server Action's answer is in `e2e/phase-journey.spec.ts`.

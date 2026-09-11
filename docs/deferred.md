@@ -17,7 +17,7 @@ highlight that with some sample projects."* It is not in this phase. The user pa
 **What left the phase:** the Requirement/Evidence extraction taxonomy (job descriptions parsed into
 typed Requirements, documents into typed Evidence, a Gap being a Requirement with no matching
 Evidence); per-job gap analysis and the `Analysis` entity with its staleness rules and re-run
-affordance; and the portfolio review — the cross-job pass, its trial quota, and the suggested sample
+affordance and its job states; and the portfolio review — the cross-job pass, its "twice per user per month" trial quota, its staleness hint, and the suggested sample
 projects. The two are entangled: structured extraction existed largely to make the portfolio pass a
 query rather than an inference call. The glossary terms (`Requirement`, `Evidence`, `Gap`,
 `Analysis`, `Portfolio review`, `Stale`) remain in `CONTEXT.md` for when this returns.
@@ -43,7 +43,7 @@ query rather than an inference call. The glossary terms (`Requirement`, `Evidenc
   wants — but citations and `output_config.format` are mutually exclusive, so provenance has to be
   something the model fills in (a quoted span, a section label).
 - One evaluation settles what the documentation cannot: on layout-heavy resumes (two columns, tables,
-  sidebars), does handing Claude the PDF itself beat extracted text? This phase extracts text at
+  sidebars), does handing Claude the PDF itself beat extracted text? Extraction flattens layout, and a resume's layout carries meaning. This phase extracts text at
   upload (ticket 15) and dropped the direct-PDF fallback on cost (ticket 19); the evaluation could
   reopen that.
 - No queue exists. A manual, low-frequency portfolio pass fits the Message Batches API (half the cost,

@@ -81,7 +81,7 @@ export function ApplicationKitCard({ job }: { job: Job }) {
                 held={documents.data.length}
                 manageHref="/documents"
                 className="mt-2"
-                onUploaded={(document) => kit.choose(document.kind, document.id)}
+                onUploaded={(document) => kit.choose(document.kind, document.id, document.fileName)}
               />
             </section>
           </>

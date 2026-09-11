@@ -100,7 +100,7 @@ Things only a dashboard login can do. Do them once, in this order.
 
 1. Create the project from this repository. Framework preset: Next.js. Build command is the
    default (`npm run build`, which runs `prisma generate` first).
-2. Add every variable from `.env.example` except `TEST_MAIL_API_URL` to _Production_ and
+2. Add every variable from `.env.example` except the test-only `TEST_*` variables (`TEST_MAIL_API_URL`, and `TEST_POSTGRES_URL` — the local `postgres` superuser, which must never reach a hosted project) to _Production_ and
    _Preview_. `ANTHROPIC_API_KEY` is a key created for this project alone, so it can be revoked
    without touching anything else.
 3. Deploy. Then add the deployment URL to the Supabase redirect allow-list (step 6 above).

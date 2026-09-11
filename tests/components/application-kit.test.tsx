@@ -140,6 +140,40 @@ describe("the application kit (ticket 17)", () => {
     expect(within(group("Resume")).getByRole("radio", { name: "Nothing" })).toBeChecked();
   });
 
+  it("KIT-9: a refused choice rolls back only its own slot, not the other slot saved meanwhile", async () => {
+    const { client, user } = renderKit();
+    client.attach.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new ActionError("failed", "That change wasn’t saved.")), 200),
+        ),
+    );
+    await within(kit()).findByRole("group", { name: "Resume" });
+
+    await user.click(within(group("Resume")).getByRole("radio", { name: /resume_staff_v1\.pdf/ }));
+    await user.click(within(group("Cover letter")).getByRole("radio", { name: /letter_harvest\.docx/ }));
+
+    expect(await within(kit()).findByRole("alert")).toHaveTextContent("wasn’t saved");
+    await waitFor(() =>
+      expect(within(group("Resume")).getByRole("radio", { name: "Nothing" })).toBeChecked(),
+    );
+    expect(within(group("Cover letter")).getByRole("radio", { name: /letter_harvest\.docx/ })).toBeChecked();
+  });
+
+  it("KIT-10: a new upload shows as chosen at once, while the server is still attaching it", async () => {
+    const { client, user } = renderKit([growth]);
+    client.attach.mockImplementationOnce(() => new Promise(() => {}));
+    const upload = await within(kit()).findByRole("region", { name: "Upload another" });
+
+    await user.upload(
+      within(upload).getByLabelText("Choose a file to upload"),
+      new File([new Uint8Array(900)], "resume_new.pdf", { type: "application/pdf" }),
+    );
+
+    expect(await within(upload).findByText("resume_new.pdf is ready.")).toBeInTheDocument();
+    expect(within(group("Resume")).getByRole("radio", { name: /resume_new\.pdf/ })).toBeChecked();
+  });
+
   it("KIT-8: the kit has no structural axe violations", async () => {
     const { container } = renderKit();
     await within(kit()).findByRole("group", { name: "Resume" });

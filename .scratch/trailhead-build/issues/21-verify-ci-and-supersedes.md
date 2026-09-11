@@ -1,6 +1,6 @@
 # 21: `verify`, CI, and the record of what this work superseded
 
-**Status:** ready-for-review
+**Status:** ready-for-review (`verify` red on the landing page, outside this effort)
 
 **Blocked by:** 20
 
@@ -108,3 +108,11 @@ those tests fail for that reason, not because linking broke. (2) Runner time: th
 take a few minutes on top of the stack's start; the job allows 45.
 
 **Status:** ready-for-review
+
+### 2026-09-11 — agent (correction)
+
+The comment above reads as though this ticket added the integration level to `npm run verify`. It was already there (ticket 04 added
+the integration project); this ticket did not change `package.json`. The second review also found: `docs/provisioning.md` would have
+copied the test-only `TEST_POSTGRES_URL` to Vercel (now excluded), glossary slips in the README (fixed), Phase-1 boundary rules and
+a success criterion without a Supersedes line (added), and detail missing from the deferral record (restored). Still unverified:
+that the Supabase CLI maps `host.docker.internal` for the Auth container on a Linux runner (ticket 07's note).

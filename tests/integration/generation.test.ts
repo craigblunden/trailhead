@@ -25,6 +25,7 @@ import { newUserId, resetTables } from "./helpers";
 const claude = vi.hoisted(() => ({
   outcome: { ok: true, letter: "Dear Hiring Team," } as { ok: true; letter: string } | { ok: false; reason: string },
   calls: 0,
+  throws: false,
 }));
 
 vi.mock("@/server/generation/cover-letter", () => ({
@@ -32,6 +33,7 @@ vi.mock("@/server/generation/cover-letter", () => ({
   createClaudeClient: () => ({}),
   writeCoverLetter: async () => {
     claude.calls += 1;
+    if (claude.throws) throw new Error("something unexpected");
     return claude.outcome;
   },
 }));
@@ -84,6 +86,7 @@ beforeEach(async () => {
   signOut();
   claude.outcome = { ok: true, letter: "Dear Hiring Team," };
   claude.calls = 0;
+  claude.throws = false;
   vi.useRealTimers();
 });
 
@@ -176,8 +179,26 @@ describe("ticket 18: the route", () => {
       claude.outcome = { ok: false, reason };
       const result = await post(job.id);
       expect(result.status, reason).toBe(status);
-      expect(result.body, reason).toMatchObject({ ok: false, error: reason, quota: { used: 0, remaining: 5 } });
+      expect(result.body, reason).toMatchObject({
+        ok: false,
+        error: reason,
+        refunded: true,
+        quota: { used: 0, remaining: 5 },
+      });
     }
+  });
+
+  it("a crash after the letter was reserved gives it back, and says so", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const user = newUserId();
+    const job = await jobWithResume(user);
+    claude.throws = true;
+
+    const result = await post(job.id);
+
+    expect(result.status).toBe(500);
+    expect(result.body).toMatchObject({ ok: false, error: "failed", refunded: true, quota: { used: 0 } });
+    expect(JSON.stringify(result.body)).not.toContain("something unexpected");
   });
 
   it("user B cannot generate against user A's job or document, and takes no quota trying", async () => {

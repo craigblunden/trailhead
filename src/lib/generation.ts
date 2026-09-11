@@ -78,10 +78,15 @@ export const REFUNDED_FAILURES: readonly GenerationFailure[] = ["refused", "fail
 
 /** What the cover-letter route returns, as JSON. */
 export type GenerationResponse =
-  | { ok: true; letter: string; quota: QuotaStatus }
+  | { ok: true; letter: string; quota?: QuotaStatus }
   | {
       ok: false;
-      error: GenerationFailure | "unauthenticated" | "not-found" | "invalid";
+      error: GenerationFailure | "unauthenticated" | "not-found";
       message: string;
       quota?: QuotaStatus;
+      /**
+       * True only when a letter was reserved and then given back. The card says "this didn't use one
+       * of your letters" on this alone, never on the error code.
+       */
+      refunded?: boolean;
     };

@@ -1,6 +1,6 @@
 # Trailhead
 
-A job-application tracker for one job seeker running 5–30 applications at once — every role from
+A tracker for one job seeker pursuing 5–30 roles at once — every role from
 first spark to signed offer, on one board. Accounts, a private database per user, the people in the
 search, the documents that go out with each job, and cover letters written from them.
 
@@ -33,7 +33,7 @@ dashboard can do.
 ```bash
 npm test                   # Vitest unit + component (jsdom). No database.
 npm run test:integration   # Vitest against the local stack: data layer, policies, Storage, the quota
-npm run test:e2e           # Playwright: builds, serves on :3100, starts a fake Anthropic API, runs
+npm run test:e2e           # Playwright: builds, serves on :3100, starts a fake Anthropic API, runs the specs
 npm run verify             # lint + typecheck + unit + integration + e2e — what CI runs on every push
 ```
 
@@ -53,7 +53,7 @@ are asserted in `e2e/`.
 | `/board/[id]` | A job: description, notes, stage and history, contacts, application kit, cover letter |
 | `/contacts`, `/contacts/[id]` | The people in the search, and every role each one is part of, grouped by stage |
 | `/documents` | Resumes and cover letters on file (up to three), upload and delete |
-| `POST /api/jobs/[id]/cover-letter` | Writes a cover letter from the job and its attached resume |
+| `POST /api/jobs/[id]/cover-letter` | Writes a cover letter from the job and the resume in its application kit |
 
 ## Where things live
 

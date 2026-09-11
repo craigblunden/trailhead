@@ -8,15 +8,16 @@ import { coverLetterClient } from "@/components/job/cover-letter-client";
 import { Button } from "@/components/ui/button";
 import {
   COVER_LETTER_QUOTA,
-  REFUNDED_FAILURES,
   SHORT_DESCRIPTION_CHARS,
   formatResetDay,
-  type GenerationFailure,
 } from "@/lib/generation";
 import type { Job } from "@/lib/jobs";
 import type { GenerationStatus } from "@/server/actions/generation";
 
 const STATUS_KEY = ["generation-status"] as const;
+
+const WAITING =
+  "Writing your cover letter. This usually takes 10 to 25 seconds — you can keep editing this page.";
 
 type State =
   | { phase: "idle" }
@@ -55,11 +56,13 @@ export function CoverLetterCard({ job }: { job: Job }) {
     if (result.ok) {
       setState({ phase: "written", letter: result.letter });
     } else {
+      // Only the server knows whether the letter was given back; a guess from the error code could
+      // tell the user a letter was not used when it was.
       setState({
         phase: "failed",
         error: result.error,
         message: result.message,
-        refunded: REFUNDED_FAILURES.includes(result.error as GenerationFailure),
+        refunded: result.refunded === true,
       });
     }
   }
@@ -92,6 +95,11 @@ export function CoverLetterCard({ job }: { job: Job }) {
       <p className="mt-1 text-sm text-muted-foreground">
         Written fresh from this job’s description and the resume in its application kit. Each letter is
         written by a paid AI model, so there are {COVER_LETTER_QUOTA} a week.
+      </p>
+      {/* On the page from the start: a live region that arrives already holding its text is often
+          not announced, so the wait is announced by filling this one. */}
+      <p role="status" className="sr-only">
+        {writing ? WAITING : ""}
       </p>
 
       {status.isPending ? (
@@ -180,7 +188,7 @@ export function CoverLetterCard({ job }: { job: Job }) {
   );
 }
 
-/** Elapsed seconds against the usual range. Announced once; the counter itself is not read out. */
+/** Elapsed seconds against the usual range. The live region above says it once; this is for the eye. */
 function Writing({ startedAt }: { startedAt: number }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -190,14 +198,12 @@ function Writing({ startedAt }: { startedAt: number }) {
   const elapsed = Math.max(0, Math.floor((now - startedAt) / 1_000));
 
   return (
-    <div className="mt-4 rounded-md bg-card p-5 ring-1 ring-foreground/10">
-      <p role="status" className="text-sm">
-        Writing your cover letter. This usually takes 10 to 25 seconds — you can keep editing this page.
-      </p>
-      <p aria-hidden="true" className="mt-1 text-xs text-muted-foreground tabular-nums">
+    <div aria-hidden="true" className="mt-4 rounded-md bg-card p-5 ring-1 ring-foreground/10">
+      <p className="text-sm">{WAITING}</p>
+      <p className="mt-1 text-xs text-muted-foreground tabular-nums">
         {elapsed} s{elapsed > 25 ? " · taking longer than usual" : ""}
       </p>
-      <div aria-hidden="true" className="mt-4 space-y-2">
+      <div className="mt-4 space-y-2">
         {[92, 100, 84, 96, 60].map((width, index) => (
           <div key={index} className="h-2.5 animate-pulse rounded bg-muted" style={{ width: `${width}%` }} />
         ))}

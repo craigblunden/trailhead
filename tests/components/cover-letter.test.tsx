@@ -89,6 +89,7 @@ describe("the cover letter card (tickets 13, 18, 19)", () => {
       error: "refused",
       message: "Claude declined to write a letter for this job.",
       quota: status(5),
+      refunded: true,
     });
     const { user } = renderWithJobs(<CoverLetterCard job={job} />);
 
@@ -139,6 +140,48 @@ describe("the cover letter card (tickets 13, 18, 19)", () => {
     renderWithJobs(<CoverLetterCard job={job} />);
     expect(await screen.findByText(/aren’t available on this deployment/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Write cover letter" })).toBeNull();
+  });
+
+  it("GEN-U9: says no letter was used only when the server says it gave the letter back", async () => {
+    client.generate.mockResolvedValueOnce({
+      ok: false,
+      error: "failed",
+      message: "Something went wrong on our side.",
+      quota: status(4),
+    });
+    const { user } = renderWithJobs(<CoverLetterCard job={job} />);
+
+    await user.click(await screen.findByRole("button", { name: "Write cover letter" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Something went wrong on our side.");
+    expect(alert).not.toHaveTextContent("didn’t use one of your letters");
+
+    client.generate.mockResolvedValueOnce({
+      ok: false,
+      error: "failed",
+      message: "The writing service had a problem.",
+      quota: status(4),
+      refunded: true,
+    });
+    await user.click(within(alert).getByRole("button", { name: "Try again" }));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("didn’t use one of your letters"),
+    );
+  });
+
+  it("GEN-U10: the wait is announced by a live region that was already on the page", async () => {
+    let finish!: (response: GenerationResponse) => void;
+    client.generate.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    const { user } = renderWithJobs(<CoverLetterCard job={job} />);
+    const button = await screen.findByRole("button", { name: "Write cover letter" });
+    const live = screen.getByRole("status");
+    expect(live).toBeEmptyDOMElement();
+
+    await user.click(button);
+
+    expect(live).toHaveTextContent("Writing your cover letter");
+    finish({ ok: true, letter: "Dear Hiring Team,", quota: status(4) });
+    await screen.findByRole("region", { name: "Your cover letter" });
   });
 
   it("GEN-U8: idle, writing, and written states have no structural axe violations", async () => {

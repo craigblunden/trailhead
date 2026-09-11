@@ -5,7 +5,7 @@ import { signInAs, signOut } from "./session-mock";
 import { setJobDocumentAction } from "@/server/actions/documents";
 import { deleteDocument, listDocuments, setJobDocument } from "@/server/data/documents";
 import { NotFoundError, RuleError } from "@/server/data/errors";
-import { createJob, getJob } from "@/server/data/jobs";
+import { createJob, getJob, updateJob } from "@/server/data/jobs";
 import { withTenant } from "@/server/db/tenant";
 
 import { newUserId, resetTables } from "./helpers";
@@ -153,6 +153,24 @@ describe("ticket 17: pick an existing document for a job", () => {
 
     signInAs(userA);
     expect((await listDocuments())[0].jobs).toEqual([]);
+  });
+
+  it("an attach racing a delete never leaves a job pointing at a deleted document, or uneditable", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const user = newUserId();
+    signInAs(user);
+    const job = await createJob(jobInput("Product Designer"), FROZEN);
+
+    for (let round = 0; round < 25; round += 1) {
+      const resume = await documentRow(user, "resume", `resume-${round}.pdf`);
+      await Promise.allSettled([setJobDocument(job.id, "resume", resume.id), deleteDocument(resume.id)]);
+
+      const row = await withTenant(user, (tx) =>
+        tx.job.findFirst({ where: { id: job.id }, select: { resume: { select: { deletedAt: true } } } }),
+      );
+      expect(row?.resume?.deletedAt ?? null, `round ${round}`).toBeNull();
+      await expect(updateJob(job.id, { notes: `round ${round}` }), `round ${round}`).resolves.toBeTruthy();
+    }
   });
 
   it("deleting a cover letter detaches it and leaves the job's resume", async () => {

@@ -81,3 +81,14 @@ the reference cleared; user B cannot delete user A's document, and A's object su
 `storage.objects` and no foreign key references the `storage` schema.
 
 **Status:** ready-for-review
+
+### 2026-09-11 — agent (second review)
+
+**Fixed: a ready Document's upload URL outlives the Document.** The per-ticket spec review found that deleting a ready Document
+forgot its key at once, while the signed upload URL minted for it could still be used. A new test proves the token does put a file
+back under the same key after the delete. Every tombstone — ready or not — is now kept until three hours after its row was created
+(`finishDeleting`, and migration `20260911150000_sweep_keeps_every_tombstone_until_urls_expire` for `pg_cron`'s half); while it is
+kept, every owner's sweep removes whatever arrived under its key. The Document still leaves the list and frees its slot at once.
+
+**Fixed: a failed upload whose removal did not run** stayed in the list and held a slot. `failed` rows are now excluded from the list
+and the cap, and the swallowed error is logged; the sweep reclaims them with other unfinished uploads.

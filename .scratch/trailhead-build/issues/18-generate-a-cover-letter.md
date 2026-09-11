@@ -130,3 +130,20 @@ local server. The request shape follows the bundled `claude-api` skill and type-
 that `fallbacks: "default"` is accepted for this account.
 
 **Status:** ready-for-review
+
+### 2026-09-11 — agent (second review)
+
+**Fixed, each with a test:**
+
+- **The card could say "This didn't use one of your letters" when it had.** It inferred a refund from the error code, but the
+  route's catch-all and a network failure also produce `failed`. The route now tracks its reservation through every exit, gives it
+  back on any failure (a crash included), and returns `refunded` explicitly; the card believes only that. A letter already written
+  is returned even if the quota cannot be read back afterwards.
+- **The wait announcement arrived in a live region that appeared already holding its text**, which screen readers often skip. The
+  region is now on the page from the start and filled when writing begins (GEN-U10).
+- **The other-tab e2e test did not prove what it claimed**: Server Actions queue per page, so it would pass even if generation were
+  an action. `generation.spec.ts` now also saves the notes on the same page while the letter is being written and requires that
+  save's answer to arrive first.
+
+**Still open for the user:** whether to keep the server-side refusal fallback (`fallbacks: "default"`), which the review flagged
+against "The model is `claude-opus-5`".

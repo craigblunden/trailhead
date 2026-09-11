@@ -19,7 +19,8 @@ export const coverLetterClient = {
       return {
         ok: false,
         error: "failed",
-        message: "We couldn’t reach the server. Check your connection and try again.",
+        message:
+          "We couldn’t reach the server, so we can’t tell whether that letter was counted. Check your connection and try again.",
       };
     }
     const body = (await response.json().catch(() => null)) as GenerationResponse | null;
