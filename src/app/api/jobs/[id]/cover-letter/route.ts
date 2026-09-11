@@ -80,20 +80,22 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   let reservedWeek: string | null = null;
 
   try {
-    // 1. What the letter is written from. A foreign job, a missing resume, or an empty description
-    //    stops here, before any quota is taken.
-    const inputs = await coverLetterInputs(parsedId.data);
-
+    // 1. Whether a letter can be written at all. A deployment with no API key says so without
+    //    reading anything.
     const client = createClaudeClient();
     if (!client) {
       return reply(503, { ok: false, error: "unavailable", message: GENERATION_FAILURES.unavailable });
     }
 
-    // 2. One letter from this week's quota, atomically. Calling this handler directly meets the same
+    // 2. What the letter is written from. A foreign job, a missing resume, or an empty description
+    //    stops here, before any quota is taken.
+    const inputs = await coverLetterInputs(parsedId.data);
+
+    // 3. One letter from this week's quota, atomically. Calling this handler directly meets the same
     //    rule: there is no path to Claude that does not pass through the reservation.
     reservedWeek = (await reserveCoverLetter()).weekStart;
 
-    // 3. The call, outside any transaction.
+    // 4. The call, outside any transaction.
     const outcome = await writeCoverLetter(inputs, { client, tenant: session.userId });
     if (outcome.ok) {
       reservedWeek = null; // Delivered: this letter is used.
@@ -102,7 +104,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       return reply(200, { ok: true, letter: outcome.letter, quota });
     }
 
-    // 4. No letter was delivered, so the reservation is given back.
+    // 5. No letter was delivered, so the reservation is given back.
     const week = reservedWeek;
     reservedWeek = null;
     const { refunded, quota } = REFUNDED_FAILURES.includes(outcome.reason)

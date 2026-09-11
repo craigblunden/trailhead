@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { act } from "react";
 
 import { BoardView } from "@/components/board/board-view";
 import { STAGES, STAGE_META, pluralize, type Job } from "@/lib/jobs";
+import { jobsCache } from "@/lib/jobs-cache";
 import { SEED_JOBS } from "../fixtures/jobs";
-import { renderWithJobs, screen, within } from "../test-utils";
+import { renderWithJobs, screen, waitFor, within } from "../test-utils";
 
 /** The column `<section>` for a stage, located by its visible heading. */
 function column(stage: (typeof STAGES)[number]) {
@@ -185,5 +187,29 @@ describe("job card", () => {
       .getByRole("link", { name: "Senior Product Designer" })
       .closest("li")!;
     expect(within(lead).getByText("Added Jul 22")).toBeInTheDocument();
+  });
+});
+
+describe("the trail scene (performance ticket 04)", () => {
+  it("renders the scene the server hands it, and a change to the jobs does not render it again", async () => {
+    let renders = 0;
+    function Scene() {
+      renders += 1;
+      return <div data-testid="trail-scene" />;
+    }
+    const { queryClient } = renderWithJobs(<BoardView scene={<Scene />} />);
+    expect(screen.getByTestId("trail-scene")).toBeInTheDocument();
+    expect(renders).toBe(1);
+
+    // A job moves on: the board re-renders with it.
+    const moved = { ...SEED_JOBS[0], stage: "offer" as const };
+    act(() => {
+      queryClient.setQueryData(jobsCache.key, [moved, ...SEED_JOBS.slice(1)]);
+    });
+    await waitFor(() =>
+      expect(within(column("offer")).getAllByRole("link", { name: moved.role })).toHaveLength(1),
+    );
+
+    expect(renders).toBe(1);
   });
 });

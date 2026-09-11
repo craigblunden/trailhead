@@ -1,5 +1,3 @@
-import { createBrowserClient } from "@supabase/ssr";
-
 import type { SocialProviderId } from "@/lib/social-providers";
 import { supabasePublicEnv } from "@/lib/supabase-env";
 
@@ -12,6 +10,9 @@ import { supabasePublicEnv } from "@/lib/supabase-env";
  */
 export async function startSocialSignIn(provider: SocialProviderId): Promise<void> {
   const { url, publishableKey } = supabasePublicEnv();
+  // Loaded on the click, not with the page: sign-in and sign-up would otherwise ship the whole
+  // Supabase client even when no provider is configured (performance ticket 01).
+  const { createBrowserClient } = await import("@supabase/ssr");
   const supabase = createBrowserClient(url, publishableKey);
   const { error } = await supabase.auth.signInWithOAuth({
     provider,

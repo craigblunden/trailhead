@@ -8,6 +8,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * editing; while they are, it holds what they typed and commits after `delayMs` of quiet or on
  * `flush()` (blur). A committed value that comes back from the server different from the draft
  * (a rejected edit rolled back) wins once the user stops typing.
+ *
+ * The draft follows a new committed value during render rather than in an effect, so the page beneath
+ * it renders once when a save comes back, not twice (performance ticket 05).
  */
 export function useDraft(
   committed: string,
@@ -15,6 +18,10 @@ export function useDraft(
   delayMs = 600,
 ): [draft: string, setDraft: (value: string) => void, flush: () => void] {
   const [draft, setDraftState] = useState(committed);
+  // Whether the user has typed something not yet committed. State, not a ref, so render can read it.
+  const [editing, setEditing] = useState(false);
+  // The committed value the draft last saw.
+  const [seen, setSeen] = useState(committed);
   const pending = useRef<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const commit = useRef(onCommit);
@@ -22,9 +29,10 @@ export function useDraft(
     commit.current = onCommit;
   });
 
-  useEffect(() => {
-    if (pending.current === null) setDraftState(committed);
-  }, [committed]);
+  if (committed !== seen) {
+    setSeen(committed);
+    if (!editing) setDraftState(committed);
+  }
 
   const flush = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -32,12 +40,14 @@ export function useDraft(
     if (pending.current === null) return;
     const value = pending.current;
     pending.current = null;
+    setEditing(false);
     commit.current(value);
   }, []);
 
   const setDraft = useCallback(
     (value: string) => {
       setDraftState(value);
+      setEditing(true);
       pending.current = value;
       if (timer.current) clearTimeout(timer.current);
       timer.current = setTimeout(flush, delayMs);

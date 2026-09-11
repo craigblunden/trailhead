@@ -49,6 +49,15 @@ import { JOB_INCLUDE } from "./jobs";
  */
 export const ABANDONED_UPLOAD_MS = 3 * 60 * 60 * 1000;
 
+/**
+ * Runs work the user does not wait on: removing objects from Storage. Inline by default, because the
+ * data layer is also called outside any request (the integration suites); the document actions pass
+ * one that runs the work after the response has been sent (performance ticket 03).
+ */
+export type Defer = (work: () => Promise<unknown>) => unknown;
+
+const inline: Defer = (work) => work();
+
 /** Newest first; tombstoned rows are gone from the user's point of view. */
 export async function listDocuments(): Promise<DocumentSummary[]> {
   const { userId } = await requireSession();
@@ -66,7 +75,7 @@ export async function listDocuments(): Promise<DocumentSummary[]> {
  * Creates the pending row, then mints a signed upload URL for its key. The cap is checked under a
  * per-user advisory lock, so two uploads started at once cannot both take the last slot.
  */
-export async function startUpload(input: StartUploadInput): Promise<UploadTicket> {
+export async function startUpload(input: StartUploadInput, defer: Defer = inline): Promise<UploadTicket> {
   const { userId } = await requireSession();
   const extension = extensionOf(input.fileName);
   if (!extension) throw new RuleError("unsupported-type", UPLOAD_REFUSALS["unsupported-type"]);
@@ -74,8 +83,10 @@ export async function startUpload(input: StartUploadInput): Promise<UploadTicket
     throw new RuleError("too-large", UPLOAD_REFUSALS["too-large"]);
   }
 
-  // Abandoned uploads and unfinished deletes must not hold a slot the user is trying to use.
-  await sweepMyDocuments();
+  // Abandoned uploads must not hold a slot the user is trying to use, so they are tombstoned before
+  // the cap is counted. Removing objects — theirs, and any unfinished delete's — can wait.
+  const tombstones = await tombstoneAbandoned(userId, new Date());
+  await defer(() => finishDeleting(userId, tombstones));
 
   const row = await withTenant(userId, async (tx) => {
     await tx.$executeRaw`select pg_advisory_xact_lock(hashtext(${userId}))`;
@@ -172,10 +183,10 @@ async function refuse(userId: string, id: string, reason: UploadRefusal): Promis
  * everything else, and its object is removed from Storage. If the object removal does not happen
  * in this request, the row stays tombstoned and the sweep finishes it.
  */
-export async function deleteDocument(id: string): Promise<void> {
+export async function deleteDocument(id: string, defer: Defer = inline): Promise<void> {
   const { userId } = await requireSession();
   const tombstoned = await tombstone(userId, id);
-  await finishDeleting(userId, [tombstoned]);
+  await defer(() => finishDeleting(userId, [tombstoned]));
 }
 
 type Tombstoned = { id: string; storageKey: string; ingestion: string; createdAt: Date };
@@ -243,7 +254,13 @@ async function finishDeleting(userId: string, rows: Tombstoned[], now: Date = ne
  */
 export async function sweepMyDocuments(now: Date = new Date()): Promise<{ deleted: number }> {
   const { userId } = await requireSession();
-  const tombstones = await withTenant(userId, async (tx) => {
+  const tombstones = await tombstoneAbandoned(userId, now);
+  return { deleted: await finishDeleting(userId, tombstones, now) };
+}
+
+/** Tombstones this user's abandoned uploads, then returns every tombstone still waiting to be finished. */
+async function tombstoneAbandoned(userId: string, now: Date): Promise<Tombstoned[]> {
+  return withTenant(userId, async (tx) => {
     await tx.document.updateMany({
       where: {
         userId,
@@ -258,7 +275,6 @@ export async function sweepMyDocuments(now: Date = new Date()): Promise<{ delete
       select: { id: true, storageKey: true, ingestion: true, createdAt: true },
     });
   });
-  return { deleted: await finishDeleting(userId, tombstones, now) };
 }
 
 /**

@@ -9,9 +9,14 @@ type AppHeaderProps = {
   /** Replaces the default logo lockup — used by the job detail back-link. */
   leading: React.ReactNode;
   actions?: React.ReactNode;
+  /**
+   * While the page is still loading, the account menu is drawn as a placeholder. A live menu would be
+   * replaced by the page's own header when it arrives, closing itself under an open click.
+   */
+  loading?: boolean;
 };
 
-export function AppHeader({ leading, actions }: AppHeaderProps) {
+export function AppHeader({ leading, actions, loading = false }: AppHeaderProps) {
   const user = useSessionUser();
 
   return (
@@ -23,7 +28,12 @@ export function AppHeader({ leading, actions }: AppHeaderProps) {
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           {actions}
-          {user && <UserMenu name={user.name} email={user.email} signOut={signOutAction} />}
+          {user &&
+            (loading ? (
+              <span aria-hidden="true" className="size-8 rounded-full bg-muted" />
+            ) : (
+              <UserMenu name={user.name} email={user.email} signOut={signOutAction} />
+            ))}
         </div>
       </div>
     </header>

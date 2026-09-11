@@ -26,11 +26,12 @@ const claude = vi.hoisted(() => ({
   outcome: { ok: true, letter: "Dear Hiring Team," } as { ok: true; letter: string } | { ok: false; reason: string },
   calls: 0,
   throws: false,
+  available: true,
 }));
 
 vi.mock("@/server/generation/cover-letter", () => ({
-  generationAvailable: () => true,
-  createClaudeClient: () => ({}),
+  generationAvailable: () => claude.available,
+  createClaudeClient: () => (claude.available ? {} : null),
   writeCoverLetter: async () => {
     claude.calls += 1;
     if (claude.throws) throw new Error("something unexpected");
@@ -87,6 +88,7 @@ beforeEach(async () => {
   claude.outcome = { ok: true, letter: "Dear Hiring Team," };
   claude.calls = 0;
   claude.throws = false;
+  claude.available = true;
   vi.useRealTimers();
 });
 
@@ -230,6 +232,18 @@ describe("ticket 18: the route", () => {
 
     signOut();
     expect((await post(bare.id)).status).toBe(401);
+    expect(claude.calls).toBe(0);
+  });
+
+  it("says generation is unavailable before reading the job, when no API key is configured", async () => {
+    signInAs(newUserId());
+    claude.available = false;
+
+    // There is no such job: a route that read the job first would answer 404.
+    const response = await post("no-such-job");
+
+    expect(response.status).toBe(503);
+    expect(response.body).toMatchObject({ ok: false, error: "unavailable" });
     expect(claude.calls).toBe(0);
   });
 

@@ -1,5 +1,3 @@
-import { createBrowserClient } from "@supabase/ssr";
-
 import { ActionError, unwrap } from "@/components/action-client";
 import { DOCUMENTS_BUCKET, UPLOAD_REFUSALS } from "@/lib/documents";
 import type { DocumentsClient } from "@/lib/documents-client";
@@ -37,6 +35,9 @@ export function createActionsDocumentsClient(): DocumentsClient {
 
       onStage?.("uploading");
       const { url, publishableKey } = supabasePublicEnv();
+      // Loaded here rather than at the top: this PUT is the only use of the Supabase client in the
+      // browser, and every signed-in page would otherwise ship it (performance ticket 01).
+      const { createBrowserClient } = await import("@supabase/ssr");
       const storage = createBrowserClient(url, publishableKey).storage.from(DOCUMENTS_BUCKET);
       const { error } = await storage.uploadToSignedUrl(ticket.path, ticket.token, file, {
         contentType: ticket.contentType,

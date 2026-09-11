@@ -8,7 +8,6 @@ import { BoardColumn } from "@/components/board/board-column";
 import { AppHeader } from "@/components/app-header";
 import { useJobs } from "@/components/jobs-provider";
 import { TrailheadLogo } from "@/components/trailhead-logo";
-import { TrailScene } from "@/components/trail-scene";
 import { Button } from "@/components/ui/button";
 import {
   ACTIVE_STAGES,
@@ -18,7 +17,16 @@ import {
   type Stage,
 } from "@/lib/jobs";
 
-export function BoardView() {
+type BoardViewProps = {
+  /**
+   * The illustration beneath the board. The server renders it and passes it in, so its code stays out
+   * of this component's JavaScript and a change to the jobs never renders it again (performance
+   * ticket 04).
+   */
+  scene?: React.ReactNode;
+};
+
+export function BoardView({ scene }: BoardViewProps = {}) {
   const { jobs, status, error, dismissError, reload } = useJobs();
   const [addOpen, setAddOpen] = useState(false);
   // Either the header button or the empty-state button can open the dialog;
@@ -112,7 +120,7 @@ export function BoardView() {
         )}
       </main>
 
-      <TrailScene variant="trail" />
+      {scene}
 
       <AddJobDialog
         open={addOpen}

@@ -105,3 +105,14 @@ describe("layering (tickets 10, 11)", () => {
     }
   });
 });
+
+describe("the Supabase browser client loads on demand (performance ticket 01)", () => {
+  it("no browser-side module imports @supabase/ssr statically; it is imported where it is used", () => {
+    const offenders = files
+      .filter(({ path }) => !path.startsWith("server/") && path !== "proxy.ts")
+      .filter(({ source }) => imports(source).includes("@supabase/ssr"))
+      .map(({ path }) => path);
+
+    expect(offenders).toEqual([]);
+  });
+});

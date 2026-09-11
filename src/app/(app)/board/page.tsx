@@ -2,6 +2,7 @@ import { HydrationBoundary } from "@tanstack/react-query";
 import type { Metadata } from "next";
 
 import { BoardView } from "@/components/board/board-view";
+import { TrailScene } from "@/components/trail-scene";
 import { requirePageSession } from "@/server/auth/session";
 import { listJobs } from "@/server/data/jobs";
 import { prefetchJobs } from "@/server/prefetch";
@@ -13,7 +14,7 @@ export default async function BoardPage() {
   await requirePageSession();
   return (
     <HydrationBoundary state={await prefetchJobs(listJobs)}>
-      <BoardView />
+      <BoardView scene={<TrailScene variant="trail" />} />
     </HydrationBoundary>
   );
 }

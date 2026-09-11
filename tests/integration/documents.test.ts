@@ -69,6 +69,22 @@ vi.mock("@/server/storage/documents-bucket", async (importOriginal) => {
   };
 });
 
+/** `after()` holds work until the response has been sent. Here, each test decides when that is. */
+const afterResponse = vi.hoisted(() => ({ tasks: [] as Array<() => unknown> }));
+
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => {
+    afterResponse.tasks.push(task);
+  },
+}));
+
+/** Runs what the actions deferred, as happens once their response has been sent. */
+async function responseSent() {
+  const tasks = afterResponse.tasks.splice(0);
+  await Promise.all(tasks.map((task) => task()));
+}
+
 let alice: RealUser;
 let bob: RealUser;
 
@@ -81,6 +97,7 @@ beforeEach(async () => {
   signOut();
   hooks.beforeSign = null;
   hooks.failNextRemove = false;
+  afterResponse.tasks.length = 0;
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -341,6 +358,7 @@ describe("ticket 16: delete a document", () => {
 
     expect(result).toEqual({ ok: true, data: null });
     expect(await listDocuments()).toEqual([]);
+    await responseSent();
     expect((await bucketOf(alice).createSignedUrl(key, 60)).error).not.toBeNull();
     // Tombstoned until its upload URL expires (see finishDeleting).
     expect((await storedRow(alice, summary.id))?.deletedAt).toBeInstanceOf(Date);
@@ -481,5 +499,61 @@ describe("ticket 16: delete a document", () => {
     actAs(alice);
     expect((await listDocuments()).map((d) => d.id)).toEqual([summary.id]);
     expect(await objectExists(alice, key)).toBe(true);
+  });
+});
+
+describe("performance ticket 03: Storage cleanup runs after the response", () => {
+  /** Holds deferred work instead of running it, the way `after()` holds it until the response is sent. */
+  function holdDeferred() {
+    const held: Array<() => Promise<unknown>> = [];
+    return {
+      held,
+      defer: (work: () => Promise<unknown>) => void held.push(work),
+      run: () => Promise.all(held.map((work) => work())),
+    };
+  }
+
+  it("a delete answers before its object is removed, and the held work removes it", async () => {
+    const { summary } = await upload(alice, "resume.pdf");
+    const key = (await storedRow(alice, summary.id))!.storageKey;
+    const later = holdDeferred();
+
+    await deleteDocument(summary.id, later.defer);
+
+    // Answered: gone from the user's view and tombstoned, with the object not yet touched.
+    expect(await listDocuments()).toEqual([]);
+    expect((await storedRow(alice, summary.id))?.deletedAt).toBeInstanceOf(Date);
+    expect(await objectExists(alice, key)).toBe(true);
+    expect(later.held).toHaveLength(1);
+
+    await later.run();
+    expect(await objectExists(alice, key)).toBe(false);
+  });
+
+  it("starting an upload at the cap frees an abandoned upload's slot before counting, and removes its object afterwards", async () => {
+    actAs(alice);
+    const abandoned = await startUpload({ kind: "resume", fileName: "resume.pdf", sizeBytes: 1024 });
+    expect((await putObject(alice, abandoned, fixture("resume.pdf"))).error).toBeNull();
+    const abandonedKey = (await storedRow(alice, abandoned.documentId))!.storageKey;
+    await upload(alice, "resume.docx", "cover_letter");
+    await upload(alice, "resume.pdf");
+    // All three slots are held. The first upload never finished, and its URL has since expired.
+    await withTenant(alice.userId, (tx) =>
+      tx.document.update({
+        where: { id: abandoned.documentId },
+        data: { createdAt: new Date(Date.now() - ABANDONED_UPLOAD_MS - 60_000) },
+      }),
+    );
+    actAs(alice);
+    const later = holdDeferred();
+
+    const ticket = await startUpload({ kind: "resume", fileName: "new.pdf", sizeBytes: 1024 }, later.defer);
+
+    expect(ticket.documentId).toBeTruthy();
+    expect((await storedRow(alice, abandoned.documentId))?.deletedAt).toBeInstanceOf(Date);
+    expect(await objectExists(alice, abandonedKey)).toBe(true);
+
+    await later.run();
+    expect(await objectExists(alice, abandonedKey)).toBe(false);
   });
 });
