@@ -7,10 +7,15 @@ export const PUBLIC_ROUTES = [
 ] as const;
 
 /**
- * The signed-in screens. The job detail page is not listed: it needs a job the test created
- * itself, so the sweeps open it through `createJob()` from `./fixtures`.
+ * The signed-in screens, each with the level-one heading that says it has rendered. The job detail
+ * and contact pages are not listed: they need records the test created itself, so the sweeps open
+ * them through `createJob()` from `./fixtures` (and e2e/contacts.spec.ts).
  */
-export const PRIVATE_ROUTES = [{ name: "board", path: "/board" }] as const;
+export const PRIVATE_ROUTES = [
+  { name: "board", path: "/board", heading: "Your trail" },
+  { name: "contacts", path: "/contacts", heading: "Contacts" },
+  { name: "documents", path: "/documents", heading: "Documents" },
+] as const;
 
 /** Spec RESP-1 names these four widths explicitly. */
 export const BREAKPOINTS = [320, 768, 1024, 1440] as const;

@@ -71,7 +71,7 @@ test.describe("signed in", () => {
       test(`RESP-1: ${route.name} does not overflow horizontally at ${width}px`, async ({ page }) => {
         await page.setViewportSize({ width, height: 900 });
         await page.goto(route.path);
-        await expect(page.getByRole("heading", { name: "Your trail" })).toBeVisible();
+        await expect(page.getByRole("heading", { level: 1, name: route.heading })).toBeVisible();
         await expectNoHorizontalOverflow(page, width);
       });
     }

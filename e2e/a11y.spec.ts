@@ -76,6 +76,7 @@ test.describe("signed in", () => {
   for (const route of PRIVATE_ROUTES) {
     test(`A11Y-1: ${route.name} has no axe violations`, async ({ page }) => {
       await page.goto(route.path);
+      await expect(page.getByRole("heading", { level: 1, name: route.heading })).toBeVisible();
       await page.evaluate(() => document.fonts.ready);
 
       const { violations } = await analyse(page);

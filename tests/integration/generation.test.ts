@@ -128,6 +128,13 @@ describe("ticket 18: the quota", () => {
 });
 
 describe("ticket 18: the route", () => {
+  // The route reads the clock for the quota week; pin it, so a run at midnight on a Sunday cannot
+  // split one test across two weeks.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(MONDAY);
+  });
+
   it("writes a letter, persists nothing but the quota counter, and reports what is left", async () => {
     const user = newUserId();
     const job = await jobWithResume(user);

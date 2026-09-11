@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { signInAs, signOut } from "./session-mock";
 
@@ -53,6 +53,13 @@ const dana = {
 beforeEach(async () => {
   await resetTables();
   signOut();
+  // Validation refuses a last-spoken date after today, so today is pinned.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(FROZEN);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("ticket 14: contacts are user-owned and link to many jobs", () => {

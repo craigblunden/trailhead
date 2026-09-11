@@ -49,6 +49,17 @@ test.describe("ticket 18: generate a cover letter", () => {
   // The quota is per account, so each journey owns a fresh one.
   test.use({ storageState: SIGNED_OUT });
 
+  // Each journey uploads a resume; take it back out of storage so runs leave no files behind.
+  test.afterEach(async ({ page }) => {
+    await page.goto("/documents");
+    const remove = page.getByRole("button", { name: /^Delete / });
+    while ((await remove.count()) > 0) {
+      await remove.first().click();
+      await page.getByRole("dialog").getByRole("button", { name: "Delete document" }).click();
+      await expect(page.getByRole("dialog")).toBeHidden();
+    }
+  });
+
   test("a long generation does not block editing notes or changing the stage in another tab; then copy it", async ({
     page,
     context,
