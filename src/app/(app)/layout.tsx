@@ -1,4 +1,5 @@
 import { ContactsProvider } from "@/components/contacts/contacts-provider";
+import { DocumentsProvider } from "@/components/documents/documents-provider";
 import { Providers } from "@/components/providers";
 import { SessionProvider } from "@/components/session-provider";
 import { getOptionalSession } from "@/server/auth/session";
@@ -19,7 +20,9 @@ export default async function AppLayout({
   return (
     <SessionProvider user={user}>
       <Providers>
-        <ContactsProvider>{children}</ContactsProvider>
+        <ContactsProvider>
+          <DocumentsProvider>{children}</DocumentsProvider>
+        </ContactsProvider>
       </Providers>
     </SessionProvider>
   );

@@ -1,6 +1,6 @@
 # 15: Upload a resume
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 **Blocked by:** 11, 13
 
@@ -63,3 +63,59 @@ before the user hits it, per ticket 13.
 - [ ] The document cap is a named constant, and reaching it is communicated before the fourth upload
       is attempted
 - [ ] A PDF with no text layer is detected at upload rather than surfacing later as empty text
+
+## Comments
+
+### 2026-09-11 — agent (built with ticket 16; one data layer)
+
+**Built.**
+
+- **Browser-direct upload, row first.** `startUploadAction` validates a description of the file
+  (name, kind, size — never bytes), then `startUpload()` (`src/server/data/documents.ts`) creates a
+  `pending` row with key `<userId>/<uuid>.<ext>` and only then mints a signed upload URL with the
+  user's own session. The browser PUTs straight to Storage (`src/components/documents-actions-client.ts`,
+  `createBrowserClient` + `uploadToSignedUrl`), then `finishUploadAction` reads the object back as
+  the user, extracts, and marks the row `ready`. The e2e journey watches every request and asserts
+  the PUTs went to Storage's signed-upload endpoint and no request to the app carried a file body.
+- **Extraction at upload** (`src/server/ingest/extract.ts`): magic bytes first (`%PDF-`, ZIP, OLE2),
+  never the name or the declared type; `unpdf` with the page count checked before `extractText`
+  (cap 20); `mammoth.extractRawText`; a 20 s race; fewer than 50 non-space characters means the PDF
+  has **no text layer**; 150,000 characters max. Refusals are codes with user-facing messages that
+  name what to do (`UPLOAD_REFUSALS` in `src/lib/documents.ts`). Research 03 flagged mammoth's
+  `browser` field as a bundling risk: the production build resolves the Node entry — the e2e run
+  uploads a real DOCX through `next start` and it is read.
+- **Cap:** `DOCUMENT_CAP = 3`, checked under `pg_advisory_xact_lock(hashtext(userId))`, so racing
+  uploads cannot both take the last slot (tested with three concurrent starts at one held). The UI
+  says "Room for N more" wherever upload is offered and replaces the control with "All 3 slots used"
+  at the cap.
+- **Signed download URLs:** `DOWNLOAD_URL_TTL_SECONDS = 120`, minted per click with `download=<name>`,
+  never stored or listed. The integration test decodes the token and asserts `exp − iat`.
+- **No `service_role`:** `tests/server/storage-guards.test.ts` greps `src/`, `next.config.ts`, and
+  `.env.example` (comments stripped). The same file pins the bucket config to the constants and
+  asserts there is no UPDATE policy in the provisioning migration; the integration test reads
+  `pg_policies` and fetches a real object's public URL (not 200).
+- **Pages:** `/documents` (list with kind, size, date, "On N jobs"; upload; download; delete) and a
+  Documents link in the header nav.
+
+**What an abandoned upload leaves:** a `pending` row and no object — proven by hooking the mint to
+check that the row already exists and the object does not. The sweep (ticket 16) reclaims it.
+
+**Decided here for ticket 19** (recorded there too): an upload that cannot be used — no text layer,
+locked, mismatched, unreadable — **is not kept**. It is marked `failed` with its reason, removed by
+the same tombstone → object removal → row deletion path as a delete, and the refusal is shown while
+the user is holding the file. It never occupies a slot.
+
+**Fixtures:** `tests/fixtures/documents/` holds real files — a text PDF, an image-only PDF, a PDF
+encrypted with the standard security handler (RC4, a real user password), a 21-page PDF, a DOCX, a
+password-protected DOCX (encrypted by `officecrypto-tool`), and a PDF under a `.docx` name — plus
+the generator that made them.
+
+**Tests:** `tests/server/extract.test.ts` (8, node environment), `tests/server/storage-guards.test.ts`
+(4), `tests/integration/documents.test.ts` (16, against the real bucket with two real verified
+accounts), `tests/components/documents.test.tsx` (8, including axe), `e2e/documents.spec.ts` (the
+full journey, axe, and no overflow at 320/768/1024/1440).
+
+**Found while testing:** the Download and Delete buttons first used an sr-only file name, which JSX
+joined without its space ("Deleteresume.pdf" to a screen reader). They use `aria-label` now.
+
+**Status:** ready-for-review

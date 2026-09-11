@@ -23,10 +23,28 @@ vi.mock("@/server/auth/session", async (importOriginal) => {
   };
 });
 
+/**
+ * Storage checks the signed-in user itself, so tests that reach it hand in a real Supabase client
+ * signed in as that user (see `storage-helpers.ts`). Everything else never calls this seam.
+ */
+const supabase = vi.hoisted(() => ({ client: null as unknown }));
+
+vi.mock("@/server/auth/supabase", () => ({
+  createServerSupabase: async () => {
+    if (!supabase.client) throw new Error("No Supabase client: call setSupabaseClient() first");
+    return supabase.client;
+  },
+}));
+
 export function signInAs(userId: string) {
   current.userId = userId;
 }
 
+export function setSupabaseClient(client: unknown) {
+  supabase.client = client;
+}
+
 export function signOut() {
   current.userId = "";
+  supabase.client = null;
 }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { CONTACT_KINDS, todayUtc } from "@/lib/contacts";
+import { DOCUMENT_KINDS, MAX_UPLOAD_BYTES, UPLOAD_REFUSALS, extensionOf } from "@/lib/documents";
 import { STAGES } from "@/lib/jobs";
 
 /**
@@ -189,6 +190,23 @@ export const contactPatchSchema = z.strictObject({
 });
 
 export type ContactPatchInput = z.infer<typeof contactPatchSchema>;
+
+/**
+ * Starting an upload. The browser sends a description of the file, never its bytes: those go
+ * straight to Storage, whose bucket limits are what actually enforce size and type. These checks
+ * refuse early, before a row or a token exists, with the same messages the upload control shows.
+ */
+export const startUploadSchema = z.object({
+  kind: z.enum(DOCUMENT_KINDS, "Choose resume or cover letter"),
+  fileName: requiredText(255).refine((name) => extensionOf(name) !== null, UPLOAD_REFUSALS["unsupported-type"]),
+  sizeBytes: z
+    .number("That file could not be read")
+    .int()
+    .min(1, "That file is empty.")
+    .max(MAX_UPLOAD_BYTES, UPLOAD_REFUSALS["too-large"]),
+});
+
+export type StartUploadInput = z.infer<typeof startUploadSchema>;
 
 /** Ids are opaque cuids; this only stops a caller handing us a novel. */
 export const idSchema = z.string().trim().min(1).max(64);

@@ -6,6 +6,7 @@ import type {
   JobContact as JobContactRow,
 } from "@/generated/prisma/client";
 import type { ContactDetail, ContactListItem } from "@/lib/contacts";
+import type { DocumentSummary } from "@/lib/documents";
 import { STAGES, type ActivityEntry, type Contact, type Job } from "@/lib/jobs";
 
 /**
@@ -151,5 +152,34 @@ export function toJobDto(row: JobRow): Job {
     contacts: sortContacts(row.contacts.map((link) => link.contact)).map(toContactDto),
     activity: sortActivity(row.activity).map(toActivityDto),
     accent: row.accent,
+  };
+}
+
+/** The relations a document summary is built from: the Jobs it is attached to. */
+export const DOCUMENT_SUMMARY_INCLUDE = {
+  jobs: { select: { id: true, company: true, role: true } },
+} as const;
+
+export type DocumentSummaryRow = DocumentRow & {
+  jobs: Pick<JobModel, "id" | "company" | "role">[];
+};
+
+/** Only ready and pending Documents reach the user; a failed upload is removed where it failed. */
+export function toDocumentSummary(row: DocumentSummaryRow): DocumentSummary {
+  return {
+    id: row.id,
+    kind: row.kind,
+    fileName: row.fileName,
+    sizeBytes: row.sizeBytes,
+    uploadedOn: toIsoDate(row.createdAt),
+    status: row.ingestion === "ready" ? "ready" : "pending",
+    jobs: [...row.jobs]
+      .sort(
+        (a, b) =>
+          a.company.localeCompare(b.company, "en") ||
+          a.role.localeCompare(b.role, "en") ||
+          (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      )
+      .map((job) => ({ id: job.id, company: job.company, role: job.role })),
   };
 }

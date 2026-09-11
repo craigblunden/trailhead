@@ -4,13 +4,16 @@ import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 
 import { ContactsProvider } from "@/components/contacts/contacts-provider";
+import { DocumentsProvider } from "@/components/documents/documents-provider";
 import { JobsProvider } from "@/components/jobs-provider";
 import { SessionProvider } from "@/components/session-provider";
 import { SEED_JOBS, type Job } from "@/lib/jobs";
 import { jobsCache } from "@/lib/jobs-cache";
 import type { ContactsClient } from "@/lib/contacts-client";
+import type { DocumentsClient } from "@/lib/documents-client";
 import { createFixtureJobsClient, type JobsClient } from "@/lib/jobs-client";
 import { createFakeContactsClient } from "./fakes/contacts-client";
+import { createFakeDocumentsClient } from "./fakes/documents-client";
 
 /** The signed-in user every board test renders as. */
 export const TEST_USER = { name: "Sam Rivera", email: "sam.rivera@example.com" };
@@ -46,6 +49,8 @@ type Options = Omit<RenderOptions, "wrapper"> & {
   seedCache?: boolean;
   /** Overrides the in-memory contacts client built over `initialJobs`. */
   contactsClient?: ContactsClient;
+  /** Overrides the empty in-memory documents client. */
+  documentsClient?: DocumentsClient;
 };
 
 /**
@@ -56,12 +61,13 @@ type Options = Omit<RenderOptions, "wrapper"> & {
  */
 export function renderWithJobs(
   ui: React.ReactElement,
-  { initialJobs = SEED_JOBS, client, seedCache = true, contactsClient, ...options }: Options = {},
+  { initialJobs = SEED_JOBS, client, seedCache = true, contactsClient, documentsClient, ...options }: Options = {},
 ) {
   const queryClient = createTestQueryClient();
   if (seedCache) queryClient.setQueryData(jobsCache.key, initialJobs);
   const jobsClient = client ?? createFixtureJobsClient(initialJobs);
   const contacts = contactsClient ?? createFakeContactsClient({ jobs: initialJobs });
+  const documents = documentsClient ?? createFakeDocumentsClient();
 
   return {
     user: userEvent.setup(),
@@ -71,7 +77,9 @@ export function renderWithJobs(
         <SessionProvider user={TEST_USER}>
           <QueryClientProvider client={queryClient}>
             <ContactsProvider client={contacts}>
-              <JobsProvider client={jobsClient}>{children}</JobsProvider>
+              <DocumentsProvider client={documents}>
+                <JobsProvider client={jobsClient}>{children}</JobsProvider>
+              </DocumentsProvider>
             </ContactsProvider>
           </QueryClientProvider>
         </SessionProvider>
