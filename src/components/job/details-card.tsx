@@ -3,6 +3,7 @@
 import { useId } from "react";
 import { FileText } from "lucide-react";
 
+import { useDraft } from "@/components/job/use-draft";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,8 +23,22 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Blank means "not specified"; anything else is parsed and the server has the final say. */
+function toBound(text: string): number | null {
+  const trimmed = text.trim();
+  if (trimmed === "") return null;
+  const parsed = Number(trimmed);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 export function DetailsCard({ job, onChange }: DetailsCardProps) {
   const fieldId = useId();
+  const [min, setMin, flushMin] = useDraft(job.salaryMin?.toString() ?? "", (value) =>
+    onChange({ salaryMin: toBound(value) }),
+  );
+  const [max, setMax, flushMax] = useDraft(job.salaryMax?.toString() ?? "", (value) =>
+    onChange({ salaryMax: toBound(value) }),
+  );
 
   return (
     <Card
@@ -51,12 +66,9 @@ export function DetailsCard({ job, onChange }: DetailsCardProps) {
               inputMode="numeric"
               min={0}
               className="h-10"
-              value={job.salaryMin ?? ""}
-              onChange={(event) =>
-                onChange({
-                  salaryMin: event.target.value === "" ? null : Number(event.target.value),
-                })
-              }
+              value={min}
+              onChange={(event) => setMin(event.target.value)}
+              onBlur={flushMin}
             />
             <span aria-hidden="true" className="text-muted-foreground">
               –
@@ -70,12 +82,9 @@ export function DetailsCard({ job, onChange }: DetailsCardProps) {
               inputMode="numeric"
               min={0}
               className="h-10"
-              value={job.salaryMax ?? ""}
-              onChange={(event) =>
-                onChange({
-                  salaryMax: event.target.value === "" ? null : Number(event.target.value),
-                })
-              }
+              value={max}
+              onChange={(event) => setMax(event.target.value)}
+              onBlur={flushMax}
             />
           </div>
           <p className="mt-1.5 text-xs text-muted-foreground">

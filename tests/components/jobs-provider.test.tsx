@@ -99,10 +99,18 @@ describe("rollback", () => {
   });
 
   it("TSQ-5: a successful add replaces the optimistic card with what the server returned", async () => {
+    // A server that assigns its own id — and, like a real one, lists what it assigned.
     const fixture = createFixtureJobsClient(SEED_JOBS);
+    const assigned = new Map<string, string>();
     const client: JobsClient = {
       ...fixture,
-      add: async (input) => ({ ...(await fixture.add(input)), id: "server-assigned-id" }),
+      add: async (input) => {
+        const saved = await fixture.add(input);
+        assigned.set(saved.id, "server-assigned-id");
+        return { ...saved, id: "server-assigned-id" };
+      },
+      list: async () =>
+        (await fixture.list()).map((job) => ({ ...job, id: assigned.get(job.id) ?? job.id })),
     };
     const { user } = renderWithJobs(<BoardView />, { client });
 

@@ -188,3 +188,17 @@
     #cfe4cf 100%
   );
 }
+
+/* Sits between two scene-wash surfaces: picks up the meadow tint at the top,
+   lightens through the middle, and settles back into green at the bottom so
+   the section dissolves into its neighbours instead of sitting on a slab. */
+@utility basecamp-wash {
+  background-color: var(--basecamp);
+  background-image:
+    radial-gradient(
+      60rem 28rem at 85% 0%,
+      rgb(237 193 88 / 0.12),
+      transparent 70%
+    ),
+    linear-gradient(180deg, #e9f1e6 0%, #f8f9f4 28%, #f8f9f4 72%, #e3eedc 100%);
+}

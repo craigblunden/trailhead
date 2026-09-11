@@ -5,11 +5,12 @@ import { ArrowLeft, ArrowUpRight } from "lucide-react";
 
 import { AppHeader } from "@/components/app-header";
 import { CompanyAvatar } from "@/components/company-avatar";
-import { useJobs } from "@/components/jobs-provider";
+import { useJobs, type JobPatch } from "@/components/jobs-provider";
 import { ActivityCard } from "@/components/job/activity-card";
 import { ContactsCard } from "@/components/job/contacts-card";
 import { CoverLetterCard } from "@/components/job/cover-letter-card";
 import { DetailsCard } from "@/components/job/details-card";
+import { useDraft } from "@/components/job/use-draft";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -19,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { STAGES, STAGE_META, webLink, type Stage } from "@/lib/jobs";
+import { STAGES, STAGE_META, webLink, type Job, type Stage } from "@/lib/jobs";
 
 function DetailHeader() {
   return (
@@ -45,36 +46,64 @@ export function JobDetail({ jobId }: { jobId: string }) {
   const { getJob, updateJob, setStage, status, error, dismissError } = useJobs();
   const job = getJob(jobId);
 
-  if (!job && status === "pending") {
-    return (
-      <div className="flex flex-1 flex-col bg-background">
-        <DetailHeader />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
-          <p role="status" className="text-sm text-muted-foreground">
-            Loading this job…
-          </p>
-        </main>
-      </div>
-    );
-  }
+  if (!job && status === "pending") return <DetailLoading />;
+  // An unknown id and another user's id are the same thing here, on purpose.
+  if (!job) return <DetailMissing />;
+  return (
+    <JobDetailView
+      job={job}
+      error={error}
+      dismissError={dismissError}
+      onPatch={(patch) => updateJob(job.id, patch)}
+      onStage={(stage) => setStage(job.id, stage)}
+    />
+  );
+}
 
-  if (!job) {
-    return (
-      <div className="flex flex-1 flex-col bg-background">
-        <DetailHeader />
-        <main className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center px-6 py-20 text-center">
-          <h1 className="text-2xl">This job isn&rsquo;t on your trail</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            It may have been removed, or the link is out of date.
-          </p>
-          <Button asChild className="mt-6 h-10 px-4">
-            <Link href="/board">Back to your trail</Link>
-          </Button>
-        </main>
-      </div>
-    );
-  }
+function DetailLoading() {
+  return (
+    <div className="flex flex-1 flex-col bg-background">
+      <DetailHeader />
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+        <p role="status" className="text-sm text-muted-foreground">
+          Loading this job…
+        </p>
+      </main>
+    </div>
+  );
+}
 
+function DetailMissing() {
+  return (
+    <div className="flex flex-1 flex-col bg-background">
+      <DetailHeader />
+      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center px-6 py-20 text-center">
+        <h1 className="text-2xl">This job isn&rsquo;t on your trail</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          It may have been removed, or the link is out of date.
+        </p>
+        <Button asChild className="mt-6 h-10 px-4">
+          <Link href="/board">Back to your trail</Link>
+        </Button>
+      </main>
+    </div>
+  );
+}
+
+type JobDetailViewProps = {
+  job: Job;
+  error: string | null;
+  dismissError: () => void;
+  onPatch: (patch: JobPatch) => void;
+  onStage: (stage: Stage) => void;
+};
+
+/** Free text is typed into a local draft and saved after a pause or on blur, not per keystroke. */
+function JobDetailView({ job, error, dismissError, onPatch, onStage }: JobDetailViewProps) {
+  const [description, setDescription, flushDescription] = useDraft(job.description, (value) =>
+    onPatch({ description: value }),
+  );
+  const [notes, setNotes, flushNotes] = useDraft(job.notes, (value) => onPatch({ notes: value }));
   const posting = webLink(job.postingUrl);
 
   return (
@@ -108,10 +137,7 @@ export function JobDetail({ jobId }: { jobId: string }) {
           </div>
 
           <div className="flex w-full shrink-0 flex-wrap items-center gap-3 sm:w-auto">
-            <Select
-              value={job.stage}
-              onValueChange={(next) => setStage(job.id, next as Stage)}
-            >
+            <Select value={job.stage} onValueChange={(next) => onStage(next as Stage)}>
               <SelectTrigger
                 className="h-9 w-full min-w-32 sm:w-40"
                 aria-label="Application stage"
@@ -161,10 +187,9 @@ export function JobDetail({ jobId }: { jobId: string }) {
               <Textarea
                 aria-labelledby="description-heading"
                 aria-describedby="description-hint"
-                value={job.description}
-                onChange={(event) =>
-                  updateJob(job.id, { description: event.target.value })
-                }
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                onBlur={flushDescription}
                 className="mt-3 min-h-56 resize-y"
               />
             </section>
@@ -179,10 +204,9 @@ export function JobDetail({ jobId }: { jobId: string }) {
               <Textarea
                 aria-labelledby="notes-heading"
                 placeholder="Interview prep, follow-ups, anything worth remembering."
-                value={job.notes}
-                onChange={(event) =>
-                  updateJob(job.id, { notes: event.target.value })
-                }
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                onBlur={flushNotes}
                 className="mt-3 min-h-32 resize-y"
               />
             </section>
@@ -191,10 +215,7 @@ export function JobDetail({ jobId }: { jobId: string }) {
           </div>
 
           <aside className="space-y-6">
-            <DetailsCard
-              job={job}
-              onChange={(patch) => updateJob(job.id, patch)}
-            />
+            <DetailsCard job={job} onChange={onPatch} />
             <ContactsCard contacts={job.contacts} />
             <ActivityCard entries={job.activity} />
           </aside>

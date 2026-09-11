@@ -3,14 +3,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
-import { SEED_JOBS, type Job, type Stage } from "@/lib/jobs";
+import { ActionError, createActionsJobsClient } from "@/components/jobs-actions-client";
+import type { Job, Stage } from "@/lib/jobs";
 import { jobsCache } from "@/lib/jobs-cache";
-import {
-  createFixtureJobsClient,
-  type JobPatch,
-  type JobsClient,
-  type NewJobInput,
-} from "@/lib/jobs-client";
+import type { JobPatch, JobsClient, NewJobInput } from "@/lib/jobs-client";
 import { OPENING_ACTIVITY_LABEL, nextAccent, stageChange } from "@/lib/jobs-rules";
 
 export type { JobPatch, NewJobInput };
@@ -33,7 +29,7 @@ type JobsContextValue = {
 
 const JobsContext = createContext<JobsContextValue | null>(null);
 
-const defaultClient: JobsClient = createFixtureJobsClient(SEED_JOBS);
+const defaultClient: JobsClient = createActionsJobsClient();
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -60,7 +56,7 @@ export function JobsProvider({
   client = defaultClient,
 }: {
   children: React.ReactNode;
-  /** Where jobs come from and go to. Defaults to the fixture client until a server exists. */
+  /** Where jobs come from and go to. Defaults to the Server Actions client; tests inject one. */
   client?: JobsClient;
 }) {
   const queryClient = useQueryClient();
@@ -75,10 +71,19 @@ export function JobsProvider({
   }, [queryClient]);
 
   const restore = useCallback(
-    (previous: Job[] | undefined, message: string) => {
+    (previous: Job[] | undefined, error: unknown, fallback: string) => {
       queryClient.setQueryData<Job[]>(jobsCache.key, previous);
-      setError(message);
+      // An action's message is written to be shown; anything else gets the generic line.
+      setError(error instanceof ActionError ? error.message : fallback);
     },
+    [queryClient],
+  );
+
+  // After any write, settle on what the server holds. A navigation that started before the write
+  // committed can hydrate a stale snapshot over the optimistic state; the refetch that follows
+  // the write is always newer than that snapshot, so the board ends on the truth.
+  const resync = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: jobsCache.key }),
     [queryClient],
   );
 
@@ -110,12 +115,13 @@ export function JobsProvider({
       queryClient.setQueryData<Job[]>(jobsCache.key, (current = []) => [...current, optimistic]);
       return { previous, optimisticId: optimistic.id };
     },
-    onError: (_error, _input, context) => {
-      restore(context?.previous, "That job wasn't saved. Check your connection and try again.");
+    onError: (error, _input, context) => {
+      restore(context?.previous, error, "That job wasn't saved. Check your connection and try again.");
     },
     onSuccess: (saved, _input, context) => {
       patchCache(context.optimisticId, () => saved);
     },
+    onSettled: resync,
   });
 
   const update = useMutation({
@@ -125,9 +131,13 @@ export function JobsProvider({
       patchCache(id, (job) => ({ ...job, ...patch }));
       return { previous };
     },
-    onError: (_error, _variables, context) => {
-      restore(context?.previous, "That edit wasn't saved. Check your connection and try again.");
+    onError: (error, _variables, context) => {
+      restore(context?.previous, error, "That edit wasn't saved. Check your connection and try again.");
     },
+    onSuccess: (saved) => {
+      patchCache(saved.id, () => saved);
+    },
+    onSettled: resync,
   });
 
   const move = useMutation({
@@ -146,15 +156,17 @@ export function JobsProvider({
       });
       return { previous };
     },
-    onError: (_error, _variables, context) => {
+    onError: (error, _variables, context) => {
       restore(
         context?.previous,
+        error,
         "That stage change wasn't saved. Check your connection and try again.",
       );
     },
     onSuccess: (saved) => {
       patchCache(saved.id, () => saved);
     },
+    onSettled: resync,
   });
 
   const status: JobsStatus = query.status;

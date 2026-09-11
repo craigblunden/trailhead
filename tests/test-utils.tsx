@@ -4,9 +4,13 @@ import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 
 import { JobsProvider } from "@/components/jobs-provider";
+import { SessionProvider } from "@/components/session-provider";
 import { SEED_JOBS, type Job } from "@/lib/jobs";
 import { jobsCache } from "@/lib/jobs-cache";
 import { createFixtureJobsClient, type JobsClient } from "@/lib/jobs-client";
+
+/** The signed-in user every board test renders as. */
+export const TEST_USER = { name: "Sam Rivera", email: "sam.rivera@example.com" };
 
 /** The clock every date-sensitive test runs against (spec T-3). */
 export const FROZEN_NOW = new Date("2026-07-25T12:00:00Z");
@@ -58,9 +62,11 @@ export function renderWithJobs(
     queryClient,
     ...render(ui, {
       wrapper: ({ children }) => (
-        <QueryClientProvider client={queryClient}>
-          <JobsProvider client={jobsClient}>{children}</JobsProvider>
-        </QueryClientProvider>
+        <SessionProvider user={TEST_USER}>
+          <QueryClientProvider client={queryClient}>
+            <JobsProvider client={jobsClient}>{children}</JobsProvider>
+          </QueryClientProvider>
+        </SessionProvider>
       ),
       ...options,
     }),
