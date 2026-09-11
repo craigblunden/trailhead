@@ -1,6 +1,6 @@
 # 08: Validation schemas and mappers
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 **Blocked by:** 03
 
@@ -41,3 +41,30 @@ their arguments are untrusted regardless of which component calls them.
 - [ ] Activity ordering is deterministic for two entries sharing a date
 - [ ] Every free-text field has a length bound, tested at and past the limit
 - [ ] A `javascript:` posting URL is rejected or neutralised at the validation boundary, with a test
+
+## Comments
+
+### 2026-09-11 — agent
+
+**Built, test-first, no database.**
+
+- `src/server/db/mappers.ts` — `toJobDto(row)` produces exactly the Phase-1 `Job` (a test asserts
+  the key set, and that `userId`, timestamps, and the document row do not leak). `toIsoDate` /
+  `toDateColumn` round-trip `date` columns as `YYYY-MM-DD` in UTC; `todayIso(now?)` takes the
+  clock as an argument. `sortActivity`: date desc, then `createdAt` desc, then id — total order.
+  `sortContacts`: name, then id. `resumeFile` is the attached document's file name or null.
+- `src/server/validation.ts` — zod 4. `newJobSchema`: company/role required and trimmed; blank
+  location → "Location TBD"; salary bounds: blank or non-numeric → null, numeric strings accepted,
+  zero kept, negative/fractional/absurd → field error; posting URL: blank allowed, anything not
+  `http(s):` **rejected with a message naming the fix** (chosen over silently neutralising a typo'd
+  link); every free-text field bounded by `JOB_LIMITS`. `jobPatchSchema` is a `strictObject`
+  allowlist of description and notes — any other key is rejected, not dropped (ticket 11).
+  `stageSchema`, `idSchema`. `parseInput(schema, input)` returns `{ok, data}` or `{ok, errors}`
+  with one message per field for inline rendering.
+- Tests: `tests/server/mappers.test.ts` (10) and `tests/server/validation.test.ts` (13), in the
+  unit project. Limits are tested at and one past each bound.
+
+The Contact DTO keeps its Phase-1 shape (`id, name, title, email`) here; ticket 14 extends it
+when the UI for kinds and agency exists.
+
+**Status:** ready-for-review
