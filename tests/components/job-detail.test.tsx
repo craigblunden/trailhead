@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { JobDetail } from "@/components/job/job-detail";
-import { SEED_JOBS, type Job } from "@/lib/jobs";
+import type { Job } from "@/lib/jobs";
+import { SEED_JOBS } from "../fixtures/jobs";
 import { freezeClock, renderWithJobs, screen, within } from "../test-utils";
 
 const HARVEST = "harvest-lead-product-designer";

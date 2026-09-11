@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { BoardView } from "@/components/board/board-view";
-import { SEED_JOBS, STAGES, STAGE_META, pluralize, type Job } from "@/lib/jobs";
+import { STAGES, STAGE_META, pluralize, type Job } from "@/lib/jobs";
+import { SEED_JOBS } from "../fixtures/jobs";
 import { renderWithJobs, screen, within } from "../test-utils";
 
 /** The column `<section>` for a stage, located by its visible heading. */

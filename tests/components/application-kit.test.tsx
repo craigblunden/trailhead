@@ -3,7 +3,8 @@ import { axe } from "vitest-axe";
 
 import { JobDetail } from "@/components/job/job-detail";
 import { ActionError } from "@/components/jobs-actions-client";
-import { SEED_JOBS, type Job } from "@/lib/jobs";
+import type { Job } from "@/lib/jobs";
+import { SEED_JOBS } from "../fixtures/jobs";
 import { createFakeDocumentsClient, summary } from "../fakes/documents-client";
 import { freezeClock, renderWithJobs, screen, waitFor, within } from "../test-utils";
 

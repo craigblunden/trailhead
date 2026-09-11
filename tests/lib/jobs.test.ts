@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   ACTIVE_STAGES,
-  SEED_JOBS,
   STAGES,
   STAGE_META,
   formatLongDate,
@@ -14,6 +13,7 @@ import {
   webLink,
   type Job,
 } from "@/lib/jobs";
+import { SEED_JOBS } from "../fixtures/jobs";
 
 function jobWith(patch: Partial<Job>): Job {
   return { ...SEED_JOBS[0], ...patch };

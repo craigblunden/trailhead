@@ -3,7 +3,8 @@ import { axe } from "vitest-axe";
 
 import { CoverLetterCard } from "@/components/job/cover-letter";
 import type { GenerationResponse } from "@/lib/generation";
-import { SEED_JOBS, type Job } from "@/lib/jobs";
+import type { Job } from "@/lib/jobs";
+import { SEED_JOBS } from "../fixtures/jobs";
 import { renderWithJobs, screen, waitFor, within } from "../test-utils";
 
 const client = vi.hoisted(() => ({

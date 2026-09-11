@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BoardView } from "@/components/board/board-view";
-import { SEED_JOBS, STAGE_META } from "@/lib/jobs";
+import { STAGE_META } from "@/lib/jobs";
+import { SEED_JOBS } from "../fixtures/jobs";
 import { freezeClock, renderWithJobs, screen, within } from "../test-utils";
 
 const interested = () =>

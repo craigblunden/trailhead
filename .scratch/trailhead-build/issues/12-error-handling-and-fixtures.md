@@ -1,6 +1,6 @@
 # 12: Error handling, outage states, and fixtures moved out of production code
 
-**Status:** in-progress (fixture move pending)
+**Status:** ready-for-review
 
 **Blocked by:** 11
 
@@ -69,3 +69,25 @@ fixture moves to `tests/fixtures/jobs.ts`, the landing's illustrative data becom
 `SAMPLE_JOBS` module, and a source-grep test enforces the rule.
 
 **Status:** in-progress (fixture move pending)
+
+### 2026-09-11 — agent (part 2: fixtures become test-only)
+
+**Built, as part 1 scheduled.**
+
+- `SEED_JOBS` moved out of `src/lib/jobs.ts` into **`tests/fixtures/jobs.ts`**. Every test that used
+  it imports it from there; `renderWithJobs` still seeds with it by default.
+- The landing page's illustrative data is its own module, **`src/components/landing/sample-jobs.ts`**
+  (`SAMPLE_JOBS`) — marketing content, a separate copy, so the fixtures and the landing can change
+  independently.
+- **`tests/server/fixtures-boundary.test.ts`** fails the unit suite if anything under `src/` names
+  `SEED_JOBS` or imports from `tests/`.
+- A fresh account sees the empty state (e2e ACC-1, from part 1), and nothing in production can seed
+  one.
+
+**The landing rewrite in progress** (`src/components/landing/everything-you-need.tsx`, uncommitted,
+not part of this effort) imported `SEED_JOBS`. In the working tree it now imports `SAMPLE_JOBS` from
+`@/components/landing/sample-jobs`, with its uses renamed to match — an identifier rename and nothing
+else — so it keeps building and the boundary test holds for the working tree too. That file is not in
+this commit; the committed landing page never imported the seeds.
+
+**Status:** ready-for-review

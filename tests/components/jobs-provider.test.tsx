@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BoardView } from "@/components/board/board-view";
 import { JobDetail } from "@/components/job/job-detail";
 import { getQueryClient } from "@/components/providers";
-import { SEED_JOBS } from "@/lib/jobs";
+import { SEED_JOBS } from "../fixtures/jobs";
 import { jobsCache } from "@/lib/jobs-cache";
 import { createFixtureJobsClient, type JobsClient } from "@/lib/jobs-client";
 import { freezeClock, renderWithJobs, screen, waitFor, within } from "../test-utils";

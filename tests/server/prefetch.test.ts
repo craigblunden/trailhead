@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SEED_JOBS } from "@/lib/jobs";
+import { SEED_JOBS } from "../fixtures/jobs";
 import { jobsCache } from "@/lib/jobs-cache";
 import { prefetchJobs } from "@/server/prefetch";
 
