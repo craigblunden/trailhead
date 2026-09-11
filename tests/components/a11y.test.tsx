@@ -4,6 +4,8 @@ import { axe } from "vitest-axe";
 
 import LandingPage from "@/app/page";
 import { AuthForm } from "@/components/auth/auth-form";
+import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
+import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 import { BoardView } from "@/components/board/board-view";
 import { JobDetail } from "@/components/job/job-detail";
 import { renderWithJobs } from "../test-utils";
@@ -40,6 +42,16 @@ describe("A11Y-1: no structural violations", () => {
     const { container } = render(
       <AuthForm mode="login" action={idle} resendAction={idle} />,
     );
+    expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
+  });
+
+  it("forgot password", async () => {
+    const { container } = render(<ForgotPasswordForm action={idle} notice="A notice." />);
+    expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
+  });
+
+  it("reset password", async () => {
+    const { container } = render(<ResetPasswordForm action={idle} />);
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
   });
 

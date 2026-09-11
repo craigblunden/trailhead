@@ -16,7 +16,9 @@ export type AuthState =
   | { status: "check-email"; email: string }
   /** Sign-in refused because the address is not verified yet. */
   | { status: "unverified"; email: string }
-  | { status: "resent"; email: string };
+  | { status: "resent"; email: string }
+  /** Reset requested — the same state whether or not the address has an account. */
+  | { status: "sent"; email: string };
 
 const email = z.string().trim().toLowerCase().min(1, "Enter your email").max(254).pipe(
   z.email("Enter a valid email address"),
@@ -109,6 +111,47 @@ export async function resendVerificationAction(
   });
   // Same response whether or not a mail went out: no enumeration through the resend path either.
   return { status: "resent", email: parsed.data.email };
+}
+
+/**
+ * Always the same confirmation. "No account with that email" would be a lookup service; the
+ * response and the rendering depend only on what was typed.
+ */
+export async function requestPasswordResetAction(
+  _prev: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  const parsed = parseInput(emailOnlySchema, formFields(formData));
+  if (!parsed.ok) return { status: "error", message: "Enter a valid email address.", fields: parsed.errors };
+
+  const supabase = await createServerSupabase();
+  await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+    redirectTo: `${await appOrigin()}/auth/confirm`,
+  });
+  return { status: "sent", email: parsed.data.email };
+}
+
+/**
+ * Sets the password for the session the recovery link created, then ends that session so the
+ * user signs in with the new password like any other day — which is also the proof that it took.
+ */
+export async function updatePasswordAction(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  const parsed = parseInput(z.object({ password }), formFields(formData));
+  if (!parsed.ok) return { status: "error", message: "Check the highlighted fields.", fields: parsed.errors };
+
+  const supabase = await createServerSupabase();
+  const { error } = await supabase.auth.updateUser({ password: parsed.data.password });
+  if (error) {
+    if (/same|different from the old/i.test(error.message)) {
+      return { status: "error", message: "Choose a password you haven't used before." };
+    }
+    if (/session|not logged in|jwt/i.test(error.message)) {
+      redirect("/forgot-password?error=session");
+    }
+    return { status: "error", message: GENERIC_FAILURE };
+  }
+  await supabase.auth.signOut();
+  redirect("/login?reset=1");
 }
 
 /** A mutation, so a submit control rather than a link, and never during render. */

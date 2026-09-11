@@ -3,6 +3,7 @@ export const PUBLIC_ROUTES = [
   { name: "landing", path: "/" },
   { name: "signup", path: "/signup" },
   { name: "login", path: "/login" },
+  { name: "forgot-password", path: "/forgot-password" },
 ] as const;
 
 /**
