@@ -5,7 +5,7 @@ import { Download, FileText, Trash2 } from "lucide-react";
 
 import { describeFailure } from "@/components/action-client";
 import { AppHeader } from "@/components/app-header";
-import { useDocumentActions, useDocumentList } from "@/components/documents/documents-provider";
+import { useDocumentActions, useDocumentList, useLimits } from "@/components/documents/documents-provider";
 import { UploadDocument } from "@/components/documents/upload-document";
 import { BrandLogo } from "@/components/brand-logo";
 import { LoadingTrail } from "@/components/loading-trail";
@@ -20,7 +20,6 @@ import {
 } from "@/components/ui/dialog";
 import { DOCUMENT_KIND_LABEL, formatBytes, type DocumentSummary } from "@/lib/documents";
 import { formatShortDate, pluralize } from "@/lib/jobs";
-import { DEFAULT_PLAN, limitsOf } from "@/lib/plans";
 
 /**
  * `/documents`: every Document the user holds, the one place Delete lives (ticket 13), and an
@@ -28,8 +27,9 @@ import { DEFAULT_PLAN, limitsOf } from "@/lib/plans";
  */
 export function DocumentsView() {
   const documents = useDocumentList();
-  // Every Tenant's Limit is the default Plan's until the Plan is read (plans issue 03).
-  const limit = limitsOf(DEFAULT_PLAN).documents;
+  const limits = useLimits();
+  /** The Tenant's Document Limit; null until it is known. */
+  const limit = limits.data?.documents ?? null;
   const { remove, open } = useDocumentActions();
   const [confirming, setConfirming] = useState<DocumentSummary | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
@@ -65,7 +65,7 @@ export function DocumentsView() {
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
         <h1 className="text-3xl tracking-tight">Documents</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Your resumes and cover letters{limit !== "unlimited" && ` — up to ${limit} at a time`}. Attach
+          Your resumes and cover letters{typeof limit === "number" && ` — up to ${limit} at a time`}. Attach
           them to jobs from each job’s page.
         </p>
 
@@ -76,7 +76,7 @@ export function DocumentsView() {
           <h2 id="upload-heading" className="text-lg">
             Upload
           </h2>
-          {documents.isPending ? (
+          {documents.isPending || limit === null ? (
             <p className="mt-2 text-sm text-muted-foreground">Checking how many slots are free…</p>
           ) : (
             <UploadDocument held={held} limit={limit} className="mt-3" />
@@ -99,7 +99,7 @@ export function DocumentsView() {
           <h2 id="documents-heading" className="text-lg">
             On file{" "}
             <span className="text-sm font-normal text-muted-foreground">
-              {limit === "unlimited" ? pluralize(held, "document") : `${held} of ${limit}`}
+              {typeof limit === "number" ? `${held} of ${limit}` : pluralize(held, "document")}
             </span>
           </h2>
 

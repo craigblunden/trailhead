@@ -8,6 +8,7 @@ import {
   type UploadRefusal,
 } from "@/lib/documents";
 import type { Job } from "@/lib/jobs";
+import type { Limits } from "@/lib/plans";
 
 /** Where an upload is, for the status line that announces it. */
 export type UploadStage = "uploading" | "reading";
@@ -15,6 +16,8 @@ export type UploadStage = "uploading" | "reading";
 /** What the documents UI asks the world for. Tests inject a fake; the app uses actions + Storage. */
 export type DocumentsClient = {
   list(): Promise<DocumentSummary[]>;
+  /** The Tenant's Limits, so the upload control can show one before it is reached. */
+  limits(): Promise<Limits>;
   /** Starts the upload, puts the bytes in Storage, and waits for the text to be read. */
   upload(file: File, kind: DocumentKind, onStage?: (stage: UploadStage) => void): Promise<DocumentSummary>;
   /** Resolves once the Document is gone from the user's list. */
@@ -33,6 +36,18 @@ export const documentsCache = {
       queryKey: documentsCache.key,
       queryFn: fetchDocuments,
       staleTime: documentsCache.staleTime,
+    }),
+};
+
+/** The Tenant's Limits. A Plan changes rarely and never from the browser, so they are read once a minute. */
+export const limitsCache = {
+  key: ["limits"] as const,
+  staleTime: 60_000,
+  options: (fetchLimits: () => Promise<Limits>) =>
+    queryOptions({
+      queryKey: limitsCache.key,
+      queryFn: fetchLimits,
+      staleTime: limitsCache.staleTime,
     }),
 };
 

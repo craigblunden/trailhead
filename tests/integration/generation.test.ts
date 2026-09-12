@@ -21,7 +21,7 @@ import { withTenant } from "@/server/db/tenant";
 import { COVER_LETTER_MODEL } from "@/server/generation/cover-letter";
 import { generateCoverLetter } from "@/server/generation/generate-cover-letter";
 
-import { newUserId, resetTables } from "./helpers";
+import { newUserId, resetTables, setPlan } from "./helpers";
 
 /**
  * Nothing is mocked but the session. The Claude call goes through a real SDK client — the seam the
@@ -157,6 +157,21 @@ describe("ticket 18: the quota", () => {
     expect(await refundCoverLetter(weekStart)).toMatchObject({ used: 1 });
     expect(await refundCoverLetter(weekStart)).toMatchObject({ used: 0 });
     expect(await refundCoverLetter(weekStart)).toMatchObject({ used: 0 });
+  });
+});
+
+describe("plans issue 03: the letters Limit is the Tenant's Plan's", () => {
+  it("a pro Tenant reserves a sixth letter and is told 25; moved back to free with seven used, the next is refused", async () => {
+    const userId = newUserId();
+    await setPlan(userId, "pro");
+    signInAs(userId);
+    for (let i = 0; i < 7; i += 1) await reserveCoverLetter(MONDAY);
+    expect(await generationQuota(MONDAY)).toEqual({ limit: 25, used: 7, remaining: 18, resetsOn: "2026-07-27" });
+
+    await setPlan(userId, "free");
+    await expect(reserveCoverLetter(MONDAY)).rejects.toMatchObject({ code: "quota" });
+    expect(await generationQuota(MONDAY)).toEqual({ limit: 5, used: 5, remaining: 0, resetsOn: "2026-07-27" });
+    expect(await withTenant(userId, (tx) => tx.generationQuota.findFirstOrThrow())).toMatchObject({ used: 7 });
   });
 });
 

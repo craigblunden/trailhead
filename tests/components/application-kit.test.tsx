@@ -34,8 +34,8 @@ const fernwood: Job = {
   contacts: [],
 };
 
-function renderKit(documents = [growth, staff, letter], job: Job = harvest) {
-  const trail = createTrail({ jobs: [job, fernwood], documents });
+function renderKit(documents = [growth, staff, letter], job: Job = harvest, plan: "free" | "pro" = "free") {
+  const trail = createTrail({ jobs: [job, fernwood], documents, plan });
   const rendered = renderWithJobs(<JobDetail jobId={job.id} />, { trail });
   return { client: trail.documents, ...rendered };
 }
@@ -129,6 +129,14 @@ describe("the application kit (ticket 17)", () => {
     expect(upload).toHaveTextContent("All 3 slots used");
     expect(within(upload).getByRole("link", { name: "Manage documents" })).toHaveAttribute("href", "/documents");
     expect(within(upload).queryByLabelText("Choose a file to upload")).toBeNull();
+  });
+
+  it("KIT-8: under an unlimited Limit the upload row is offered with three held, and shows no count", async () => {
+    renderKit([growth, staff, letter], harvest, "pro");
+    const upload = await within(kit()).findByRole("region", { name: "Upload another" });
+
+    expect(await within(upload).findByLabelText("Choose a file to upload")).toBeInTheDocument();
+    expect(upload).not.toHaveTextContent(/slots used|Room for|Last slot/);
   });
 
   it("KIT-7: a refused choice rolls back visibly and says why", async () => {

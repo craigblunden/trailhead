@@ -190,6 +190,26 @@ describe("the cover letter card (tickets 13, 18, 19)", () => {
     await screen.findByRole("region", { name: "Your cover letter" });
   });
 
+  it("GEN-U11: the numbers are the Tenant's Plan's, and an unlimited Limit shows no count at all", async () => {
+    client.status.mockResolvedValue({ limit: 25, used: 4, remaining: 21, resetsOn: "2026-07-27", available: true });
+    const { unmount } = renderWithJobs(<CoverLetterCard job={job} />);
+    expect(await screen.findByText("21 of 25 left this week")).toBeInTheDocument();
+    expect(screen.getByText(/so there are 25 a week\./)).toBeInTheDocument();
+    unmount();
+
+    client.status.mockResolvedValue({
+      limit: "unlimited",
+      used: 40,
+      remaining: "unlimited",
+      resetsOn: "2026-07-27",
+      available: true,
+    });
+    renderWithJobs(<CoverLetterCard job={job} />);
+    expect(await screen.findByRole("button", { name: "Write cover letter" })).toBeEnabled();
+    expect(screen.queryByText(/left this week/)).toBeNull();
+    expect(screen.getByText(/written by a paid AI model\.$/)).toBeInTheDocument();
+  });
+
   it("GEN-U8: idle, writing, and written states have no structural axe violations", async () => {
     let finish!: (response: GenerationResponse) => void;
     client.generate.mockReturnValue(new Promise((resolve) => (finish = resolve)));

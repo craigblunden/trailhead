@@ -10,6 +10,7 @@ import {
   setJobDocumentAction,
   startUploadAction,
 } from "@/server/actions/documents";
+import { limitsAction } from "@/server/actions/plans";
 
 /** A Storage refusal on the signed upload, in the same words the server would have used. */
 function storageRefusal(error: { status?: number; statusCode?: string; message?: string }): ActionError {
@@ -31,6 +32,8 @@ function storageRefusal(error: { status?: number; statusCode?: string; message?:
 export function createActionsDocumentsClient(): DocumentsClient {
   return {
     list: unwrapping(listDocumentsAction),
+
+    limits: unwrapping(limitsAction),
 
     upload: async (file, kind, onStage) => {
       const ticket = unwrap(await startUploadAction({ kind, fileName: file.name, sizeBytes: file.size }));

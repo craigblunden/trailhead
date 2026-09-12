@@ -1,14 +1,15 @@
 import "server-only";
 
 import { GENERATION_FAILURES, quotaStatus, weekStartOf, type QuotaStatus } from "@/lib/generation";
-import { DEFAULT_PLAN, limitsOf } from "@/lib/plans";
+import { limitsOf } from "@/lib/plans";
 import { requireSession } from "@/server/auth/session";
 import { toDateColumn } from "@/server/db/mappers";
-import { withTenant } from "@/server/db/tenant";
+import { withTenant, type Tenant } from "@/server/db/tenant";
 import type { CoverLetterInputs } from "@/server/generation/prompt";
 
 import { RuleError } from "./errors";
 import { ownJob } from "./jobs";
+import { planOf } from "./plans";
 
 /**
  * The data access layer for cover-letter generation. Generation persists nothing but the quota
@@ -29,16 +30,17 @@ import { ownJob } from "./jobs";
 
 const WEEK = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Every Tenant's Limit is the default Plan's until the Plan is read (plans issue 03). */
-const lettersPerWeek = () => limitsOf(DEFAULT_PLAN).lettersPerWeek;
+/** The Tenant's letters-per-week Limit, from inside the transaction that counts against it. */
+const lettersPerWeek = async (tenant: Tenant) => limitsOf(await planOf(tenant)).lettersPerWeek;
 
 export async function generationQuota(now: Date = new Date()): Promise<QuotaStatus> {
   const { userId } = await requireSession();
   const weekStart = weekStartOf(now);
-  const row = await withTenant(userId, (tx) =>
-    tx.generationQuota.findFirst({ where: { userId, weekStart: toDateColumn(weekStart) } }),
-  );
-  return quotaStatus(row?.used ?? 0, weekStart, lettersPerWeek());
+  const { used, limit } = await withTenant(userId, async (tx, tenant) => ({
+    used: (await tx.generationQuota.findFirst({ where: { userId, weekStart: toDateColumn(weekStart) } }))?.used ?? 0,
+    limit: await lettersPerWeek(tenant),
+  }));
+  return quotaStatus(used, weekStart, limit);
 }
 
 /**
@@ -73,25 +75,27 @@ export async function reserveCoverLetter(
 ): Promise<{ weekStart: string; quota: QuotaStatus }> {
   const { userId } = await requireSession();
   const weekStart = weekStartOf(now);
-  const limit = lettersPerWeek();
-  const rows = await withTenant(userId, (tx) =>
-    limit === "unlimited"
-      ? tx.$queryRaw<{ used: number }[]>`
-          insert into "GenerationQuota" ("userId", "weekStart", "used", "updatedAt")
-          values (${userId}::uuid, ${weekStart}::date, 1, now())
-          on conflict ("userId", "weekStart") do update
-            set "used" = "GenerationQuota"."used" + 1, "updatedAt" = now()
-          returning "used"
-        `
-      : tx.$queryRaw<{ used: number }[]>`
-          insert into "GenerationQuota" ("userId", "weekStart", "used", "updatedAt")
-          values (${userId}::uuid, ${weekStart}::date, 1, now())
-          on conflict ("userId", "weekStart") do update
-            set "used" = "GenerationQuota"."used" + 1, "updatedAt" = now()
-            where "GenerationQuota"."used" < ${limit}
-          returning "used"
-        `,
-  );
+  const { rows, limit } = await withTenant(userId, async (tx, tenant) => {
+    const limit = await lettersPerWeek(tenant);
+    const rows =
+      limit === "unlimited"
+        ? await tx.$queryRaw<{ used: number }[]>`
+            insert into "GenerationQuota" ("userId", "weekStart", "used", "updatedAt")
+            values (${userId}::uuid, ${weekStart}::date, 1, now())
+            on conflict ("userId", "weekStart") do update
+              set "used" = "GenerationQuota"."used" + 1, "updatedAt" = now()
+            returning "used"
+          `
+        : await tx.$queryRaw<{ used: number }[]>`
+            insert into "GenerationQuota" ("userId", "weekStart", "used", "updatedAt")
+            values (${userId}::uuid, ${weekStart}::date, 1, now())
+            on conflict ("userId", "weekStart") do update
+              set "used" = "GenerationQuota"."used" + 1, "updatedAt" = now()
+              where "GenerationQuota"."used" < ${limit}
+            returning "used"
+          `;
+    return { rows, limit };
+  });
   if (rows.length === 0) throw new RuleError("quota", GENERATION_FAILURES.quota);
   return { weekStart, quota: quotaStatus(rows[0].used, weekStart, limit) };
 }
@@ -100,13 +104,14 @@ export async function reserveCoverLetter(
 export async function refundCoverLetter(weekStart: string): Promise<QuotaStatus> {
   const { userId } = await requireSession();
   if (!WEEK.test(weekStart)) throw new Error("refundCoverLetter: weekStart must be YYYY-MM-DD");
-  const rows = await withTenant(userId, (tx) =>
-    tx.$queryRaw<{ used: number }[]>`
+  const { rows, limit } = await withTenant(userId, async (tx, tenant) => ({
+    rows: await tx.$queryRaw<{ used: number }[]>`
       update "GenerationQuota"
          set "used" = greatest("used" - 1, 0), "updatedAt" = now()
        where "userId" = ${userId}::uuid and "weekStart" = ${weekStart}::date
       returning "used"
     `,
-  );
-  return quotaStatus(rows[0]?.used ?? 0, weekStart, lettersPerWeek());
+    limit: await lettersPerWeek(tenant),
+  }));
+  return quotaStatus(rows[0]?.used ?? 0, weekStart, limit);
 }

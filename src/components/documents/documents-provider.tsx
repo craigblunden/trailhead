@@ -7,7 +7,7 @@ import { createActionsDocumentsClient } from "@/components/documents-actions-cli
 import { describeFailure } from "@/components/action-client";
 import { jobCache } from "@/components/job-cache";
 import { UPLOAD_REFUSALS, type DocumentKind, type DocumentSummary } from "@/lib/documents";
-import { documentsCache, precheckFile, type DocumentsClient } from "@/lib/documents-client";
+import { documentsCache, limitsCache, precheckFile, type DocumentsClient } from "@/lib/documents-client";
 import { withKitSlot } from "@/lib/jobs";
 
 const defaultClient: DocumentsClient = createActionsDocumentsClient();
@@ -31,6 +31,12 @@ function useDocumentsClient() {
 export function useDocumentList() {
   const client = useDocumentsClient();
   return useQuery(documentsCache.options(() => client.list()));
+}
+
+/** The Tenant's Limits, for showing a Document Limit before it is reached. */
+export function useLimits() {
+  const client = useDocumentsClient();
+  return useQuery(limitsCache.options(() => client.limits()));
 }
 
 export type UploadState =

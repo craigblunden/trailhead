@@ -16,7 +16,7 @@ import {
   type UploadTicket,
 } from "@/lib/documents";
 import type { Job } from "@/lib/jobs";
-import { DEFAULT_PLAN, limitsOf } from "@/lib/plans";
+import { limitsOf } from "@/lib/plans";
 import { requireSession } from "@/server/auth/session";
 import { DOCUMENT_SUMMARY_INCLUDE, toDocumentSummary } from "@/server/db/mappers";
 import { withTenant } from "@/server/db/tenant";
@@ -27,6 +27,7 @@ import type { StartUploadInput } from "@/server/validation";
 
 import { NotFoundError, RuleError } from "./errors";
 import { ownJob, readJob } from "./jobs";
+import { planOf } from "./plans";
 
 /**
  * The data access layer for Documents. Two systems hold a Document — a row in Postgres and an
@@ -90,13 +91,14 @@ export async function startUpload(input: StartUploadInput, defer: Defer = inline
   const tombstones = await tombstoneAbandoned(userId, new Date());
   await defer(() => finishDeleting(userId, tombstones));
 
-  const row = await withTenant(userId, async (tx) => {
+  const row = await withTenant(userId, async (tx, tenant) => {
     await tx.$executeRaw`select pg_advisory_xact_lock(hashtext(${userId}))`;
     const held = await tx.document.count({
       where: { userId, deletedAt: null, ingestion: { not: "failed" } },
     });
-    // Every Tenant's Limit is the default Plan's until the Plan is read (plans issue 03).
-    const limit = limitsOf(DEFAULT_PLAN).documents;
+    // The Tenant's Limit, read in the same transaction as the count it guards (plans issue 03). A
+    // Tenant over its Limit — moved to a smaller Plan — keeps everything and adds nothing.
+    const limit = limitsOf(await planOf(tenant)).documents;
     if (limit !== "unlimited" && held >= limit) {
       throw new RuleError("cap-reached", capReachedRefusal(limit));
     }

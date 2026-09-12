@@ -1,6 +1,6 @@
 # 03: The two Limit sites read the Plan
 
-**Status:** ready
+**Status:** ready-for-review
 **Blocked by:** 02
 
 ## What to build

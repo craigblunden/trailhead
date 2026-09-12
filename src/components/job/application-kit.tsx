@@ -5,6 +5,7 @@ import { useId } from "react";
 import {
   useDocumentList,
   useJobDocuments,
+  useLimits,
 } from "@/components/documents/documents-provider";
 import { UploadDocument } from "@/components/documents/upload-document";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,6 @@ import {
   type DocumentSummary,
 } from "@/lib/documents";
 import { pluralize, type AttachedDocument, type Job } from "@/lib/jobs";
-import { DEFAULT_PLAN, limitsOf } from "@/lib/plans";
 
 /**
  * What goes out with this Job (ticket 13's decision, built by ticket 17): a radio list per kind —
@@ -25,6 +25,7 @@ import { DEFAULT_PLAN, limitsOf } from "@/lib/plans";
  */
 export function ApplicationKitCard({ job }: { job: Job }) {
   const documents = useDocumentList();
+  const limits = useLimits();
   const kit = useJobDocuments(job.id);
 
   return (
@@ -78,13 +79,17 @@ export function ApplicationKitCard({ job }: { job: Job }) {
               <h3 id="kit-upload-heading" className="font-sans text-sm font-bold">
                 Upload another
               </h3>
-              <UploadDocument
-                held={documents.data.length}
-                limit={limitsOf(DEFAULT_PLAN).documents}
-                manageHref="/documents"
-                className="mt-2"
-                onUploaded={(document) => kit.choose(document.kind, document.id, document.fileName)}
-              />
+              {limits.data ? (
+                <UploadDocument
+                  held={documents.data.length}
+                  limit={limits.data.documents}
+                  manageHref="/documents"
+                  className="mt-2"
+                  onUploaded={(document) => kit.choose(document.kind, document.id, document.fileName)}
+                />
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">Checking how many slots are free…</p>
+              )}
             </section>
           </>
         )}

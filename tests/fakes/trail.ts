@@ -9,6 +9,7 @@ import type { DocumentsClient, UploadStage } from "@/lib/documents-client";
 import { STAGES, withKitSlot, type Contact, type Job, type Stage } from "@/lib/jobs";
 import type { JobPatch, JobsClient, NewJobInput } from "@/lib/jobs-client";
 import { movedJob, newJob } from "@/lib/jobs-rules";
+import { DEFAULT_PLAN, limitsOf, type Plan } from "@/lib/plans";
 import { NotFoundError, RuleError } from "@/server/data/errors";
 import { sortContacts } from "@/server/db/mappers";
 
@@ -65,7 +66,8 @@ export function createTrail({
   jobs = [],
   contacts = [],
   documents = [],
-}: { jobs?: Job[]; contacts?: ContactSeed[]; documents?: StoredDocument[] } = {}) {
+  plan = DEFAULT_PLAN,
+}: { jobs?: Job[]; contacts?: ContactSeed[]; documents?: StoredDocument[]; plan?: Plan } = {}) {
   let storedJobs: Job[] = jobs.map((job) => ({ ...job, contacts: [] }));
   let storedContacts: StoredContact[] = contacts.map((contact) => ({ ...BLANK_CONTACT, ...contact }));
   let storedDocuments: StoredDocument[] = [...documents];
@@ -202,6 +204,7 @@ export function createTrail({
 
   const documentsClient = {
     list: vi.fn(async () => storedDocuments.map(documentView)),
+    limits: vi.fn(async () => limitsOf(plan)),
     upload: vi.fn(async (file: File, kind: DocumentKind, onStage?: (stage: UploadStage) => void) => {
       onStage?.("uploading");
       onStage?.("reading");

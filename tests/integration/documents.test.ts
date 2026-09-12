@@ -22,7 +22,7 @@ import {
 import { NotFoundError, RuleError } from "@/server/data/errors";
 import { withTenant } from "@/server/db/tenant";
 
-import { resetTables } from "./helpers";
+import { resetTables, setPlan } from "./helpers";
 import {
   actAs,
   asJanitor,
@@ -500,6 +500,26 @@ describe("ticket 16: delete a document", () => {
     actAs(alice);
     expect((await listDocuments()).map((d) => d.id)).toEqual([summary.id]);
     expect(await objectExists(alice, key)).toBe(true);
+  });
+});
+
+describe("plans issue 03: the upload Limit is the Tenant's Plan's", () => {
+  it("a pro Tenant uploads a fourth Document; moved back to free holding four, the next is refused and all four stay", async () => {
+    await setPlan(alice.userId, "pro");
+    await upload(alice, "resume.pdf");
+    await upload(alice, "resume.docx", "cover_letter");
+    await upload(alice, "resume.pdf");
+    const fourth = await upload(alice, "resume.pdf");
+    expect(fourth.summary.status).toBe("ready");
+    actAs(alice);
+    expect(await listDocuments()).toHaveLength(4);
+
+    await setPlan(alice.userId, "free");
+    actAs(alice);
+    const fifth = await startUploadAction({ kind: "resume", fileName: "e.pdf", sizeBytes: 1024 });
+    expect(fifth).toMatchObject({ ok: false, error: "rejected", code: "cap-reached" });
+    if (!fifth.ok) expect(fifth.message).toMatch(/All 3 slots are used/);
+    expect(await listDocuments()).toHaveLength(4);
   });
 });
 

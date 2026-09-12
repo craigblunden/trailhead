@@ -110,6 +110,17 @@ describe("the documents page (tickets 15, 16)", () => {
     expect(screen.queryByLabelText("Choose a file to upload")).toBeNull();
   });
 
+  it("DOC-9: under an unlimited Limit the page counts what is held, offers upload, and never says full", async () => {
+    const four = ["a", "b", "c", "d"].map((id) => summary({ id, fileName: `${id}.pdf` }));
+    renderWithJobs(<DocumentsView />, { trail: createTrail({ documents: four, plan: "pro" }) });
+
+    expect(await screen.findByText("4 documents")).toBeInTheDocument();
+    expect(screen.getByLabelText("Choose a file to upload")).toBeInTheDocument();
+    expect(screen.queryByText(/slots used/)).toBeNull();
+    expect(screen.queryByText(/Room for/)).toBeNull();
+    expect(screen.queryByText(/up to \d+ at a time/)).toBeNull();
+  });
+
   it("DOC-6: deleting asks first, names the jobs that use it, then removes it from the list", async () => {
     const trail = createTrail({ jobs: [sending("fernwood-product-designer-growth")], documents: [summary()] });
     const { user } = renderWithJobs(<DocumentsView />, { trail });
