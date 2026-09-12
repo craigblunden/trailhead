@@ -3,7 +3,6 @@ import { act } from "react";
 
 import { BoardView } from "@/components/board/board-view";
 import { STAGES, STAGE_META, pluralize, type Job } from "@/lib/jobs";
-import { jobsCache } from "@/lib/jobs-cache";
 import { ActionError } from "@/components/action-client";
 import { fakeTransfer } from "../fakes/data-transfer";
 import { SEED_JOBS } from "../fixtures/jobs";
@@ -385,29 +384,5 @@ describe("moving a job between stages", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("The trail is closed for maintenance.");
     // The board stays usable: the Move to menu is still there to try again.
     expect(within(card(job.role)).getByRole("button", { name: /^Move / })).toBeEnabled();
-  });
-});
-
-describe("the trail scene (performance ticket 04)", () => {
-  it("renders the scene the server hands it, and a change to the jobs does not render it again", async () => {
-    let renders = 0;
-    function Scene() {
-      renders += 1;
-      return <div data-testid="trail-scene" />;
-    }
-    const { queryClient } = renderWithJobs(<BoardView scene={<Scene />} />);
-    expect(screen.getByTestId("trail-scene")).toBeInTheDocument();
-    expect(renders).toBe(1);
-
-    // A job moves on: the board re-renders with it.
-    const moved = { ...SEED_JOBS[0], stage: "offer" as const };
-    act(() => {
-      queryClient.setQueryData(jobsCache.key, [moved, ...SEED_JOBS.slice(1)]);
-    });
-    await waitFor(() =>
-      expect(within(column("offer")).getAllByRole("link", { name: moved.role })).toHaveLength(1),
-    );
-
-    expect(renders).toBe(1);
   });
 });

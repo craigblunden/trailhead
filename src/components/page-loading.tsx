@@ -146,7 +146,7 @@ function BoardLoading() {
     : UNSEEN_COLUMNS;
 
   return (
-    <div className="scene-wash flex flex-1 flex-col">
+    <div className="flex flex-1 flex-col">
       <AppHeader leading={<BrandLogo href="/board" />} loading />
       <PageWait>Loading your trail…</PageWait>
 
@@ -310,7 +310,7 @@ export function JobLoading({ id }: { id: string }) {
 
 function ContactsLoading({ selectedId }: { selectedId: string | null }) {
   return (
-    <div className="flex flex-1 flex-col bg-background">
+    <div className="flex flex-1 flex-col">
       <AppHeader leading={<BrandLogo href="/board" />} loading />
       {/* One wait is said, not two: the list's here when the list is the point of the URL, and the
           Contact's otherwise, from the detail side. */}
@@ -444,7 +444,7 @@ function DocumentsLoading() {
   const limit = useQueryClient().getQueryData<Limits>(limitsCache.key)?.documents;
 
   return (
-    <div className="flex flex-1 flex-col bg-background">
+    <div className="flex flex-1 flex-col">
       <AppHeader leading={<BrandLogo href="/board" />} loading />
       <PageWait>Loading your documents…</PageWait>
 

@@ -207,6 +207,21 @@
     linear-gradient(180deg, #e9f1e6 0%, #f8f9f4 28%, #f8f9f4 72%, #e3eedc 100%);
 }
 
+/*
+ * The landscape beneath the signed-in sections holds every section's foreground; the one the URL is
+ * about is shown, and moving between sections crossfades them while the ridgeline stays put. See
+ * `SectionScene`.
+ */
+[data-scene-part] {
+  opacity: 0;
+  transition: opacity 400ms ease;
+}
+[data-scene="board"] [data-scene-part="board"],
+[data-scene="contacts"] [data-scene-part="contacts"],
+[data-scene="documents"] [data-scene-part="documents"] {
+  opacity: 1;
+}
+
 /* ------------------------------------------------------------------------------------------------
  * Waiting and arriving.
  *
@@ -283,6 +298,9 @@
 @media (prefers-reduced-motion: reduce) {
   .loading-trail-path {
     animation: none;
+  }
+  [data-scene-part] {
+    transition: none;
   }
   ::view-transition-old(*),
   ::view-transition-new(*),

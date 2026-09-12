@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 type TrailSceneProps = {
   /**
    * `hero` places the sun behind the ridgeline; `trail` swaps it for the
-   * dashed path and hiker used on the board.
+   * dashed path and the signed-in sections' foregrounds (see `SectionScene`).
    */
   variant?: "hero" | "trail";
   className?: string;
@@ -81,6 +81,88 @@ function Pine({ x, baseY, height, fill }: PineProps) {
   );
 }
 
+/** The board's hiker, placed by where their feet meet the ground. */
+function Hiker({
+  x,
+  baseY,
+  facing = "right",
+  jacket,
+}: {
+  x: number;
+  baseY: number;
+  facing?: "left" | "right";
+  jacket?: string;
+}) {
+  const scaleX = facing === "right" ? 1.5 : -1.5;
+  return (
+    <g transform={`translate(${x} ${baseY}) scale(${scaleX} 1.5) translate(${-HIKER_FEET.x} ${-HIKER_FEET.y})`}>
+      <HikerFigure jacket={jacket} />
+    </g>
+  );
+}
+
+function Tent({ x, baseY }: { x: number; baseY: number }) {
+  return (
+    <g>
+      <path d={`M${x - 36} ${baseY} L${x} ${baseY - 44} L${x} ${baseY} Z`} fill="#e0a052" />
+      <path d={`M${x} ${baseY - 44} L${x + 36} ${baseY} L${x} ${baseY} Z`} fill="#c9803a" />
+      <path d={`M${x - 9} ${baseY} L${x} ${baseY - 26} L${x + 9} ${baseY} Z`} fill="#6b4a2e" />
+    </g>
+  );
+}
+
+function Campfire({ x, baseY }: { x: number; baseY: number }) {
+  return (
+    <g>
+      <path
+        d={`M${x - 16} ${baseY + 2} L${x + 16} ${baseY - 8} M${x - 16} ${baseY - 8} L${x + 16} ${baseY + 2}`}
+        stroke="var(--trunk)"
+        strokeWidth={5}
+        strokeLinecap="round"
+      />
+      <path
+        d={`M${x} ${baseY - 34} C ${x + 12} ${baseY - 20} ${x + 16} ${baseY - 10} ${x + 8} ${baseY - 2} C ${x + 4} ${baseY + 2} ${x - 4} ${baseY + 2} ${x - 8} ${baseY - 2} C ${x - 16} ${baseY - 10} ${x - 12} ${baseY - 20} ${x} ${baseY - 34} Z`}
+        fill="var(--hiker)"
+      />
+      <path
+        d={`M${x} ${baseY - 20} C ${x + 7} ${baseY - 12} ${x + 8} ${baseY - 6} ${x + 4} ${baseY - 2} C ${x + 2} ${baseY} ${x - 2} ${baseY} ${x - 4} ${baseY - 2} C ${x - 8} ${baseY - 6} ${x - 7} ${baseY - 12} ${x} ${baseY - 20} Z`}
+        fill="var(--sun)"
+      />
+      {[-22, -12, 12, 22].map((dx) => (
+        <ellipse key={dx} cx={x + dx} cy={baseY + 3} rx={5} ry={3.5} fill="#9aa39a" />
+      ))}
+    </g>
+  );
+}
+
+/** A trailhead kiosk under a little roof, with resumes and letters pinned to it. */
+function NoticeBoard({ x, baseY }: { x: number; baseY: number }) {
+  const top = baseY - 62;
+  const sheets = [
+    { dx: -36, dy: 8, w: 22, h: 28, turn: -4, pin: "#d1603f" },
+    { dx: -10, dy: 6, w: 24, h: 31, turn: 2, pin: "#4c7a9c" },
+    { dx: 20, dy: 10, w: 19, h: 24, turn: 5, pin: "#d1603f" },
+  ];
+
+  return (
+    <g>
+      <rect x={x - 41} y={top - 6} width={6} height={68} fill="var(--trunk)" />
+      <rect x={x + 35} y={top - 6} width={6} height={68} fill="var(--trunk)" />
+      <rect x={x - 46} y={top} width={92} height={44} rx={2} fill="#b08658" stroke="var(--trunk)" strokeWidth={3} />
+      <path d={`M${x - 56} ${top - 2} L${x} ${top - 24} L${x + 56} ${top - 2} Z`} fill="#6b4a2e" />
+      {sheets.map(({ dx, dy, w, h, turn, pin }) => (
+        <g key={dx} transform={`rotate(${turn} ${x + dx + w / 2} ${top + dy + h / 2})`}>
+          <rect x={x + dx} y={top + dy} width={w} height={h} fill="var(--snow)" />
+          {[7, 12, 17].map((ly) => (
+            <rect key={ly} x={x + dx + 4} y={top + dy + ly} width={w - 8} height={1.6} fill="#c9cfc0" />
+          ))}
+          <circle cx={x + dx + w / 2} cy={top + dy + 2.5} r={2} fill={pin} />
+        </g>
+      ))}
+    </g>
+  );
+}
+
 /**
  * The view box starts below y=0 so the band stays shallow without clipping the
  * peaks, and scaling to width keeps the whole scene visible at any size.
@@ -145,6 +227,11 @@ export function TrailScene({ variant = "hero", className }: TrailSceneProps) {
 
       {variant === "trail" && (
         <>
+          {/* Contacts: a camp across the trail, pitched on the far meadow. */}
+          <g data-scene-part="contacts">
+            <Tent x={1010} baseY={304} />
+          </g>
+
           <path
             d="M-20 320 C 200 302 340 334 520 322 C 700 310 900 300 1120 320 C 1280 334 1370 330 1460 312"
             fill="none"
@@ -153,11 +240,23 @@ export function TrailScene({ variant = "hero", className }: TrailSceneProps) {
             strokeLinecap="round"
             strokeDasharray="26 20"
           />
-          {/* Hiker, mid-trail, feet on the path */}
-          <g
-            transform={`translate(752 316) scale(1.5) translate(${-HIKER_FEET.x} ${-HIKER_FEET.y})`}
-          >
-            <HikerFigure />
+
+          {/* The board: the hiker mid-trail, feet on the path. */}
+          <g data-scene-part="board">
+            <Hiker x={752} baseY={316} />
+          </g>
+
+          {/* Contacts: two hikers met at a campfire beside the trail. */}
+          <g data-scene-part="contacts">
+            <Hiker x={694} baseY={342} />
+            <Campfire x={760} baseY={342} />
+            <Hiker x={826} baseY={342} facing="left" jacket="#4c7a9c" />
+          </g>
+
+          {/* Documents: a hiker reading the notices pinned up at the trailhead. */}
+          <g data-scene-part="documents">
+            <NoticeBoard x={960} baseY={346} />
+            <Hiker x={880} baseY={344} />
           </g>
         </>
       )}

@@ -20,16 +20,8 @@ import {
   type Stage,
 } from "@/lib/jobs";
 
-type BoardViewProps = {
-  /**
-   * The illustration beneath the board. The server renders it and passes it in, so its code stays out
-   * of this component's JavaScript and a change to the jobs never renders it again (performance
-   * ticket 04).
-   */
-  scene?: React.ReactNode;
-};
-
-export function BoardView({ scene }: BoardViewProps = {}) {
+/** The landscape beneath the board is drawn by the `(app)` layout, not here (see `SectionScene`). */
+export function BoardView() {
   const { jobs, status, error, dismissError, reload, getJob, setStage } = useJobs();
   const [addOpen, setAddOpen] = useState(false);
   // What the last move from the board did, for the live region: a card that is dragged or sent
@@ -69,7 +61,7 @@ export function BoardView({ scene }: BoardViewProps = {}) {
   ).length;
 
   return (
-    <div className="scene-wash flex flex-1 flex-col">
+    <div className="flex flex-1 flex-col">
       <AppHeader
         leading={<BrandLogo href="/board" />}
         actions={
@@ -145,8 +137,6 @@ export function BoardView({ scene }: BoardViewProps = {}) {
           </>
         )}
       </PageMain>
-
-      {scene}
 
       <AddJobDialog
         open={addOpen}

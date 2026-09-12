@@ -25,7 +25,7 @@ export function ContactsShell({ children }: { children: React.ReactNode }) {
   const contacts = useContactList();
 
   return (
-    <div className="flex flex-1 flex-col bg-background">
+    <div className="flex flex-1 flex-col">
       <AppHeader leading={<BrandLogo href="/board" />} />
 
       <PageMain>

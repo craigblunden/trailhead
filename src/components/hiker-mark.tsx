@@ -42,9 +42,10 @@ export const HIKER_FEET = { x: 30, y: 52 } as const;
 
 /**
  * The hiker alone, facing right, drawn back to front. Coordinates match the
- * 64-unit badge; scenes place it with a transform anchored at `HIKER_FEET`.
+ * 64-unit badge; scenes place it with a transform anchored at `HIKER_FEET`. A scene with more
+ * than one hiker tells them apart by `jacket`.
  */
-export function HikerFigure() {
+export function HikerFigure({ jacket = "#d1603f" }: { jacket?: string } = {}) {
   return (
     <g>
       <path
@@ -62,11 +63,11 @@ export function HikerFigure() {
       />
       <path
         d="M26.5 24 h8 a2.5 2.5 0 0 1 2.5 2.4 L38.2 39 H22.8 L24 26.4 a2.5 2.5 0 0 1 2.5 -2.4 Z"
-        fill="#d1603f"
+        fill={jacket}
       />
       <path
         d="M35.5 27.5 L42.5 34.5"
-        stroke="#d1603f"
+        stroke={jacket}
         strokeWidth={3.4}
         strokeLinecap="round"
       />

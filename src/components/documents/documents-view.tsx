@@ -60,7 +60,7 @@ export function DocumentsView() {
   const held = documents.data?.length ?? 0;
 
   return (
-    <div className="flex flex-1 flex-col bg-background">
+    <div className="flex flex-1 flex-col">
       <AppHeader leading={<BrandLogo href="/board" />} />
 
       <PageMain>
