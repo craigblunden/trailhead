@@ -15,6 +15,7 @@ import {
   type DocumentSummary,
 } from "@/lib/documents";
 import { pluralize, type AttachedDocument, type Job } from "@/lib/jobs";
+import { DEFAULT_PLAN, limitsOf } from "@/lib/plans";
 
 /**
  * What goes out with this Job (ticket 13's decision, built by ticket 17): a radio list per kind —
@@ -79,6 +80,7 @@ export function ApplicationKitCard({ job }: { job: Job }) {
               </h3>
               <UploadDocument
                 held={documents.data.length}
+                limit={limitsOf(DEFAULT_PLAN).documents}
                 manageHref="/documents"
                 className="mt-2"
                 onUploaded={(document) => kit.choose(document.kind, document.id, document.fileName)}

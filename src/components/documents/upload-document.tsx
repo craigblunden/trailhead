@@ -8,18 +8,20 @@ import { useDocumentUpload } from "@/components/documents/documents-provider";
 import { Button } from "@/components/ui/button";
 import {
   ACCEPT_ATTRIBUTE,
-  DOCUMENT_CAP,
   DOCUMENT_KINDS,
   DOCUMENT_KIND_LABEL,
   roomLeft,
   type DocumentKind,
   type DocumentSummary,
 } from "@/lib/documents";
+import type { Limit } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 type UploadDocumentProps = {
-  /** How many Documents the user already holds, to express the cap before it is hit. */
+  /** How many Documents the user already holds, to express the Limit before it is hit. */
   held: number;
+  /** How many the user's Plan lets them hold. */
+  limit: Limit;
   defaultKind?: DocumentKind;
   /** Called with the new Document once its text has been read. */
   onUploaded?: (document: DocumentSummary) => void;
@@ -29,12 +31,14 @@ type UploadDocumentProps = {
 };
 
 /**
- * Upload a PDF or DOCX. The cap is shown wherever upload is offered ("Room for 1 more"), and at the
- * cap the control is replaced by a line saying so, so a fourth upload cannot even be attempted
- * (ticket 13). Each stage is announced; a refusal is announced as an alert naming what to do.
+ * Upload a PDF or DOCX. A finite Limit is shown wherever upload is offered ("Room for 1 more"), and
+ * at the Limit the control is replaced by a line saying so, so one upload too many cannot even be
+ * attempted (ticket 13). Under an unlimited Limit there is no count to show. Each stage is
+ * announced; a refusal is announced as an alert naming what to do.
  */
 export function UploadDocument({
   held,
+  limit,
   defaultKind = "resume",
   onUploaded,
   manageHref,
@@ -45,12 +49,13 @@ export function UploadDocument({
   const [kind, setKind] = useState<DocumentKind>(defaultKind);
   const { state, upload } = useDocumentUpload({ onUploaded });
   const busy = state.phase === "uploading" || state.phase === "reading";
-  const room = roomLeft(held);
+  const room = roomLeft(held, limit);
+  const full = limit !== "unlimited" && held >= limit;
 
-  if (!room && !busy) {
+  if (full && !busy) {
     return (
       <p className={cn("text-sm text-muted-foreground", className)}>
-        All {DOCUMENT_CAP} slots used
+        All {limit} slots used
         {manageHref ? (
           <>
             {" · "}
@@ -118,7 +123,7 @@ export function UploadDocument({
           </label>
         </Button>
         <p id={`${fieldId}-hint`} className="text-xs text-muted-foreground">
-          PDF or .docx, up to 5 MB · {room ?? "Last slot"}
+          PDF or .docx, up to 5 MB{limit !== "unlimited" && ` · ${room ?? "Last slot"}`}
         </p>
       </div>
 

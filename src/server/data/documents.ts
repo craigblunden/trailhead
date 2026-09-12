@@ -4,11 +4,11 @@ import { randomUUID } from "node:crypto";
 
 import {
   ACCEPTED_TYPES,
-  DOCUMENT_CAP,
   DOWNLOAD_URL_TTL_SECONDS,
   MAX_UPLOAD_BYTES,
   UPLOAD_REFUSALS,
   WRONG_KIND_REFUSALS,
+  capReachedRefusal,
   extensionOf,
   type DocumentKind,
   type DocumentSummary,
@@ -16,6 +16,7 @@ import {
   type UploadTicket,
 } from "@/lib/documents";
 import type { Job } from "@/lib/jobs";
+import { DEFAULT_PLAN, limitsOf } from "@/lib/plans";
 import { requireSession } from "@/server/auth/session";
 import { DOCUMENT_SUMMARY_INCLUDE, toDocumentSummary } from "@/server/db/mappers";
 import { withTenant } from "@/server/db/tenant";
@@ -94,7 +95,11 @@ export async function startUpload(input: StartUploadInput, defer: Defer = inline
     const held = await tx.document.count({
       where: { userId, deletedAt: null, ingestion: { not: "failed" } },
     });
-    if (held >= DOCUMENT_CAP) throw new RuleError("cap-reached", UPLOAD_REFUSALS["cap-reached"]);
+    // Every Tenant's Limit is the default Plan's until the Plan is read (plans issue 03).
+    const limit = limitsOf(DEFAULT_PLAN).documents;
+    if (limit !== "unlimited" && held >= limit) {
+      throw new RuleError("cap-reached", capReachedRefusal(limit));
+    }
     return tx.document.create({
       data: {
         userId,

@@ -1,12 +1,7 @@
 import "server-only";
 
-import {
-  COVER_LETTER_QUOTA,
-  GENERATION_FAILURES,
-  quotaStatus,
-  weekStartOf,
-  type QuotaStatus,
-} from "@/lib/generation";
+import { GENERATION_FAILURES, quotaStatus, weekStartOf, type QuotaStatus } from "@/lib/generation";
+import { DEFAULT_PLAN, limitsOf } from "@/lib/plans";
 import { requireSession } from "@/server/auth/session";
 import { toDateColumn } from "@/server/db/mappers";
 import { withTenant } from "@/server/db/tenant";
@@ -20,7 +15,7 @@ import { ownJob } from "./jobs";
  * counter: the letter is text on the user's screen and nowhere else.
  *
  * The quota decisions (ticket 18):
- * - **Five letters per user per week**, weeks starting Monday in UTC (`COVER_LETTER_QUOTA`).
+ * - **A Plan's letters per user per week** (`src/lib/plans.ts`), weeks starting Monday in UTC.
  * - **The counter is a `GenerationQuota` row per user per week**, tenant data under RLS.
  * - **A letter is reserved before the Claude call and given back if none is delivered.** Only a
  *   delivered letter uses one up: a refusal, an API error, a timeout, and a truncated letter all
@@ -34,13 +29,16 @@ import { ownJob } from "./jobs";
 
 const WEEK = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Every Tenant's Limit is the default Plan's until the Plan is read (plans issue 03). */
+const lettersPerWeek = () => limitsOf(DEFAULT_PLAN).lettersPerWeek;
+
 export async function generationQuota(now: Date = new Date()): Promise<QuotaStatus> {
   const { userId } = await requireSession();
   const weekStart = weekStartOf(now);
   const row = await withTenant(userId, (tx) =>
     tx.generationQuota.findFirst({ where: { userId, weekStart: toDateColumn(weekStart) } }),
   );
-  return quotaStatus(row?.used ?? 0, weekStart);
+  return quotaStatus(row?.used ?? 0, weekStart, lettersPerWeek());
 }
 
 /**
@@ -75,18 +73,27 @@ export async function reserveCoverLetter(
 ): Promise<{ weekStart: string; quota: QuotaStatus }> {
   const { userId } = await requireSession();
   const weekStart = weekStartOf(now);
+  const limit = lettersPerWeek();
   const rows = await withTenant(userId, (tx) =>
-    tx.$queryRaw<{ used: number }[]>`
-      insert into "GenerationQuota" ("userId", "weekStart", "used", "updatedAt")
-      values (${userId}::uuid, ${weekStart}::date, 1, now())
-      on conflict ("userId", "weekStart") do update
-        set "used" = "GenerationQuota"."used" + 1, "updatedAt" = now()
-        where "GenerationQuota"."used" < ${COVER_LETTER_QUOTA}
-      returning "used"
-    `,
+    limit === "unlimited"
+      ? tx.$queryRaw<{ used: number }[]>`
+          insert into "GenerationQuota" ("userId", "weekStart", "used", "updatedAt")
+          values (${userId}::uuid, ${weekStart}::date, 1, now())
+          on conflict ("userId", "weekStart") do update
+            set "used" = "GenerationQuota"."used" + 1, "updatedAt" = now()
+          returning "used"
+        `
+      : tx.$queryRaw<{ used: number }[]>`
+          insert into "GenerationQuota" ("userId", "weekStart", "used", "updatedAt")
+          values (${userId}::uuid, ${weekStart}::date, 1, now())
+          on conflict ("userId", "weekStart") do update
+            set "used" = "GenerationQuota"."used" + 1, "updatedAt" = now()
+            where "GenerationQuota"."used" < ${limit}
+          returning "used"
+        `,
   );
   if (rows.length === 0) throw new RuleError("quota", GENERATION_FAILURES.quota);
-  return { weekStart, quota: quotaStatus(rows[0].used, weekStart) };
+  return { weekStart, quota: quotaStatus(rows[0].used, weekStart, limit) };
 }
 
 /** Gives back a letter reserved in `weekStart` when none was delivered. Never goes below zero. */
@@ -101,5 +108,5 @@ export async function refundCoverLetter(weekStart: string): Promise<QuotaStatus>
       returning "used"
     `,
   );
-  return quotaStatus(rows[0]?.used ?? 0, weekStart);
+  return quotaStatus(rows[0]?.used ?? 0, weekStart, lettersPerWeek());
 }

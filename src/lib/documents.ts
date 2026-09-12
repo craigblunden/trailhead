@@ -4,6 +4,8 @@
  * (CONTEXT.md). Pure: shared by the server and the browser.
  */
 
+import { PLAN_LIMITS, type Limit } from "@/lib/plans";
+
 /** The one private bucket Documents live in. Its policies and limits are in the provisioning migration. */
 export const DOCUMENTS_BUCKET = "documents";
 
@@ -16,8 +18,6 @@ export const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {
   cover_letter: "Cover letter",
 };
 
-/** How many Documents one user may keep (ticket 15). A named constant, never a literal 3. */
-export const DOCUMENT_CAP = 3;
 
 /**
  * The largest upload, in bytes. The `documents` bucket's `file_size_limit` is what actually
@@ -72,10 +72,19 @@ export type UploadTicket = {
   contentType: string;
 };
 
-/** "Room for 2 more", or null at the cap. */
-export function roomLeft(count: number): string | null {
-  const left = DOCUMENT_CAP - count;
+/**
+ * "Room for 2 more", or null: at a finite Limit, or under an unlimited one, where there is no
+ * count to show. How many a Tenant may hold is its Plan's (`src/lib/plans.ts`), never a literal.
+ */
+export function roomLeft(count: number, limit: Limit): string | null {
+  if (limit === "unlimited") return null;
+  const left = limit - count;
   return left > 0 ? `Room for ${left} more` : null;
+}
+
+/** The refusal at a finite Limit, naming the Tenant's own number. */
+export function capReachedRefusal(limit: number): string {
+  return `All ${limit} slots are used. Delete a document you no longer send, then upload this one.`;
 }
 
 export function formatBytes(bytes: number): string {
@@ -91,7 +100,9 @@ export function formatBytes(bytes: number): string {
 export const UPLOAD_REFUSALS = {
   "unsupported-type": "Upload a PDF or a Word document (.docx).",
   "too-large": "That file is over the 5 MB limit. Export a smaller PDF, or remove large images, and upload that.",
-  "cap-reached": `All ${DOCUMENT_CAP} slots are used. Delete a document you no longer send, then upload this one.`,
+  // The server sends this code with the Tenant's own number (`capReachedRefusal`); this entry is
+  // the default for a caller that has only the code.
+  "cap-reached": capReachedRefusal(PLAN_LIMITS.free.documents),
   "no-text-layer":
     "This PDF has no text in it — it looks like a scan or a picture of a page. Export it from the original document, or run it through text recognition (OCR), and upload that.",
   "password-protected":

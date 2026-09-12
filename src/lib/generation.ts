@@ -1,21 +1,23 @@
 import { isoDate } from "@/lib/dates";
+import type { Limit } from "@/lib/plans";
 
 /**
  * Cover-letter generation, the parts both sides of the boundary share (ticket 18). Pure.
  *
- * The quota is the application's only guard on its one unbounded-cost surface: five letters per
- * user per week, the week running Monday to Sunday in UTC like every other date in the app.
+ * The quota is the application's only guard on its one unbounded-cost surface: a Plan's letters
+ * per week (`src/lib/plans.ts`), the week running Monday to Sunday in UTC like every other date in
+ * the app.
  */
-
-export const COVER_LETTER_QUOTA = 5;
 
 /** Below this many characters, a job description tends to produce a generic letter. */
 export const SHORT_DESCRIPTION_CHARS = 300;
 
 export type QuotaStatus = {
-  limit: number;
+  /** The Tenant's letters-per-week Limit. */
+  limit: Limit;
   used: number;
-  remaining: number;
+  /** Letters left this week; "unlimited" under an unlimited Limit. */
+  remaining: Limit;
   /** ISO `YYYY-MM-DD`: the Monday (UTC) the next window opens. */
   resetsOn: string;
 };
@@ -34,14 +36,15 @@ export function nextWeekStart(weekStart: string): string {
   return isoDate(day);
 }
 
-export function quotaStatus(used: number, weekStart: string): QuotaStatus {
-  const clamped = Math.min(Math.max(used, 0), COVER_LETTER_QUOTA);
-  return {
-    limit: COVER_LETTER_QUOTA,
-    used: clamped,
-    remaining: COVER_LETTER_QUOTA - clamped,
-    resetsOn: nextWeekStart(weekStart),
-  };
+export function quotaStatus(used: number, weekStart: string, limit: Limit): QuotaStatus {
+  const resetsOn = nextWeekStart(weekStart);
+  if (limit === "unlimited") {
+    return { limit, used: Math.max(used, 0), remaining: "unlimited", resetsOn };
+  }
+  // A Tenant moved to a smaller Plan can hold a count above its Limit; the status never shows a
+  // negative "left".
+  const clamped = Math.min(Math.max(used, 0), limit);
+  return { limit, used: clamped, remaining: limit - clamped, resetsOn };
 }
 
 /** "Monday, Sep 14" — when the next letters arrive. */

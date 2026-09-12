@@ -5,10 +5,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   ACCEPTED_TYPES,
-  DOCUMENT_CAP,
   DOWNLOAD_URL_TTL_SECONDS,
   MAX_UPLOAD_BYTES,
 } from "@/lib/documents";
+import { PLAN_LIMITS } from "@/lib/plans";
 
 /**
  * The storage rules that would silently void tenancy if they drifted, enforced by reading the
@@ -71,7 +71,7 @@ describe("storage guards", () => {
   it("STO-3: signed download URLs live 300 seconds or less, and the cap is a named constant", () => {
     expect(DOWNLOAD_URL_TTL_SECONDS).toBeGreaterThan(0);
     expect(DOWNLOAD_URL_TTL_SECONDS).toBeLessThanOrEqual(300);
-    expect(DOCUMENT_CAP).toBe(3);
+    expect(PLAN_LIMITS.free.documents).toBe(3);
 
     const dataLayer = read(join(ROOT, "src", "server", "data", "documents.ts"));
     expect(dataLayer).toMatch(/createSignedUrl\([^)]*DOWNLOAD_URL_TTL_SECONDS/);

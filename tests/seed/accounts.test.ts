@@ -1,9 +1,9 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 
-import { DOCUMENT_CAP } from "@/lib/documents";
-import { COVER_LETTER_QUOTA, SHORT_DESCRIPTION_CHARS } from "@/lib/generation";
+import { SHORT_DESCRIPTION_CHARS } from "@/lib/generation";
 import { STAGES } from "@/lib/jobs";
+import { PLAN_LIMITS } from "@/lib/plans";
 import { extractDocumentText } from "@/server/ingest/extract";
 
 import { SEED_ACCOUNTS } from "../../scripts/seed/accounts";
@@ -58,9 +58,9 @@ describe("the seeded accounts", () => {
     expect(account.contacts.some((contact) => contact.agency !== ""), "an agency recruiter").toBe(true);
 
     expect(account.documents.length).toBeGreaterThan(0);
-    expect(account.documents.length).toBeLessThan(DOCUMENT_CAP);
+    expect(account.documents.length).toBeLessThan(PLAN_LIMITS.free.documents);
     expect(account.lettersUsed).toBeGreaterThan(0);
-    expect(account.lettersUsed).toBeLessThan(COVER_LETTER_QUOTA);
+    expect(account.lettersUsed).toBeLessThan(PLAN_LIMITS.free.lettersPerWeek);
 
     expect(jobs.some((job) => job.resume && descriptionLength(job) >= SHORT_DESCRIPTION_CHARS), "ready to write").toBe(true);
     expect(
@@ -78,8 +78,8 @@ describe("the seeded accounts", () => {
 
   it("SEED-7: at every limit — every document slot and every letter this week used, with a job otherwise ready to write", () => {
     const account = planned("at-limits");
-    expect(account.documents).toHaveLength(DOCUMENT_CAP);
-    expect(account.lettersUsed).toBe(COVER_LETTER_QUOTA);
+    expect(account.documents).toHaveLength(PLAN_LIMITS.free.documents);
+    expect(account.lettersUsed).toBe(PLAN_LIMITS.free.lettersPerWeek);
     expect(account.jobs.some((job) => job.resume && descriptionLength(job) >= SHORT_DESCRIPTION_CHARS)).toBe(true);
   });
 

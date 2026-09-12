@@ -1,9 +1,9 @@
 import type { ContactKind } from "@/lib/contacts";
 import { isoDate } from "@/lib/dates";
-import { ACCEPTED_TYPES, DOCUMENT_CAP, DOCUMENT_KIND_LABEL, extensionOf, type DocumentKind } from "@/lib/documents";
-import { COVER_LETTER_QUOTA } from "@/lib/generation";
+import { ACCEPTED_TYPES, DOCUMENT_KIND_LABEL, extensionOf, type DocumentKind } from "@/lib/documents";
 import type { Accent, ActivityEntry, Stage } from "@/lib/jobs";
 import { newJobFacts, stageChange } from "@/lib/jobs-rules";
+import { DEFAULT_PLAN, limitsOf, type Plan } from "@/lib/plans";
 import {
   jobPatchSchema,
   newContactSchema,
@@ -76,6 +76,8 @@ export type SeedAccount = {
   name: string;
   /** False leaves the account signed up and never verified. */
   verified: boolean;
+  /** The Plan the account is on; absent means the default. Its Limits are what the account is held to. */
+  plan?: Plan;
   /** What to look at when signed in as it. The seed prints it; planning ignores it. */
   about?: string;
   documents?: readonly SeedDocument[];
@@ -108,6 +110,7 @@ export type PlannedJob = Required<Omit<SeedJob, "addedDaysAgo" | "moves" | "cont
 };
 
 export type PlannedAccount = Pick<SeedAccount, "key" | "name" | "verified"> & {
+  plan: Plan;
   documents: PlannedDocument[];
   contacts: PlannedContact[];
   jobs: PlannedJob[];
@@ -282,15 +285,17 @@ export function planAccount(account: SeedAccount, today: string): PlannedAccount
   const contacts = account.contacts ?? [];
   const jobs = account.jobs ?? [];
   const lettersUsed = account.lettersUsed ?? 0;
+  const plan = account.plan ?? DEFAULT_PLAN;
+  const limits = limitsOf(plan);
 
   if (!account.verified && (documents.length > 0 || contacts.length > 0 || jobs.length > 0 || lettersUsed > 0)) {
     throw new SeedPlanError(`${where}: an unverified account has never signed in, so it can own nothing`);
   }
-  if (documents.length > DOCUMENT_CAP) {
-    throw new SeedPlanError(`${where}: an account holds at most ${DOCUMENT_CAP} documents`);
+  if (limits.documents !== "unlimited" && documents.length > limits.documents) {
+    throw new SeedPlanError(`${where}: an account on ${plan} holds at most ${limits.documents} documents`);
   }
-  if (lettersUsed < 0 || lettersUsed > COVER_LETTER_QUOTA) {
-    throw new SeedPlanError(`${where}: a week holds at most ${COVER_LETTER_QUOTA} cover letters`);
+  if (lettersUsed < 0 || (limits.lettersPerWeek !== "unlimited" && lettersUsed > limits.lettersPerWeek)) {
+    throw new SeedPlanError(`${where}: a week on ${plan} holds at most ${limits.lettersPerWeek} cover letters`);
   }
   checkUniqueKeys(where, documents);
   checkUniqueKeys(where, contacts);
@@ -303,6 +308,7 @@ export function planAccount(account: SeedAccount, today: string): PlannedAccount
     key: account.key,
     name: account.name,
     verified: account.verified,
+    plan,
     documents: documents.map((document) => planDocument(document, today, where)),
     contacts: contacts.map((contact) => planContact(contact, today, where)),
     jobs: jobs.map((job, index) => planJob(job, index, today, where, known)),

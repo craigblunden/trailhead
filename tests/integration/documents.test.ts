@@ -2,7 +2,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { signOut } from "./session-mock";
 
-import { DOCUMENT_CAP, DOWNLOAD_URL_TTL_SECONDS } from "@/lib/documents";
+import { DOWNLOAD_URL_TTL_SECONDS } from "@/lib/documents";
+import { PLAN_LIMITS } from "@/lib/plans";
 import {
   deleteDocumentAction,
   documentLinkAction,
@@ -184,7 +185,7 @@ describe("ticket 15: upload a resume", () => {
   });
 
   it("expresses the cap as a rule: the fourth upload is refused, even when two race for the last slot", async () => {
-    expect(DOCUMENT_CAP).toBe(3);
+    expect(PLAN_LIMITS.free.documents).toBe(3);
     await upload(alice, "resume.pdf");
     actAs(alice);
     const racing = await Promise.allSettled([

@@ -86,6 +86,21 @@ still shown, and never silently recomputed — re-running is always the user's a
 
 **Tenant**:
 One user and everything they own. Tenancy here means **isolation**, never collaboration: there is no
-row a second user may read, and no concept of a shared or public Job.
+row a second user may read, and no concept of a shared or public Job. Every Tenant is on exactly one
+Plan.
 _Avoid_: Organization, Workspace, Account (as a synonym — an _account_ is the user's login, which is
 a different idea)
+
+### Limits
+
+**Plan**:
+Which set of Limits a Tenant lives under: `free` or `pro`. A Tenant with no Plan recorded is on
+`free`. A Plan says nothing about how the Tenant came to be on it — granted by hand and paid for are
+the same Plan.
+_Avoid_: Tier, Subscription, Membership, Paid user, Premium
+
+**Limit**:
+A number a Plan sets: how many Documents a Tenant may hold, and how many cover letters may be
+written per week. A Limit may be **unlimited**. Changing Plan never deletes anything: a Tenant over a
+Limit keeps what it has and cannot add until under it again.
+_Avoid_: Cap, Quota (as a synonym — the _quota_ is this week's count against the letters Limit)

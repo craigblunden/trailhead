@@ -18,20 +18,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DOCUMENT_CAP,
-  DOCUMENT_KIND_LABEL,
-  formatBytes,
-  type DocumentSummary,
-} from "@/lib/documents";
+import { DOCUMENT_KIND_LABEL, formatBytes, type DocumentSummary } from "@/lib/documents";
 import { formatShortDate, pluralize } from "@/lib/jobs";
+import { DEFAULT_PLAN, limitsOf } from "@/lib/plans";
 
 /**
  * `/documents`: every Document the user holds, the one place Delete lives (ticket 13), and an
- * upload control that shows the cap before it is reached.
+ * upload control that shows a finite Limit before it is reached.
  */
 export function DocumentsView() {
   const documents = useDocumentList();
+  // Every Tenant's Limit is the default Plan's until the Plan is read (plans issue 03).
+  const limit = limitsOf(DEFAULT_PLAN).documents;
   const { remove, open } = useDocumentActions();
   const [confirming, setConfirming] = useState<DocumentSummary | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
@@ -67,8 +65,8 @@ export function DocumentsView() {
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
         <h1 className="text-3xl tracking-tight">Documents</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Your resumes and cover letters — up to {DOCUMENT_CAP} at a time. Attach them to jobs from
-          each job’s page.
+          Your resumes and cover letters{limit !== "unlimited" && ` — up to ${limit} at a time`}. Attach
+          them to jobs from each job’s page.
         </p>
 
         <section
@@ -81,7 +79,7 @@ export function DocumentsView() {
           {documents.isPending ? (
             <p className="mt-2 text-sm text-muted-foreground">Checking how many slots are free…</p>
           ) : (
-            <UploadDocument held={held} className="mt-3" />
+            <UploadDocument held={held} limit={limit} className="mt-3" />
           )}
         </section>
 
@@ -101,7 +99,7 @@ export function DocumentsView() {
           <h2 id="documents-heading" className="text-lg">
             On file{" "}
             <span className="text-sm font-normal text-muted-foreground">
-              {held} of {DOCUMENT_CAP}
+              {limit === "unlimited" ? pluralize(held, "document") : `${held} of ${limit}`}
             </span>
           </h2>
 

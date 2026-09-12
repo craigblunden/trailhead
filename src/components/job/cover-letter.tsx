@@ -6,11 +6,7 @@ import { Copy, RotateCcw, Sparkles } from "lucide-react";
 
 import { coverLetterClient } from "@/components/job/cover-letter-client";
 import { Button } from "@/components/ui/button";
-import {
-  COVER_LETTER_QUOTA,
-  SHORT_DESCRIPTION_CHARS,
-  formatResetDay,
-} from "@/lib/generation";
+import { SHORT_DESCRIPTION_CHARS, formatResetDay } from "@/lib/generation";
 import type { Job } from "@/lib/jobs";
 import type { GenerationStatus } from "@/server/actions/generation";
 
@@ -42,6 +38,8 @@ export function CoverLetterCard({ job }: { job: Job }) {
   const [copied, setCopied] = useState(false);
 
   const quota = status.data;
+  // The Plan's letters per week, when there is a number to show; an unlimited Limit has none.
+  const perWeek = quota && quota.limit !== "unlimited" ? quota.limit : null;
   const atQuota = quota ? quota.remaining === 0 : false;
   const writing = state.phase === "writing";
   const hasDescription = job.description.trim().length > 0;
@@ -87,15 +85,15 @@ export function CoverLetterCard({ job }: { job: Job }) {
         <h2 id={headingId} className="text-lg">
           Cover letter
         </h2>
-        {quota?.available && (
+        {quota?.available && perWeek !== null && (
           <p className="text-sm text-muted-foreground">
-            {quota.remaining} of {quota.limit} left this week
+            {quota.remaining} of {perWeek} left this week
           </p>
         )}
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
         Written fresh from this job’s description and the resume in its application kit. Each letter is
-        written by a paid AI model, so there are {COVER_LETTER_QUOTA} a week.
+        written by a paid AI model{perWeek !== null && `, so there are ${perWeek} a week`}.
       </p>
       {/* On the page from the start: a live region that arrives already holding its text is often
           not announced, so the wait is announced by filling this one. */}
@@ -131,10 +129,10 @@ export function CoverLetterCard({ job }: { job: Job }) {
             </p>
           ) : null}
 
-          {atQuota && !writing && (
+          {atQuota && perWeek !== null && !writing && (
             <p className="mt-4 text-sm">
-              You’ve used all {quota.limit} letters this week. Each one is written fresh by a paid AI
-              model; your next {quota.limit} arrive {formatResetDay(quota.resetsOn)}.
+              You’ve used all {perWeek} letters this week. Each one is written fresh by a paid AI
+              model; your next {perWeek} arrive {formatResetDay(quota.resetsOn)}.
             </p>
           )}
 
