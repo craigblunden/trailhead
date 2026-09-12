@@ -14,7 +14,11 @@ import { createTrail, type Trail } from "./fakes/trail";
 import { SEED_JOBS } from "./fixtures/jobs";
 
 /** The signed-in user every board test renders as. */
-export const TEST_USER = { name: "Sam Rivera", email: "sam.rivera@example.com" };
+export const TEST_USER = {
+  name: "Sam Rivera",
+  email: "sam.rivera@example.com",
+  plan: "free",
+} as const;
 
 /** The clock every date-sensitive test runs against (spec T-3). */
 export const FROZEN_NOW = new Date("2026-07-25T12:00:00Z");

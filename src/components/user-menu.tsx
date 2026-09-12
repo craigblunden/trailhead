@@ -12,10 +12,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { Plan } from "@/lib/plans";
+import { cn } from "@/lib/utils";
 
 type UserMenuProps = {
   name: string;
   email: string;
+  plan: Plan;
   /** The sign-out Server Action. Sign-out is a mutation, so it is a submit control, not a link. */
   signOut: () => Promise<void>;
 };
@@ -28,7 +31,34 @@ function toInitials(name: string): string {
     .join("");
 }
 
-export function UserMenu({ name, email, signOut }: UserMenuProps) {
+const PLAN_LABEL: Record<Plan, string> = { free: "Free plan", pro: "Pro plan" };
+
+/**
+ * The Plan, marked with a trail blaze: hollow on free, painted on pro. The words carry the Plan;
+ * the blaze only echoes them.
+ */
+function PlanMark({ plan }: { plan: Plan }) {
+  const pro = plan === "pro";
+  return (
+    <span
+      className={cn(
+        "mt-1.5 flex items-center gap-1.5 text-xs",
+        pro ? "font-medium text-primary" : "text-muted-foreground",
+      )}
+    >
+      <span
+        aria-hidden="true"
+        className={cn(
+          "h-2.5 w-1 rounded-[1px]",
+          pro ? "bg-primary" : "border border-muted-foreground/70",
+        )}
+      />
+      {PLAN_LABEL[plan]}
+    </span>
+  );
+}
+
+export function UserMenu({ name, email, plan, signOut }: UserMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -49,6 +79,7 @@ export function UserMenu({ name, email, signOut }: UserMenuProps) {
         <DropdownMenuLabel className="font-normal">
           <span className="block text-sm font-medium">{name}</span>
           <span className="block text-xs text-muted-foreground">{email}</span>
+          <PlanMark plan={plan} />
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>

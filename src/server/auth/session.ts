@@ -27,21 +27,26 @@ export type Session = {
  * validates it once however many components ask. Null when there is no valid session — this is
  * the read for display purposes (the header) and for "already signed in" checks.
  *
- * `getUser()` validates against the Auth server rather than trusting the cookie, which is what
- * makes a forged cookie worthless past `proxy.ts`.
+ * `getClaims()` verifies the access token's signature rather than trusting the cookie, which is
+ * what makes a forged cookie worthless past `proxy.ts`. With an asymmetric signing key it checks
+ * against Auth's published keys, cached in memory, so a page navigation costs no round trip to
+ * Auth; with a legacy shared secret it falls back to asking Auth, as `getUser()` would.
+ *
+ * The trade: a token signed before sign-out elsewhere stays valid until it expires (`jwt_expiry`),
+ * and a name changed since it was issued shows once it refreshes. Signing out here clears the
+ * cookie, so this browser is signed out at once.
  */
 export const getOptionalSession = cache(async (): Promise<Session | null> => {
   const supabase = await createServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  const { data } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  if (!claims) return null;
 
-  const email = user.email ?? "";
+  const email = claims.email ?? "";
   const fullName =
-    typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name.trim() : "";
+    typeof claims.user_metadata?.full_name === "string" ? claims.user_metadata.full_name.trim() : "";
   return {
-    userId: user.id,
+    userId: claims.sub,
     email,
     name: fullName || email.split("@")[0] || "You",
   };

@@ -2,8 +2,10 @@
 
 import { createContext, useContext } from "react";
 
+import type { Plan } from "@/lib/plans";
+
 /** The signed-in user, for display. Comes from the server; nothing here is a secret. */
-export type SessionUser = { name: string; email: string };
+export type SessionUser = { name: string; email: string; plan: Plan };
 
 const SessionContext = createContext<SessionUser | null>(null);
 

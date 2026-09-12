@@ -8,6 +8,7 @@ import {
   useLimits,
 } from "@/components/documents/documents-provider";
 import { UploadDocument } from "@/components/documents/upload-document";
+import { useSessionUser } from "@/components/session-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -27,6 +28,7 @@ export function ApplicationKitCard({ job }: { job: Job }) {
   const documents = useDocumentList();
   const limits = useLimits();
   const kit = useJobDocuments(job.id);
+  const plan = useSessionUser()?.plan;
 
   return (
     <Card role="region" aria-labelledby="kit-heading" className="[--card-spacing:--spacing(5)]">
@@ -75,6 +77,7 @@ export function ApplicationKitCard({ job }: { job: Job }) {
               documents={documents.data}
               onChoose={(id) => kit.choose("cover_letter", id)}
             />
+            <SupportingDocumentsPreview pro={plan === "pro"} />
             <section aria-labelledby="kit-upload-heading" className="border-t border-border pt-4">
               <h3 id="kit-upload-heading" className="font-sans text-sm font-bold">
                 Upload another
@@ -95,6 +98,46 @@ export function ApplicationKitCard({ job }: { job: Job }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+const SUPPORTING_KINDS = ["Portfolio", "References", "Certificates"];
+
+/**
+ * A preview of sending more than a resume and cover letter, a Pro feature shown on every Plan so free
+ * users know it is coming; there is no way to change Plan yet, so nothing links. Nothing uploads yet:
+ * the kinds sit as unpainted blazes in a dashed outline, a stretch of trail not yet cut, beside the
+ * painted blaze the user menu uses for Pro. The outline repeats the sentence, so it is hidden from
+ * assistive tech.
+ */
+function SupportingDocumentsPreview({ pro }: { pro: boolean }) {
+  return (
+    <section aria-labelledby="kit-supporting-heading" className="border-t border-border pt-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 id="kit-supporting-heading" className="font-sans text-sm font-bold">
+          Supporting documents
+        </h3>
+        <span className="flex items-center gap-1.5 text-xs font-medium text-primary">
+          <span aria-hidden="true" className="h-2.5 w-1 rounded-[1px] bg-primary" />
+          Pro
+        </span>
+      </div>
+      <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+        {pro ? "Coming soon" : "Coming soon to Pro"}: send a portfolio, references, or certificates
+        with this job, alongside your resume and cover letter.
+      </p>
+      <ul
+        aria-hidden="true"
+        className="mt-3 flex flex-wrap gap-x-5 gap-y-2 rounded-md border border-dashed border-input px-3 py-2.5"
+      >
+        {SUPPORTING_KINDS.map((kind) => (
+          <li key={kind} className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="h-3 w-1.5 rounded-[1px] border border-muted-foreground/60" />
+            {kind}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

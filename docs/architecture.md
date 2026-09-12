@@ -82,7 +82,8 @@ flowchart TB
 
 - **Authentication** is checked in three places, and only the last two count: `proxy.ts` redirects on
   the session cookie's say-so (fast, not authorization); pages call `requirePageSession()`; every
-  data function calls `requireSession()`, which validates with Auth.
+  data function calls `requireSession()`, which verifies the access token's signature against Auth's
+  signing keys (`getClaims()`; no round trip per request with an asymmetric key).
 - **Tenancy is enforced by Postgres.** `withTenant(userId, fn)` opens a transaction whose first
   statement sets `app.tenant_id` transaction-locally; forced RLS policies on every table compare each
   row's `userId` to it, and a query outside a tenant transaction sees nothing. Write checks also

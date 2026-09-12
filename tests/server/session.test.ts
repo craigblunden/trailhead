@@ -6,12 +6,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * valid session is pinned here: a render redirects, an action's caller gets an error to map.
  */
 const auth = vi.hoisted(() => ({
-  user: null as null | { id: string; email: string; user_metadata: Record<string, unknown> },
+  claims: null as null | { sub: string; email: string; user_metadata: Record<string, unknown> },
 }));
 
 vi.mock("@/server/auth/supabase", () => ({
   createServerSupabase: async () => ({
-    auth: { getUser: async () => ({ data: { user: auth.user }, error: null }) },
+    auth: {
+      getClaims: async () => ({ data: auth.claims ? { claims: auth.claims } : null, error: null }),
+      getUser: async () => {
+        throw new Error("the session is read from verified claims, not a round trip to Auth");
+      },
+    },
   }),
 }));
 
@@ -22,7 +27,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 beforeEach(() => {
-  auth.user = null;
+  auth.claims = null;
 });
 
 describe("session (tickets 05, 12)", () => {
@@ -37,8 +42,8 @@ describe("session (tickets 05, 12)", () => {
   });
 
   it("SES-3: a valid session yields an id, email, and a display name from sign-up", async () => {
-    auth.user = {
-      id: "6a0c2e20-0000-4000-8000-000000000001",
+    auth.claims = {
+      sub: "6a0c2e20-0000-4000-8000-000000000001",
       email: "sam@example.com",
       user_metadata: { full_name: "  Sam Rivera " },
     };
@@ -51,7 +56,7 @@ describe("session (tickets 05, 12)", () => {
   });
 
   it("SES-3: falls back to the local part of the email when no name was given", async () => {
-    auth.user = { id: "6a0c2e20-0000-4000-8000-000000000002", email: "dana@example.com", user_metadata: {} };
+    auth.claims = { sub: "6a0c2e20-0000-4000-8000-000000000002", email: "dana@example.com", user_metadata: {} };
     const { requireSession } = await import("@/server/auth/session");
     expect((await requireSession()).name).toBe("dana");
   });

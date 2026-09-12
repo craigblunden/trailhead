@@ -3,11 +3,12 @@ import { axe } from "vitest-axe";
 
 import { JobDetail } from "@/components/job/job-detail";
 import { ActionError } from "@/components/action-client";
+import { SessionProvider } from "@/components/session-provider";
 import type { Job } from "@/lib/jobs";
 import type { Plan } from "@/lib/plans";
 import { SEED_JOBS } from "../fixtures/jobs";
 import { createTrail, summary } from "../fakes/trail";
-import { freezeClock, renderWithJobs, screen, waitFor, within } from "../test-utils";
+import { TEST_USER, freezeClock, renderWithJobs, screen, waitFor, within } from "../test-utils";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
@@ -37,7 +38,13 @@ const fernwood: Job = {
 
 function renderKit(documents = [growth, staff, letter], job: Job = harvest, plan: Plan = "free") {
   const trail = createTrail({ jobs: [job, fernwood], documents, plan });
-  const rendered = renderWithJobs(<JobDetail jobId={job.id} />, { trail });
+  // The session carries the same Plan as the store, as the app layout does.
+  const rendered = renderWithJobs(
+    <SessionProvider user={{ ...TEST_USER, plan }}>
+      <JobDetail jobId={job.id} />
+    </SessionProvider>,
+    { trail },
+  );
   return { client: trail.documents, ...rendered };
 }
 
@@ -197,6 +204,32 @@ describe("the application kit (ticket 17)", () => {
 
     await waitFor(() => expect(staffRadio().closest("label")).toHaveTextContent("On 1 job"));
     expect(staffRadio()).toBeChecked();
+  });
+
+  it("KIT-12: on pro, supporting documents are previewed as coming soon, with nothing to upload", async () => {
+    renderKit([growth, staff, letter], harvest, "pro");
+    const supporting = await within(kit()).findByRole("region", { name: "Supporting documents" });
+
+    expect(supporting).toHaveTextContent("Coming soon:");
+    expect(supporting).not.toHaveTextContent("Coming soon to Pro");
+    expect(within(supporting).queryByLabelText("Choose a file to upload")).toBeNull();
+    expect(within(supporting).queryByRole("button")).toBeNull();
+  });
+
+  it("KIT-13: on free, supporting documents are previewed as coming to Pro, with nothing to upload", async () => {
+    renderKit();
+    const supporting = await within(kit()).findByRole("region", { name: "Supporting documents" });
+
+    expect(supporting).toHaveTextContent("Coming soon to Pro");
+    expect(within(supporting).queryByLabelText("Choose a file to upload")).toBeNull();
+    expect(within(supporting).queryByRole("button")).toBeNull();
+  });
+
+  it("KIT-14: the pro kit has no structural axe violations", async () => {
+    const { container } = renderKit([growth, staff, letter], harvest, "pro");
+    await within(kit()).findByRole("region", { name: "Supporting documents" });
+
+    expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
   });
 
   it("KIT-8: the kit has no structural axe violations", async () => {
