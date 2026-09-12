@@ -62,6 +62,17 @@ describe("A11Y-1: no structural violations", () => {
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
   });
 
+  it("board with a card's Move to menu open", async () => {
+    const { user } = renderWithJobs(<BoardView />);
+    await user.click(screen.getAllByRole("button", { name: /^Move / })[0]);
+    await screen.findByRole("menu");
+
+    // Radix portals the menu to <body>, outside every landmark, which the region rule reads as
+    // stray page content. It is a popover, not content; the other rules still judge it.
+    const options = { rules: { ...AXE_OPTIONS.rules, region: { enabled: false } } };
+    expect(await axe(document.body, options)).toHaveNoViolations();
+  });
+
   it("board with the add-job dialog open", async () => {
     const { user } = renderWithJobs(<BoardView />);
     await user.click(screen.getByRole("button", { name: /add job/i }));

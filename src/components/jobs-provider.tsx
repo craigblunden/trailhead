@@ -27,7 +27,8 @@ type JobsContextValue = {
   getJob: (id: string) => Job | undefined;
   addJob: (input: NewJobInput) => void;
   updateJob: (id: string, patch: JobPatch) => void;
-  setStage: (id: string, stage: Stage) => void;
+  /** Moves a Job to a Stage. False when there was nothing to do: no such Job, or already there. */
+  setStage: (id: string, stage: Stage) => boolean;
   /** The most recent write failure, already rolled back. Null when there is none. */
   error: string | null;
   dismissError: () => void;
@@ -111,7 +112,7 @@ export function JobsProvider({
       setStage: (id, stage) => {
         // Re-selecting the current stage is a no-op all the way down: no request, no entry.
         const current = jobs.find((job) => job.id === id);
-        if (!current || current.stage === stage) return;
+        if (!current || current.stage === stage) return false;
         void cache
           .update(id, {
             apply: (job) => movedJob(job, stage, todayUtc(), optimisticId),
@@ -119,6 +120,7 @@ export function JobsProvider({
             fallback: "That stage change wasn't saved. Check your connection and try again.",
           })
           .then(report);
+        return true;
       },
       error,
       dismissError: () => setError(null),

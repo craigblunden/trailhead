@@ -54,7 +54,6 @@ query rather than an inference call. The glossary terms (`Requirement`, `Evidenc
 | Deferred | Why | What picking it up involves |
 | --- | --- | --- |
 | **Streaming the generated letter** as it is written | The letter is 250–400 words and arrives in 10–25 s behind an honest waiting state | The generation Route Handler returns a stream instead of JSON; its callers do not change shape, which is why this was cheap to postpone |
-| **Drag-and-drop between board columns** | Open since Phase 1 | Keyboard-equivalent moves are required alongside it; the stage select already writes history |
 | **Dark mode** | Open since Phase 1 | Colour tokens are centralised in `src/app/globals.css`; contrast (A11Y-3) must be re-proven for a second palette |
 | **Removing orphaned objects for users who never return** | Removing a Storage object takes the owner's session; no `service_role` key exists by design (tickets 15, 16) | A server-side job with a narrowly scoped credential, e.g. `pg_net` from `pg_cron` with a key in Vault — a reversal of "no `service_role` anywhere", so a decision first |
 | Teams, sharing, multi-user tenants | Tenancy means isolation, never collaboration | Out of scope by definition |

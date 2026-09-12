@@ -239,7 +239,9 @@ parent. Users themselves live in Supabase's `auth` schema, which Prisma does not
 ## Where the decisions are
 
 - `CONTEXT.md` — the glossary.
-- `.scratch/trailhead-build/issues/` — each ticket, with a record of what was built and why.
+- `.scratch/trailhead-build/issues/` — each ticket, with a record of what was built and why. Later
+  efforts sit beside it, one directory each: `trailhead-performance`, `trailhead-architecture`,
+  `trailhead-board-dnd`.
 - `docs/provisioning.md` — the hosted setup, the two database roles, and what was verified on the
   local stack.
 - `docs/supersedes.md` and `docs/deferred.md` — what this replaced, and what it deliberately left out.

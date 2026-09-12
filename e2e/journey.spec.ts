@@ -47,6 +47,18 @@ test.describe("the first journey", () => {
     await expect(
       page.getByRole("region", { name: "Applied" }).getByText("Alpine Robotics", { exact: true }),
     ).toBeVisible();
+
+    // DND-2: dragging the card onto another column moves it on, and the move persists.
+    const applied = page.getByRole("region", { name: "Applied" });
+    const interviewing = page.getByRole("region", { name: "Interviewing" });
+    await applied.getByRole("listitem").filter({ hasText: "Alpine Robotics" }).dragTo(interviewing);
+    await expect(interviewing.getByText("Alpine Robotics", { exact: true })).toBeVisible();
+    await expect(page.getByRole("status")).toHaveText("Moved Principal Designer to Interviewing");
+
+    await page.reload();
+    await expect(
+      page.getByRole("region", { name: "Interviewing" }).getByText("Alpine Robotics", { exact: true }),
+    ).toBeVisible();
   });
 });
 

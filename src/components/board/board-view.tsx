@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import {
   ACTIVE_STAGES,
   STAGES,
+  STAGE_META,
   pluralize,
   type Job,
   type Stage,
@@ -27,8 +28,23 @@ type BoardViewProps = {
 };
 
 export function BoardView({ scene }: BoardViewProps = {}) {
-  const { jobs, status, error, dismissError, reload } = useJobs();
+  const { jobs, status, error, dismissError, reload, getJob, setStage } = useJobs();
   const [addOpen, setAddOpen] = useState(false);
+  // What the last move from the board did, for the live region: a card that is dragged or sent
+  // to another column leaves the place the user was looking or listening. Counted, so the same
+  // move made twice is announced twice — an unchanged string would never reach the DOM. Said as
+  // soon as the card moves, like the move itself; a refusal rolls the card back and the error
+  // alert says so.
+  const [announcement, setAnnouncement] = useState({ text: "", count: 0 });
+
+  function moveJob(jobId: string, stage: Stage) {
+    const job = getJob(jobId);
+    if (!job || !setStage(jobId, stage)) return;
+    setAnnouncement(({ count }) => ({
+      text: `Moved ${job.role} to ${STAGE_META[stage].label}`,
+      count: count + 1,
+    }));
+  }
   // Either the header button or the empty-state button can open the dialog;
   // remember which, so focus goes back to it on close.
   const addTrigger = useRef<HTMLElement | null>(null);
@@ -112,11 +128,21 @@ export function BoardView({ scene }: BoardViewProps = {}) {
             </Button>
           </div>
         ) : (
-          <div className="mt-6 grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            {STAGES.map((stage) => (
-              <BoardColumn key={stage} stage={stage} jobs={byStage[stage]} />
-            ))}
-          </div>
+          <>
+            <div className="mt-6 grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+              {STAGES.map((stage) => (
+                <BoardColumn
+                  key={stage}
+                  stage={stage}
+                  jobs={byStage[stage]}
+                  onMove={moveJob}
+                />
+              ))}
+            </div>
+            <p role="status" aria-live="polite" className="sr-only">
+              {announcement.text && <span key={announcement.count}>{announcement.text}</span>}
+            </p>
+          </>
         )}
       </main>
 

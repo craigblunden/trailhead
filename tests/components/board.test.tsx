@@ -4,12 +4,29 @@ import { act } from "react";
 import { BoardView } from "@/components/board/board-view";
 import { STAGES, STAGE_META, pluralize, type Job } from "@/lib/jobs";
 import { jobsCache } from "@/lib/jobs-cache";
+import { ActionError } from "@/components/action-client";
+import { fakeTransfer } from "../fakes/data-transfer";
 import { SEED_JOBS } from "../fixtures/jobs";
-import { renderWithJobs, screen, waitFor, within } from "../test-utils";
+import { fireEvent, renderWithJobs, screen, waitFor, within } from "../test-utils";
 
 /** The column `<section>` for a stage, located by its visible heading. */
 function column(stage: (typeof STAGES)[number]) {
   return screen.getByRole("region", { name: STAGE_META[stage].label });
+}
+
+/** The card `<li>` for a job, located by its role link. */
+function card(role: string) {
+  return screen.getByRole("link", { name: role }).closest("li")!;
+}
+
+/** Drags `source` onto `target`, the way a browser sequences the native events. */
+function dragTo(source: Element, target: Element) {
+  const dataTransfer = fakeTransfer();
+  fireEvent.dragStart(source, { dataTransfer });
+  fireEvent.dragEnter(target, { dataTransfer });
+  fireEvent.dragOver(target, { dataTransfer });
+  fireEvent.drop(target, { dataTransfer });
+  fireEvent.dragEnd(source, { dataTransfer });
 }
 
 describe("board columns", () => {
@@ -187,6 +204,187 @@ describe("job card", () => {
       .getByRole("link", { name: "Senior Product Designer" })
       .closest("li")!;
     expect(within(lead).getByText("Added Jul 22")).toBeInTheDocument();
+  });
+});
+
+describe("moving a job between stages", () => {
+  const job = SEED_JOBS.find((j) => j.id === "fernwood-product-designer-growth")!;
+
+  it("DND-2: dropping a card on another column moves the job to that stage", async () => {
+    const { trail } = renderWithJobs(<BoardView />);
+
+    dragTo(card(job.role), column("interviewing"));
+
+    await waitFor(() =>
+      expect(column("interviewing")).toContainElement(screen.getByRole("link", { name: job.role })),
+    );
+    expect(trail.jobs.setStage).toHaveBeenCalledWith(job.id, "interviewing");
+    expect(trail.jobs.setStage).toHaveBeenCalledTimes(1);
+  });
+
+  it("DND-3: dropping a card on its own column asks the store for nothing", async () => {
+    const { trail } = renderWithJobs(<BoardView />);
+
+    dragTo(card(job.role), column(job.stage));
+
+    // Give a write every chance to have been sent before concluding it was not.
+    await act(async () => {});
+    expect(trail.jobs.setStage).not.toHaveBeenCalled();
+    expect(column(job.stage)).toContainElement(screen.getByRole("link", { name: job.role }));
+  });
+
+  it("DND-4: ignores a drop that carries no job — text dragged in from outside", async () => {
+    const { trail } = renderWithJobs(<BoardView />);
+    const dataTransfer = fakeTransfer();
+    dataTransfer.setData("text/plain", job.id);
+
+    fireEvent.dragOver(column("offer"), { dataTransfer });
+    fireEvent.drop(column("offer"), { dataTransfer });
+
+    await act(async () => {});
+    expect(trail.jobs.setStage).not.toHaveBeenCalled();
+  });
+
+  it("DND-5: a column shows it is a drop target while a job is over it, and stops when it leaves", () => {
+    renderWithJobs(<BoardView />);
+    const dataTransfer = fakeTransfer();
+    const target = column("offer");
+
+    fireEvent.dragStart(card(job.role), { dataTransfer });
+    expect(target).not.toHaveAttribute("data-drop-target");
+
+    fireEvent.dragEnter(target, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer });
+    expect(target).toHaveAttribute("data-drop-target", "true");
+
+    // Moving over the column's own children fires leave/enter pairs; the column stays lit.
+    const inner = within(target).getByRole("heading", { level: 2 });
+    fireEvent.dragEnter(inner, { dataTransfer });
+    fireEvent.dragLeave(target, { dataTransfer });
+    expect(target).toHaveAttribute("data-drop-target", "true");
+
+    fireEvent.dragLeave(inner, { dataTransfer });
+    expect(target).not.toHaveAttribute("data-drop-target");
+  });
+
+  it("DND-5: a column stops being a drop target once the card is dropped", () => {
+    renderWithJobs(<BoardView />);
+    const target = column("offer");
+
+    dragTo(card(job.role), target);
+
+    expect(target).not.toHaveAttribute("data-drop-target");
+  });
+
+  it("DND-6: the Move to menu offers every other stage, and choosing one moves the job", async () => {
+    const { user, trail } = renderWithJobs(<BoardView />);
+
+    await user.click(
+      within(card(job.role)).getByRole("button", { name: `Move ${job.role} at ${job.company}` }),
+    );
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).getAllByRole("menuitem").map((item) => item.textContent)).toEqual(
+      STAGES.filter((stage) => stage !== job.stage).map((stage) => STAGE_META[stage].label),
+    );
+
+    await user.click(within(menu).getByRole("menuitem", { name: "Offer" }));
+
+    await waitFor(() =>
+      expect(column("offer")).toContainElement(screen.getByRole("link", { name: job.role })),
+    );
+    expect(trail.jobs.setStage).toHaveBeenCalledWith(job.id, "offer");
+  });
+
+  it("DND-6: the Move to menu works from the keyboard alone", async () => {
+    const { user, trail } = renderWithJobs(<BoardView />);
+    const trigger = within(card(job.role)).getByRole("button", { name: /^Move / });
+
+    trigger.focus();
+    await user.keyboard("{Enter}");
+    await screen.findByRole("menu");
+    // Focus lands on the first item; Interested is the first stage other than Applied.
+    await user.keyboard("{Enter}");
+
+    await waitFor(() =>
+      expect(column("interested")).toContainElement(screen.getByRole("link", { name: job.role })),
+    );
+    expect(trail.jobs.setStage).toHaveBeenCalledWith(job.id, "interested");
+  });
+
+  it("DND-7: announces a move made from the board, since the card leaves the column the user was in", async () => {
+    const { user } = renderWithJobs(<BoardView />);
+
+    dragTo(card(job.role), column("interviewing"));
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(`Moved ${job.role} to Interviewing`),
+    );
+
+    await user.click(within(card(job.role)).getByRole("button", { name: /^Move / }));
+    await user.click(await screen.findByRole("menuitem", { name: "Rejected" }));
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(`Moved ${job.role} to Rejected`),
+    );
+  });
+
+  it("DND-8: a card shows it is in flight from drag start to drag end", () => {
+    renderWithJobs(<BoardView />);
+    const dataTransfer = fakeTransfer();
+    const source = card(job.role);
+
+    expect(source).toHaveAttribute("draggable", "true");
+    fireEvent.dragStart(source, { dataTransfer });
+    expect(source).toHaveAttribute("data-dragging", "true");
+    fireEvent.dragEnd(source, { dataTransfer });
+    expect(source).not.toHaveAttribute("data-dragging");
+  });
+
+  it("DND-7: announces nothing when a card is dropped where it already is", async () => {
+    renderWithJobs(<BoardView />);
+
+    dragTo(card(job.role), column(job.stage));
+
+    await act(async () => {});
+    expect(screen.queryByRole("status")).toBeEmptyDOMElement();
+  });
+
+  it("DND-7: announces the same move again when it is made again", async () => {
+    renderWithJobs(<BoardView />);
+    const status = () => screen.getByRole("status");
+
+    dragTo(card(job.role), column("interviewing"));
+    await waitFor(() => expect(status()).toHaveTextContent("to Interviewing"));
+    const first = status().firstElementChild;
+
+    dragTo(card(job.role), column("applied"));
+    await waitFor(() => expect(status()).toHaveTextContent("to Applied"));
+    dragTo(card(job.role), column("interviewing"));
+    await waitFor(() => expect(status()).toHaveTextContent("to Interviewing"));
+
+    // A live region announces what is added to it; the same text in the same node says nothing.
+    expect(status().firstElementChild).not.toBe(first);
+  });
+
+  it("DND-9: a refused drop rolls the card back and reports the failure without blocking", async () => {
+    const { trail } = renderWithJobs(<BoardView />);
+    // After a beat, the way a real server refuses, so the optimistic move is on screen to be seen.
+    trail.jobs.setStage.mockImplementationOnce(
+      () =>
+        new Promise((_, fail) =>
+          setTimeout(() => fail(new ActionError("failed", "The trail is closed for maintenance.")), 150),
+        ),
+    );
+
+    dragTo(card(job.role), column("offer"));
+    await waitFor(() =>
+      expect(column("offer")).toContainElement(screen.getByRole("link", { name: job.role })),
+    );
+
+    await waitFor(() =>
+      expect(column(job.stage)).toContainElement(screen.getByRole("link", { name: job.role })),
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent("The trail is closed for maintenance.");
+    // The board stays usable: the Move to menu is still there to try again.
+    expect(within(card(job.role)).getByRole("button", { name: /^Move / })).toBeEnabled();
   });
 });
 
