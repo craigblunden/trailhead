@@ -99,7 +99,7 @@ describe("what the prompt receives (ticket 18)", () => {
 });
 
 describe("the Claude call (tickets 18, 19)", () => {
-  it("GEN-C1: sends claude-opus-5 with adaptive thinking, medium effort, and the default fallbacks, and returns the letter", async () => {
+  it("GEN-C1: sends claude-sonnet-5 with adaptive thinking, medium effort, and the default fallbacks, and returns the letter", async () => {
     reply = { body: message({ content: [{ type: "text", text: "Dear Hiring Team,\n\nI would like…" }] }) };
 
     const outcome = await writeCoverLetter(inputs, { client: client() });
@@ -109,7 +109,7 @@ describe("the Claude call (tickets 18, 19)", () => {
     expect(sent.url).toContain("/v1/messages");
     expect(String(sent.headers["anthropic-beta"])).toContain("server-side-fallback-2026-07-01");
     expect(sent.body).toMatchObject({
-      model: "claude-opus-5",
+      model: "claude-sonnet-5",
       thinking: { type: "adaptive" },
       output_config: { effort: "medium" },
       fallbacks: "default",

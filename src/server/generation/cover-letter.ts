@@ -12,7 +12,7 @@ import { buildCoverLetterPrompt, type CoverLetterInputs } from "./prompt";
  * here and nowhere else, and `server-only` fails the build if a Client Component reaches this file.
  */
 
-export const COVER_LETTER_MODEL = "claude-opus-5";
+export const COVER_LETTER_MODEL = "claude-sonnet-5";
 
 /** Bounded well inside the route's `maxDuration`, so the handler always answers. */
 const DEFAULT_TIMEOUT_MS = 55_000;

@@ -31,7 +31,7 @@ flowchart LR
     cron["pg_cron<br/>document janitor"]
   end
 
-  anthropic["Anthropic API<br/>claude-opus-5"]
+  anthropic["Anthropic API<br/>claude-sonnet-5"]
   smtp["SMTP<br/>(Mailpit locally)"]
 
   browser -->|"pages, navigation"| proxy --> pages
@@ -160,7 +160,7 @@ sequenceDiagram
   G->>D: coverLetterInputs(job) — not yours, or no resume or description
   G->>D: reserveCoverLetter() — upsert, only while used < the Plan's letters this week
   D->>PG: quota row under RLS
-  G->>C: messages.create (claude-opus-5, adaptive thinking, refusal fallback)
+  G->>C: messages.create (claude-sonnet-5, adaptive thinking, refusal fallback)
   alt stop_reason end_turn
     C-->>G: letter text
     G-->>R: letter · letters left

@@ -7,7 +7,7 @@ search, the documents that go out with each job, and cover letters written from 
 ## Stack
 
 Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · shadcn/ui (Radix) · TanStack Query ·
-Supabase (Postgres, Auth, Storage) · Prisma 7 · `@anthropic-ai/sdk` (`claude-opus-5`) · Vercel
+Supabase (Postgres, Auth, Storage) · Prisma 7 · `@anthropic-ai/sdk` (`claude-sonnet-5`) · Vercel
 
 ## Architecture
 
