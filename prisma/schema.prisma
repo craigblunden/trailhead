@@ -7,8 +7,9 @@
 // Boundaries:
 // - An applied migration is never edited. A change is a new migration.
 // - Only `src/server/db/` imports the generated client. Mappers are the boundary to the app.
-// - The models are Job, Contact, ActivityEntry, Document, and the Job↔Contact link. No Analysis,
-//   Requirement, Evidence, queue, or job-state table: that work left the phase deliberately.
+// - The models are Job, Contact, ActivityEntry, Document, the Job↔Contact link, the weekly
+//   generation quota, and the Tenant's Plan. No Analysis, Requirement, Evidence, queue, or
+//   job-state table: that work left the phase deliberately.
 
 generator client {
   provider = "prisma-client"
@@ -50,6 +51,12 @@ enum ContactKind {
 enum DocumentKind {
   resume
   cover_letter
+}
+
+/// Members match `PLANS` in `src/lib/plans.ts`; `enum-assertions.ts` fails the typecheck if they drift.
+enum Plan {
+  free
+  pro
 }
 
 /// Where a Document is in ingestion. `pending`: the row exists, the object may not yet.
@@ -193,4 +200,13 @@ model GenerationQuota {
   updatedAt DateTime @default(now())
 
   @@id([userId, weekStart])
+}
+
+/// Which Plan a Tenant is on (ADR-0001). No row means the default Plan. The app role reads this
+/// under the tenant policy and has no grant to write it: only `npm run db:plan`, as the migrator,
+/// puts a Tenant on a Plan.
+model UserPlan {
+  userId    String   @id @db.Uuid
+  plan      Plan
+  updatedAt DateTime @default(now())
 }

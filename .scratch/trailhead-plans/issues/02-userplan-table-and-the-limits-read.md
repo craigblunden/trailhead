@@ -1,6 +1,6 @@
 # 02: The `UserPlan` table and the Limits read
 
-**Status:** ready
+**Status:** ready-for-review
 **Blocked by:** 01
 
 ## What to build

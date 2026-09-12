@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "@/server/db/prisma";
 import { withTenant, type TenantClient } from "@/server/db/tenant";
 
-import { newUserId, resetTables } from "./helpers";
+import { newUserId, resetTables, setPlan } from "./helpers";
 
-const TABLES = ["Job", "ActivityEntry", "Contact", "JobContact", "Document", "GenerationQuota"] as const;
+const TABLES = ["Job", "ActivityEntry", "Contact", "JobContact", "Document", "GenerationQuota", "UserPlan"] as const;
 
 /** Seeds one row in every application table for `userId`, returning the ids. */
 async function seedEverything(tx: TenantClient, userId: string) {
@@ -48,10 +48,11 @@ async function countAll(db: TenantClient | typeof prisma) {
     JobContact: await db.jobContact.count(),
     Document: await db.document.count(),
     GenerationQuota: await db.generationQuota.count(),
+    UserPlan: await db.userPlan.count(),
   };
 }
 
-const NOTHING = { Job: 0, ActivityEntry: 0, Contact: 0, JobContact: 0, Document: 0, GenerationQuota: 0 };
+const NOTHING = { Job: 0, ActivityEntry: 0, Contact: 0, JobContact: 0, Document: 0, GenerationQuota: 0, UserPlan: 0 };
 
 beforeEach(async () => {
   await resetTables();
@@ -73,13 +74,26 @@ describe("ticket 04: tenant isolation, proven", () => {
     }
 
     const policies = await prisma.$queryRaw<
-      { tablename: string; cmd: string; qual: string | null; with_check: string | null }[]
+      { tablename: string; cmd: string; roles: string[]; qual: string | null; with_check: string | null }[]
     >`
-      select tablename, cmd, qual, with_check from pg_policies where schemaname = 'public' order by tablename
+      select tablename, cmd, roles::text[] as roles, qual, with_check
+      from pg_policies where schemaname = 'public' order by tablename, cmd
     `;
-    expect(policies.map((p) => p.tablename).sort()).toEqual([...TABLES].sort());
-    for (const policy of policies) {
+    // UserPlan is the one table the app role may only read (ADR-0001): a SELECT policy for it, and
+    // a policy naming the migrator, which sets Plans. Every other table has one policy over
+    // read and write.
+    const userPlan = policies.filter((p) => p.tablename === "UserPlan");
+    expect(userPlan.map(({ cmd, roles }) => ({ cmd, roles }))).toEqual([
+      { cmd: "ALL", roles: ["trailhead_migrator"] },
+      { cmd: "SELECT", roles: ["trailhead_app"] },
+    ]);
+    expect(userPlan.find((p) => p.cmd === "SELECT")?.qual).toContain("tenant_id()");
+
+    const rest = policies.filter((p) => p.tablename !== "UserPlan");
+    expect(rest.map((p) => p.tablename).sort()).toEqual(TABLES.filter((t) => t !== "UserPlan").sort());
+    for (const policy of rest) {
       expect(policy.cmd).toBe("ALL");
+      expect(policy.roles).toEqual(["trailhead_app"]);
       expect(policy.qual).toContain("tenant_id()");
       expect(policy.with_check).toContain("tenant_id()");
     }
@@ -97,6 +111,7 @@ describe("ticket 04: tenant isolation, proven", () => {
     const userA = newUserId();
     const userB = newUserId();
     await withTenant(userA, (tx) => seedEverything(tx, userA));
+    await setPlan(userA, "pro");
 
     const asA = await withTenant(userA, (tx) => countAll(tx));
     expect(asA).toEqual({
@@ -106,6 +121,7 @@ describe("ticket 04: tenant isolation, proven", () => {
       JobContact: 1,
       Document: 1,
       GenerationQuota: 1,
+      UserPlan: 1,
     });
 
     const asB = await withTenant(userB, (tx) => countAll(tx));
