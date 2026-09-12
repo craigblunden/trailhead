@@ -10,7 +10,7 @@ export default function AuthLayout({
         <BrandLogo href="/" size="lg" />
         <div className="mt-8 w-full max-w-md">{children}</div>
         <p className="mt-8 max-w-sm text-center text-sm text-pretty text-muted-foreground">
-          Keep every application on the trail — from first spark to signed offer.
+          Keep every application on the trail, and see what&rsquo;s working.
         </p>
       </main>
 

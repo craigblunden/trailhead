@@ -3,7 +3,7 @@ import { ArrowUpRight, FileText, Sparkles } from "lucide-react";
 import { CompanyAvatar } from "@/components/company-avatar";
 import {
   SectionTrail,
-  type TrailLandmark,
+  TrailMarker,
 } from "@/components/landing/section-trail";
 import { MetaChip } from "@/components/meta-chip";
 import {
@@ -280,42 +280,31 @@ function MiniCoverLetter() {
 
 type FeatureProps = {
   id: string;
-  /** Landmark the section trail threads past. */
-  trail: TrailLandmark;
   heading: string;
   children: React.ReactNode;
   preview: React.ReactNode;
-  /** Spans both columns on large screens, with the copy beside the preview. */
-  wide?: boolean;
 };
 
-function Feature({
-  id,
-  trail,
-  heading,
-  children,
-  preview,
-  wide = false,
-}: FeatureProps) {
+/** One stop on the trail: copy beside its miniature on large screens. */
+function Feature({ id, heading, children, preview }: FeatureProps) {
   return (
-    <article
-      aria-labelledby={id}
-      data-trail={trail}
-      className={cn(
-        "flex flex-col gap-6 rounded-xl bg-muted p-6 sm:p-7",
-        wide && "lg:col-span-2 lg:flex-row lg:items-start lg:gap-10",
-      )}
-    >
-      <div className={cn("max-w-md", wide && "lg:w-72 lg:shrink-0")}>
-        <h3 id={id} className="text-xl">
-          {heading}
-        </h3>
-        <p className="mt-2 text-[0.95rem] leading-relaxed text-muted-foreground">
-          {children}
-        </p>
-      </div>
-      <div className={cn("min-w-0", wide && "lg:flex-1")}>{preview}</div>
-    </article>
+    <li className="relative pl-8 sm:pl-16">
+      <TrailMarker />
+      <article
+        aria-labelledby={id}
+        className="flex flex-col gap-6 rounded-xl bg-muted p-6 sm:p-7 lg:flex-row lg:items-start lg:gap-10"
+      >
+        <div className="max-w-md lg:w-72 lg:shrink-0">
+          <h3 id={id} className="text-xl">
+            {heading}
+          </h3>
+          <p className="mt-2 text-[0.95rem] leading-relaxed text-muted-foreground">
+            {children}
+          </p>
+        </div>
+        <div className="min-w-0 lg:flex-1">{preview}</div>
+      </article>
+    </li>
   );
 }
 
@@ -323,63 +312,54 @@ export const EveryThingYouNeed = () => {
   return (
     <section
       aria-labelledby="everything-heading"
-      className="basecamp-wash relative overflow-hidden pt-16 pb-8 sm:pt-20"
+      className="basecamp-wash overflow-hidden pt-16 sm:pt-20"
     >
-      {/* Sits under the panels: they cover it, so it shows only in gaps and
-          margins and reads as weaving beneath the content. */}
-      <SectionTrail />
-
-      <div className="relative mx-auto w-full max-w-6xl px-4 sm:px-6">
-        <div data-trail="heading" className="max-w-2xl">
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6">
+        <div className="max-w-2xl">
           <h2 id="everything-heading" className="text-3xl tracking-tight sm:text-4xl">
-            Everything you need for the climb
+            Learn from every application
           </h2>
           <p className="mt-3 text-lg leading-relaxed text-muted-foreground">
-            Three views, one trail. What you see below is the product itself,
-            filled with a sample search.
+            When replies are scarce, a clear record is how you find out what
+            lands. What you see below is the product itself, filled with a
+            sample search.
           </p>
         </div>
 
-        <div className="mt-10 grid gap-5 lg:grid-cols-2">
+        {/* The trail runs down the left, with a marker at each stop, and
+            carries on past the last one toward the call to action. */}
+        <ol className="relative mt-10 flex flex-col gap-6 pb-20">
+          <SectionTrail />
+
           <Feature
             id="feature-board"
-            trail="board"
-            heading="A board with stages"
+            heading="See where your search stands"
             preview={<MiniBoard />}
-            wide
           >
-            Move roles from Interested through Applied, Interviewing, and Offer.
-            Salary, location, and the date you applied stay in view on every
-            card.
+            Move roles from Interested through Applied, Interviewing, and Offer
+            — or Rejected, so nothing quietly disappears. At a glance, you can
+            see what&rsquo;s moving and where things stall.
           </Feature>
-
-          {/* Room for the trail to cross between the rows. */}
-          <div aria-hidden="true" className="h-16 lg:col-span-2" />
 
           <Feature
             id="feature-page"
-            trail="page"
-            heading="A page per application"
+            heading="Remember exactly what you sent"
             preview={<MiniDetail />}
           >
-            The posting link, the resume you sent, the job description, your
-            contacts, notes, and a timeline of every move, together in one
-            place.
+            The resume you used, the posting and its description, your
+            contacts, notes, and a dated timeline of every move. When one turns
+            into an interview, you can look back at what got you there.
           </Feature>
 
           <Feature
             id="feature-cover"
-            trail="cover"
             heading="Cover letters, on the way"
             preview={<MiniCoverLetter />}
           >
             Keep each job description current. Soon {BRAND_NAME} will draft a
             tailored cover letter from it and the resume you attached.
           </Feature>
-        </div>
-
-        {/* Room for the trail to run on toward the call to action. */}
-        <div aria-hidden="true" className="mt-6 h-24" />
+        </ol>
       </div>
     </section>
   );

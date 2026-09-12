@@ -16,7 +16,7 @@ export const ReadyToHitTheTrail = () => {
         <Link href="/signup">Create your account</Link>
       </Button>
       <p className="mt-6 text-sm text-muted-foreground">
-        {BRAND_NAME} — keep every application on the trail.
+        {BRAND_NAME} — see what&rsquo;s working in your job search.
       </p>
     </section>
   );

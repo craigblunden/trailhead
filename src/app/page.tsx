@@ -20,9 +20,9 @@ export default function LandingPage() {
             Every application, one trail.
           </h1>
           <p className="mt-6 max-w-lg text-lg leading-relaxed text-pretty text-muted-foreground">
-            Track every role from first spark to signed offer — with the resume
-            you used, the posting link, and the details that matter, all in one
-            basecamp.
+            It&rsquo;s a tough market. Keep a clear record of every application
+            — the resume you sent, where it went, and how far it got — so you
+            can see what&rsquo;s working and put your energy there.
           </p>
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
             <Button asChild className="h-11 px-6 text-base">

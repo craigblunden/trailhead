@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     template: `%s · ${BRAND_NAME}`,
   },
   description:
-    "Track every role from first spark to signed offer — with the resume you used, the posting link, and the details that matter, all in one basecamp.",
+    "Keep a clear record of every job application — the resume you sent, where it went, and how far it got — so you can see what's working in a tough market.",
 };
 
 export default function RootLayout({
