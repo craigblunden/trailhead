@@ -73,7 +73,7 @@ model Job {
   userId      String    @db.Uuid
   company     String
   role        String
-  /// Free text as it reads on the card, e.g. "Hybrid · Austin".
+  /// Free text as it reads on the card, e.g. "Hybrid · Brisbane".
   location    String
   /// Thousands per year. Null on either end means that bound is unknown.
   salaryMin   Int?

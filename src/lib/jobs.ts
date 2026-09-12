@@ -65,7 +65,7 @@ export type Job = {
   id: string;
   company: string;
   role: string;
-  /** Free text as it reads on the card, e.g. "Hybrid · Austin". */
+  /** Free text as it reads on the card, e.g. "Hybrid · Brisbane". */
   location: string;
   /** Thousands per year. `null` on either end means the range is unknown. */
   salaryMin: number | null;

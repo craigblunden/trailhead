@@ -101,7 +101,7 @@ export function AddJobDialog({
               <Input
                 id={`${fieldId}-location`}
                 name="location"
-                placeholder="Remote / NYC"
+                placeholder="Hybrid / Brisbane"
                 className="h-10"
               />
             </div>

@@ -10,7 +10,7 @@ import type { SeedAccount } from "./plan";
 
 const SAM_RESUME = [
   "Sam Rivera - Senior Product Designer",
-  "Austin, TX | sam.rivera@example.com | samrivera.example.com",
+  "Brisbane, QLD | sam.rivera@example.com | samrivera.example.com",
   "SUMMARY",
   "Eight years designing analytics, onboarding, and marketplace products for B2B teams.",
   "Leads research through launch; comfortable owning a surface end to end.",
@@ -27,7 +27,7 @@ const SAM_RESUME = [
   "SKILLS",
   "Interaction design, design systems, research synthesis, prototyping (Figma, code).",
   "EDUCATION",
-  "BFA, Interaction Design - California College of the Arts",
+  "Bachelor of Design, Interaction Design - QUT",
 ];
 
 const SAM_FERNWOOD_LETTER = [
@@ -45,7 +45,7 @@ const SAM_FERNWOOD_LETTER = [
 
 const MORGAN_RESUME = [
   "Morgan Hale - Product Designer",
-  "Seattle, WA | morgan.hale@example.com",
+  "Melbourne, VIC | morgan.hale@example.com",
   "Six years designing consumer and B2B products, from research to shipped UI.",
   "EXPERIENCE",
   "Harborline - Product Designer - 2021 to present",
@@ -59,7 +59,7 @@ const MORGAN_RESUME = [
 
 const MORGAN_SYSTEMS_RESUME = [
   "Morgan Hale - Product Designer, Design Systems",
-  "Seattle, WA | morgan.hale@example.com",
+  "Melbourne, VIC | morgan.hale@example.com",
   "Six years designing products, the last three building and running a design system.",
   "EXPERIENCE",
   "Harborline - Product Designer, Design Systems - 2021 to present",
@@ -85,7 +85,7 @@ const MORGAN_LETTER = [
 
 const JORDAN_RESUME = [
   "Jordan Reyes - Staff Product Designer",
-  "Denver, CO | jordan.reyes@example.com",
+  "Sydney, NSW | jordan.reyes@example.com",
   "Ten years designing developer tools and data products; leads a team of five.",
   "EXPERIENCE",
   "Cinder Cloud - Staff Product Designer - 2022 to present",
@@ -100,7 +100,7 @@ const JORDAN_RESUME = [
 
 const JORDAN_PLATFORM_RESUME = [
   "Jordan Reyes - Staff Product Designer, Platform",
-  "Denver, CO | jordan.reyes@example.com",
+  "Sydney, NSW | jordan.reyes@example.com",
   "Ten years on developer platforms: CLIs, APIs, dashboards, and the docs that explain them.",
   "EXPERIENCE",
   "Cinder Cloud - Staff Product Designer - 2022 to present",
@@ -171,7 +171,7 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
         title: "Senior Design Recruiter",
         agency: "Northstar Talent",
         email: "dana@northstar-talent.example.com",
-        phone: "+1 (512) 555-0142",
+        phone: "+61 491 570 156",
         linkedinUrl: "https://www.linkedin.com/in/dana-whitfield-example",
         notes: "Places product designers at Series B-D startups. Put me forward for Fernwood, Cobalt, and Northbeam.",
         lastSpokenDaysAgo: 3,
@@ -213,7 +213,7 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
       {
         company: "Bramble",
         role: "Senior UX Designer",
-        location: "Hybrid · Denver",
+        location: "Hybrid · Sydney",
         salaryMin: 145,
         salaryMax: 160,
         postingUrl: "https://bramble.example.com/careers/senior-ux-designer",
@@ -234,7 +234,7 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
       {
         company: "Quill Health",
         role: "Product Designer",
-        location: "Remote (US)",
+        location: "Remote (AU)",
         salaryMin: 130,
         salaryMax: 150,
         postingUrl: "https://quillhealth.example.com/jobs/product-designer",
@@ -252,7 +252,7 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
       {
         company: "Harvest & Co",
         role: "Lead Product Designer",
-        location: "Onsite · Chicago",
+        location: "Onsite · Melbourne",
         salaryMin: 140,
         salaryMax: 165,
         postingUrl: "https://harvest.example.com/careers/lead-product-designer",
@@ -274,7 +274,7 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
       {
         company: "Northbeam",
         role: "Product Designer II",
-        location: "Remote (US)",
+        location: "Remote (AU)",
         postingUrl: "https://northbeam.example.com/jobs/product-designer-ii",
         description:
           "Northbeam builds route planning for regional freight. This role sits on the dispatcher tools team, " +
@@ -293,7 +293,7 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
       {
         company: "Fernwood",
         role: "Product Designer, Growth",
-        location: "Hybrid · Austin",
+        location: "Hybrid · Brisbane",
         salaryMin: 125,
         salaryMax: 145,
         postingUrl: "https://fernwood.example.com/jobs/product-designer-growth",
@@ -312,7 +312,7 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
       {
         company: "Cobalt Systems",
         role: "Staff UX Designer",
-        location: "Remote (US)",
+        location: "Remote (AU)",
         salaryMax: 200,
         postingUrl: "https://cobaltsystems.example.com/careers/staff-ux-designer",
         description:
@@ -327,7 +327,7 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
       {
         company: "Meridian Labs",
         role: "Senior Product Designer",
-        location: "Remote (US)",
+        location: "Remote (AU)",
         salaryMin: 150,
         salaryMax: 180,
         postingUrl: "https://meridianlabs.example.com/careers/senior-product-designer",
@@ -344,7 +344,7 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
       {
         company: "Loft & Ledger",
         role: "Product Designer, Payments",
-        location: "Hybrid · New York",
+        location: "Hybrid · Sydney",
         salaryMin: 135,
         description:
           "Loft & Ledger makes bookkeeping software for independent shops. The Payments team is looking for a " +
@@ -388,7 +388,7 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
       {
         company: "Tidewater",
         role: "Senior Product Designer, Design Systems",
-        location: "Remote (US)",
+        location: "Hybrid · Fremantle",
         salaryMin: 160,
         salaryMax: 185,
         postingUrl: "https://tidewater.example.com/careers/senior-product-designer-design-systems",
@@ -405,7 +405,7 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
       {
         company: "Kestrel Maps",
         role: "Product Designer",
-        location: "Hybrid · Seattle",
+        location: "Hybrid · Hobart",
         salaryMin: 120,
         salaryMax: 140,
         postingUrl: "https://kestrelmaps.example.com/jobs/product-designer",
@@ -462,7 +462,7 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
       {
         company: "Summit Devtools",
         role: "Principal Product Designer",
-        location: "Remote (US)",
+        location: "Remote (AU)",
         salaryMin: 190,
         salaryMax: 230,
         postingUrl: "https://summitdevtools.example.com/careers/principal-product-designer",
@@ -481,7 +481,7 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
       {
         company: "Orbit Analytics",
         role: "Design Lead, Data Products",
-        location: "Hybrid · Denver",
+        location: "Hybrid · Canberra",
         salaryMin: 170,
         salaryMax: 200,
         postingUrl: "https://orbitanalytics.example.com/jobs/design-lead-data-products",
