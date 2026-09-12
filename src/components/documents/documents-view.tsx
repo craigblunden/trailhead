@@ -9,6 +9,7 @@ import { useDocumentActions, useDocumentList, useLimits } from "@/components/doc
 import { UploadDocument } from "@/components/documents/upload-document";
 import { BrandLogo } from "@/components/brand-logo";
 import { LoadingTrail } from "@/components/loading-trail";
+import { PageMain } from "@/components/page-main";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -62,26 +63,12 @@ export function DocumentsView() {
     <div className="flex flex-1 flex-col bg-background">
       <AppHeader leading={<BrandLogo href="/board" />} />
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
+      <PageMain>
         <h1 className="text-3xl tracking-tight">Documents</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Your resumes and cover letters{typeof limit === "number" && ` — up to ${limit} at a time`}. Attach
           them to jobs from each job’s page.
         </p>
-
-        <section
-          aria-labelledby="upload-heading"
-          className="mt-6 rounded-lg bg-card p-5 ring-1 ring-foreground/10"
-        >
-          <h2 id="upload-heading" className="text-lg">
-            Upload
-          </h2>
-          {documents.isPending || limit === null ? (
-            <p className="mt-2 text-sm text-muted-foreground">Checking how many slots are free…</p>
-          ) : (
-            <UploadDocument held={held} limit={limit} className="mt-3" />
-          )}
-        </section>
 
         {failure && (
           <div
@@ -95,79 +82,97 @@ export function DocumentsView() {
           </div>
         )}
 
-        <section aria-labelledby="documents-heading" className="mt-8">
-          <h2 id="documents-heading" className="text-lg">
-            On file{" "}
-            <span className="text-sm font-normal text-muted-foreground">
-              {typeof limit === "number" ? `${held} of ${limit}` : pluralize(held, "document")}
-            </span>
-          </h2>
+        {/* Upload first in reading order; on wide screens it stands beside the list, as a job
+            page’s side cards do. */}
+        <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
+          <section
+            aria-labelledby="upload-heading"
+            className="rounded-lg bg-card p-5 ring-1 ring-foreground/10 lg:col-start-2 lg:row-start-1"
+          >
+            <h2 id="upload-heading" className="text-lg">
+              Upload
+            </h2>
+            {documents.isPending || limit === null ? (
+              <p className="mt-2 text-sm text-muted-foreground">Checking how many slots are free…</p>
+            ) : (
+              <UploadDocument held={held} limit={limit} className="mt-3" />
+            )}
+          </section>
 
-          {documents.isPending ? (
-            <LoadingTrail className="mt-3">Loading your documents…</LoadingTrail>
-          ) : documents.isError ? (
-            <div role="alert" className="mt-3 rounded-md border border-dashed border-border p-4 text-sm">
-              <p>We couldn’t load your documents.</p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => documents.refetch()}>
-                Try again
-              </Button>
-            </div>
-          ) : documents.data.length === 0 ? (
-            <p className="mt-3 rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
-              Nothing on file yet. Upload the resume you send most, then attach it to any job.
-            </p>
-          ) : (
-            <ul className="mt-3 space-y-3">
-              {documents.data.map((document) => (
-                <li
-                  key={document.id}
-                  className="flex flex-wrap items-start gap-3 rounded-lg bg-card p-4 ring-1 ring-foreground/10"
-                >
-                  <FileText aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0 flex-1 basis-48">
-                    <p className="font-bold break-words">{document.fileName}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {DOCUMENT_KIND_LABEL[document.kind]} · {formatBytes(document.sizeBytes)} · Uploaded{" "}
-                      {formatShortDate(document.uploadedOn)}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {document.status === "pending"
-                        ? "This upload didn’t finish. Delete it and try again."
-                        : document.jobs.length === 0
-                          ? "Not attached to any job"
-                          : `On ${pluralize(document.jobs.length, "job")}`}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {/* Explicit labels: an adjacent sr-only span loses its leading space in JSX
-                        and would be announced as "Deleteresume.pdf". */}
-                    {document.status === "ready" && (
+          <section aria-labelledby="documents-heading" className="min-w-0 lg:col-start-1 lg:row-start-1">
+            <h2 id="documents-heading" className="text-lg">
+              On file{" "}
+              <span className="text-sm font-normal text-muted-foreground">
+                {typeof limit === "number" ? `${held} of ${limit}` : pluralize(held, "document")}
+              </span>
+            </h2>
+
+            {documents.isPending ? (
+              <LoadingTrail className="mt-3">Loading your documents…</LoadingTrail>
+            ) : documents.isError ? (
+              <div role="alert" className="mt-3 rounded-md border border-dashed border-border p-4 text-sm">
+                <p>We couldn’t load your documents.</p>
+                <Button variant="outline" size="sm" className="mt-3" onClick={() => documents.refetch()}>
+                  Try again
+                </Button>
+              </div>
+            ) : documents.data.length === 0 ? (
+              <p className="mt-3 rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+                Nothing on file yet. Upload the resume you send most, then attach it to any job.
+              </p>
+            ) : (
+              <ul className="mt-3 grid grid-cols-1 gap-3 2xl:grid-cols-2">
+                {documents.data.map((document) => (
+                  <li
+                    key={document.id}
+                    className="flex flex-wrap items-start gap-3 rounded-lg bg-card p-4 ring-1 ring-foreground/10"
+                  >
+                    <FileText aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0 flex-1 basis-48">
+                      <p className="font-bold break-words">{document.fileName}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {DOCUMENT_KIND_LABEL[document.kind]} · {formatBytes(document.sizeBytes)} · Uploaded{" "}
+                        {formatShortDate(document.uploadedOn)}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {document.status === "pending"
+                          ? "This upload didn’t finish. Delete it and try again."
+                          : document.jobs.length === 0
+                            ? "Not attached to any job"
+                            : `On ${pluralize(document.jobs.length, "job")}`}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      {/* Explicit labels: an adjacent sr-only span loses its leading space in JSX
+                          and would be announced as "Deleteresume.pdf". */}
+                      {document.status === "ready" && (
+                        <Button
+                          variant="outline"
+                          className="h-9 px-3"
+                          aria-label={`Download ${document.fileName}`}
+                          onClick={() => download(document)}
+                        >
+                          <Download aria-hidden="true" />
+                          Download
+                        </Button>
+                      )}
                       <Button
-                        variant="outline"
-                        className="h-9 px-3"
-                        aria-label={`Download ${document.fileName}`}
-                        onClick={() => download(document)}
+                        variant="ghost"
+                        className="h-9 px-3 text-destructive"
+                        aria-label={`Delete ${document.fileName}`}
+                        onClick={() => setConfirming(document)}
                       >
-                        <Download aria-hidden="true" />
-                        Download
+                        <Trash2 aria-hidden="true" />
+                        Delete
                       </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      className="h-9 px-3 text-destructive"
-                      aria-label={`Delete ${document.fileName}`}
-                      onClick={() => setConfirming(document)}
-                    >
-                      <Trash2 aria-hidden="true" />
-                      Delete
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </main>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      </PageMain>
 
       <Dialog open={confirming !== null} onOpenChange={(next) => !next && setConfirming(null)}>
         <DialogContent className="gap-0 p-6 sm:max-w-md">

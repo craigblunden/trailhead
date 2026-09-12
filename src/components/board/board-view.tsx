@@ -9,6 +9,7 @@ import { AppHeader } from "@/components/app-header";
 import { useJobs } from "@/components/jobs-provider";
 import { BrandLogo } from "@/components/brand-logo";
 import { LoadingTrail } from "@/components/loading-trail";
+import { PageMain } from "@/components/page-main";
 import { Button } from "@/components/ui/button";
 import {
   ACTIVE_STAGES,
@@ -79,7 +80,7 @@ export function BoardView({ scene }: BoardViewProps = {}) {
         }
       />
 
-      <main className="mx-auto w-full max-w-[110rem] flex-1 px-4 py-8 sm:px-6">
+      <PageMain>
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <h1 className="text-3xl tracking-tight">Your trail</h1>
           <p className="text-sm text-muted-foreground">
@@ -143,7 +144,7 @@ export function BoardView({ scene }: BoardViewProps = {}) {
             </p>
           </>
         )}
-      </main>
+      </PageMain>
 
       {scene}
 

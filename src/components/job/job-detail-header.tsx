@@ -23,7 +23,8 @@ export function JobDetailHeader({ loading = false }: { loading?: boolean }) {
               Board
             </Link>
           </Button>
-          <span className="font-heading text-xl font-semibold tracking-tight">
+          {/* Off on a phone, where the way back and a loading page’s wait need the width. */}
+          <span className="hidden font-heading text-xl font-semibold tracking-tight sm:inline">
             {BRAND_NAME}
           </span>
         </>

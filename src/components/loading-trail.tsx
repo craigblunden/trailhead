@@ -33,28 +33,35 @@ export function LoadingTrail({ children, size = "sm", className }: LoadingTrailP
         className,
       )}
     >
-      <svg
-        viewBox="0 0 120 40"
-        aria-hidden="true"
-        focusable="false"
-        className={cn("shrink-0 overflow-visible", MARK[size])}
-      >
-        <path
-          d="M2 32 C 30 27 58 36 118 30"
-          fill="none"
-          stroke="var(--trail-path)"
-          strokeWidth={3.5}
-          strokeLinecap="round"
-          strokeDasharray="13 10"
-          className="loading-trail-path"
-        />
-        <g
-          transform={`translate(62 32) scale(0.6) translate(${-HIKER_FEET.x} ${-HIKER_FEET.y})`}
-        >
-          <HikerFigure />
-        </g>
-      </svg>
+      <TrailMark className={MARK[size]} />
       <span>{children}</span>
     </div>
+  );
+}
+
+/** The hiker and the moving path, without words: for a wait whose sentence is placed separately. */
+export function TrailMark({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 120 40"
+      aria-hidden="true"
+      focusable="false"
+      className={cn("shrink-0 overflow-visible", className)}
+    >
+      <path
+        d="M2 32 C 30 27 58 36 118 30"
+        fill="none"
+        stroke="var(--trail-path)"
+        strokeWidth={3.5}
+        strokeLinecap="round"
+        strokeDasharray="13 10"
+        className="loading-trail-path"
+      />
+      <g
+        transform={`translate(62 32) scale(0.6) translate(${-HIKER_FEET.x} ${-HIKER_FEET.y})`}
+      >
+        <HikerFigure />
+      </g>
+    </svg>
   );
 }

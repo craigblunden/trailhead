@@ -305,14 +305,13 @@ describe("the contacts list (ticket 14)", () => {
     expect(link).toHaveTextContent("On 2 roles");
   });
 
-  it("CON-L2: adding a contact asks for name and kind, then opens their page", async () => {
+  it("CON-L2: adding a contact asks for name and kind beside the list, then opens their page", async () => {
     const trail = createTrail({ jobs: SEED_JOBS });
     const { user } = renderWithJobs(<ContactsShell>detail</ContactsShell>, { trail });
 
-    await user.click(screen.getAllByRole("button", { name: "Add contact" })[0]);
-    const dialog = screen.getByRole("dialog", { name: "Add a contact" });
-    await user.type(within(dialog).getByLabelText("Name"), "Sam Ortiz");
-    await user.click(within(dialog).getByRole("button", { name: "Save contact" }));
+    const card = screen.getByRole("region", { name: "Add a contact" });
+    await user.type(within(card).getByLabelText("Name"), "Sam Ortiz");
+    await user.click(within(card).getByRole("button", { name: "Save contact" }));
 
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith("/contacts/contact-1"));
     expect(trail.contacts.create).toHaveBeenCalledWith({ name: "Sam Ortiz", kind: "recruiter" });

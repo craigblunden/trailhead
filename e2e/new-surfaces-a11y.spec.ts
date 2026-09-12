@@ -29,21 +29,6 @@ test.describe("signed out", () => {
 });
 
 test.describe("signed in", () => {
-  test("A11Y-2: the add-contact dialog takes focus and returns it to the button that opened it", async ({ page }) => {
-    await page.goto("/contacts");
-    const trigger = page.getByRole("main").getByRole("button", { name: "Add contact" }).or(
-      page.getByRole("banner").getByRole("button", { name: "Add contact" }),
-    );
-    await trigger.first().click();
-    const dialog = page.getByRole("dialog", { name: "Add a contact" });
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByLabel("Name")).toBeFocused();
-
-    await page.keyboard.press("Escape");
-    await expect(dialog).toBeHidden();
-    await expect(trigger.first()).toBeFocused();
-  });
-
   test("A11Y-2: the job page's link-contact dialog returns focus, and the page stays operable from the keyboard", async ({ page }) => {
     await createJob(page);
     const add = page.getByRole("region", { name: "Contacts" }).getByRole("button", { name: "Add contact" });
@@ -78,10 +63,7 @@ test.describe("keyboard only", () => {
     await page.goto("/contacts");
     await expect(page.getByRole("heading", { level: 1, name: "Contacts" })).toBeVisible();
 
-    await tabTo(page, page.getByRole("button", { name: "Add contact" }).first());
-    await page.keyboard.press("Enter");
-    const dialog = page.getByRole("dialog", { name: "Add a contact" });
-    await expect(dialog.getByLabel("Name")).toBeFocused();
+    await tabTo(page, page.getByRole("region", { name: "Add a contact" }).getByLabel("Name"));
     await page.keyboard.type(name);
     await page.keyboard.press("Enter");
 

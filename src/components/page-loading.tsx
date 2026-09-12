@@ -9,12 +9,15 @@ import { AppHeader } from "@/components/app-header";
 import { BrandLogo } from "@/components/brand-logo";
 import { CompanyAvatar } from "@/components/company-avatar";
 import { JobDetailHeader } from "@/components/job/job-detail-header";
-import { LoadingTrail } from "@/components/loading-trail";
+import { PageMain } from "@/components/page-main";
+import { PageWait } from "@/components/page-wait";
 import { Button } from "@/components/ui/button";
 import { kindLine, type ContactListItem } from "@/lib/contacts";
 import { contactsCache } from "@/lib/contacts-client";
-import { STAGES, STAGE_META, type Job, type Stage } from "@/lib/jobs";
+import { limitsCache } from "@/lib/documents-client";
+import { ACTIVE_STAGES, STAGES, STAGE_META, pluralize, type Job, type Stage } from "@/lib/jobs";
 import { jobsCache } from "@/lib/jobs-cache";
+import type { Limits } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 /**
@@ -22,10 +25,12 @@ import { cn } from "@/lib/utils";
  * session and reads the page's data (performance ticket 02).
  *
  * It is the destination page with its data not yet written: the same header, the same grid, the
- * same cards, in outline. So when the page arrives nothing moves; the outline fills in. Where the
+ * same cards, in outline. So when the page arrives nothing moves; the outline fills in. A section's
+ * own title and the line beneath it are fixed words, so they are written, not outlined. Where the
  * browser already holds the answer — a Job's name from the board it just left, a Contact's name
  * from the list beside it — it is shown at once rather than drawn as a bar. The one thing that
- * moves is the hiker on the trail, beside a sentence that says what is on its way.
+ * moves is the hiker on the trail, beside a sentence that says what is on its way, and it always
+ * stands in the header beside the account menu (see `PageWait`), never somewhere in the page.
  *
  * The route is read from the URL because a loading state is handed no params, and one file covers
  * every section (see `(app)/loading.tsx`). Nothing here is interactive except the way back: a live
@@ -51,9 +56,8 @@ function SectionLoading() {
   return (
     <div className="flex flex-1 flex-col bg-background">
       <AppHeader leading={<BrandLogo href="/board" />} loading />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
-        <LoadingTrail>Loading…</LoadingTrail>
-      </main>
+      <PageWait>Loading…</PageWait>
+      <PageMain />
     </div>
   );
 }
@@ -68,9 +72,25 @@ function Bar({ className }: { className?: string }) {
   return <span className={cn("block rounded-sm bg-foreground/8", className)} />;
 }
 
-/** The header's action, the size of the button that will stand there, so the account menu does not shift. */
-function HeaderAction({ className }: { className?: string }) {
-  return <span aria-hidden="true" className={cn("block h-9 rounded-lg bg-muted", className)} />;
+/**
+ * A section's title and the line beneath it, in the page's own classes so they land exactly where
+ * the page will draw them. For the eye only, like the Stage names: the page's heading announces
+ * itself when it arrives.
+ */
+function SectionTitle({ children }: { children: string }) {
+  return (
+    <p aria-hidden="true" className="font-heading text-3xl tracking-tight">
+      {children}
+    </p>
+  );
+}
+
+function SectionLede({ children }: { children: React.ReactNode }) {
+  return (
+    <p aria-hidden="true" className="mt-1 text-sm text-muted-foreground">
+      {children}
+    </p>
+  );
 }
 
 /**
@@ -127,13 +147,20 @@ function BoardLoading() {
 
   return (
     <div className="scene-wash flex flex-1 flex-col">
-      <AppHeader leading={<BrandLogo href="/board" />} actions={<HeaderAction className="w-24" />} loading />
+      <AppHeader leading={<BrandLogo href="/board" />} loading />
+      <PageWait>Loading your trail…</PageWait>
 
-      <main className="mx-auto w-full max-w-[110rem] flex-1 px-4 py-8 sm:px-6">
-        {/* The title row: the heading's bar, and the wait where the count of active jobs will be. */}
-        <div className="flex min-h-9 flex-wrap items-center gap-x-4 gap-y-1">
-          <Bar className="h-7 w-36" />
-          <LoadingTrail>Loading your trail…</LoadingTrail>
+      <PageMain>
+        {/* The title row: the heading, and the count of active jobs when the browser last saw them. */}
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <SectionTitle>Your trail</SectionTitle>
+          {seen ? (
+            <p aria-hidden="true" className="text-sm text-muted-foreground">
+              {pluralize(seen.filter((job) => ACTIVE_STAGES.includes(job.stage)).length, "active application")}
+            </p>
+          ) : (
+            <Bar className="h-3.5 w-32 self-center" />
+          )}
         </div>
 
         <div className="mt-6 grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -169,7 +196,7 @@ function BoardLoading() {
             </div>
           ))}
         </div>
-      </main>
+      </PageMain>
     </div>
   );
 }
@@ -207,6 +234,7 @@ export function JobLoading({ id }: { id: string }) {
   return (
     <div className="flex flex-1 flex-col bg-background">
       <JobDetailHeader loading />
+      <PageWait>Loading this job…</PageWait>
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
@@ -241,9 +269,7 @@ export function JobLoading({ id }: { id: string }) {
             <GhostCard>
               <Bar className="h-5 w-36" />
               <Bar className="mt-2.5 h-3.5 w-72 max-w-full" />
-              <div className="mt-3 flex min-h-56 items-center justify-center rounded-md border border-dashed border-input">
-                <LoadingTrail size="lg">Loading this job…</LoadingTrail>
-              </div>
+              <div className="mt-3 min-h-56 rounded-md border border-dashed border-input" />
               <div className="mt-3 flex justify-end">
                 <Bar className="h-9 w-36 rounded-lg" />
               </div>
@@ -271,48 +297,73 @@ export function JobLoading({ id }: { id: string }) {
 }
 
 /* ------------------------------------------------------------------------------------------------
- * Contacts: the list beside the detail, as the page lays them out; below `lg` only the half the
- * URL is about, the same way the page decides. Seen only when the contacts layout was not
+ * Contacts: the add card, the list, and the detail, as the page lays them out; below `lg` only the
+ * half the URL is about, the same way the page decides. Seen only when the contacts layout was not
  * prefetched; otherwise the layout is already there and `ContactLoading` below is what waits.
  * ---------------------------------------------------------------------------------------------- */
 
 function ContactsLoading({ selectedId }: { selectedId: string | null }) {
   return (
     <div className="flex flex-1 flex-col bg-background">
-      <AppHeader leading={<BrandLogo href="/board" />} actions={<HeaderAction className="w-32" />} loading />
+      <AppHeader leading={<BrandLogo href="/board" />} loading />
+      {/* One wait is said, not two: the list's here when the list is the point of the URL, and the
+          Contact's otherwise, from the detail side. */}
+      {!selectedId && <PageWait>Loading your contacts…</PageWait>}
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[19rem_minmax(0,1fr)]">
-          <div className={cn(selectedId && "hidden lg:block")}>
-            <div className="flex min-h-9 items-center">
-              <Bar className="h-7 w-32" />
-            </div>
-            <Bar className="mt-2 h-3.5 w-full max-w-64" />
-            {/* One wait is said, not two: the list's when the list is the point of the URL, and
-                the Contact's otherwise, on the detail side. */}
-            {!selectedId && <LoadingTrail className="mt-6">Loading your contacts…</LoadingTrail>}
-            <div className="mt-6 space-y-2">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="rounded-md bg-card px-3 py-2.5 ring-1 ring-foreground/10">
-                  <Bar className="h-4 w-2/3" />
-                  <Bar className="mt-2 h-3 w-1/2" />
-                  <Bar className="mt-2 h-3 w-1/3" />
+      <PageMain>
+        <div className={cn("mb-6", selectedId && "hidden lg:block")}>
+          <SectionTitle>Contacts</SectionTitle>
+          <SectionLede>The people in your search, each linked to every role they’re part of.</SectionLede>
+        </div>
+
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[19rem_minmax(0,1fr)] xl:grid-cols-[19rem_minmax(0,1fr)_21rem]">
+          <div className={cn("space-y-6 xl:contents xl:space-y-0", selectedId && "hidden lg:block")}>
+            <GhostCard className="xl:col-start-3 xl:row-start-1">
+              <p aria-hidden="true" className="font-heading text-lg">
+                Add a contact
+              </p>
+              <p aria-hidden="true" className="mt-1 text-sm text-muted-foreground">
+                Just a name and what they are to you. Add the rest on their page.
+              </p>
+              <div aria-hidden="true" className="mt-4 space-y-4 text-sm leading-none font-medium">
+                <div className="space-y-1.5">
+                  <p>Name</p>
+                  <Bar className="h-10 w-full rounded-lg" />
                 </div>
-              ))}
+                <div className="space-y-1.5">
+                  <p>Kind</p>
+                  <Bar className="h-10 w-full rounded-lg" />
+                </div>
+                <Bar className="h-10 w-full rounded-lg" />
+              </div>
+            </GhostCard>
+
+            <div className="xl:col-start-1 xl:row-start-1">
+              <div className="space-y-2">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="rounded-md bg-card px-3 py-2.5 ring-1 ring-foreground/10">
+                    <Bar className="h-4 w-2/3" />
+                    <Bar className="mt-2 h-3 w-1/2" />
+                    <Bar className="mt-2 h-3 w-1/3" />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div className={cn("min-w-0", !selectedId && "hidden lg:block")}>
+          <div className={cn("min-w-0 xl:col-start-2 xl:row-start-1", !selectedId && "hidden lg:block")}>
             {selectedId ? (
               <ContactLoading />
             ) : (
-              <div className="rounded-lg border border-dashed border-border px-6 py-16">
-                <Bar className="mx-auto h-3.5 w-72 max-w-full" />
+              <div className="rounded-lg border border-dashed border-border px-6 py-16 text-center">
+                <p aria-hidden="true" className="text-sm text-muted-foreground">
+                  Choose a contact to see their details and every role they’re part of.
+                </p>
               </div>
             )}
           </div>
         </div>
-      </main>
+      </PageMain>
     </div>
   );
 }
@@ -335,14 +386,19 @@ export function ContactLoading() {
 
   if (!id) {
     return (
-      <div className="flex justify-center rounded-lg border border-dashed border-border px-6 py-16">
-        <LoadingTrail>Loading your contacts…</LoadingTrail>
+      <div className="rounded-lg border border-dashed border-border px-6 py-16 text-center">
+        <PageWait>Loading your contacts…</PageWait>
+        <p aria-hidden="true" className="text-sm text-muted-foreground">
+          Choose a contact to see their details and every role they’re part of.
+        </p>
       </div>
     );
   }
 
   return (
     <div className="min-w-0 space-y-6">
+      {/* In the header even here, where the header belongs to the list's layout and stays mounted. */}
+      <PageWait>Loading this contact…</PageWait>
       <div>
         {/* The way back, live, as on the page itself: below `lg` the list is hidden behind this side. */}
         <Button asChild variant="ghost" size="sm" className="-ml-2 mb-3 lg:hidden">
@@ -365,9 +421,7 @@ export function ContactLoading() {
 
       <GhostCard>
         <Bar className="h-5 w-24" />
-        <div className="mt-4 flex min-h-40 items-center justify-center rounded-md border border-dashed border-input">
-          <LoadingTrail size="lg">Loading this contact…</LoadingTrail>
-        </div>
+        <div className="mt-4 min-h-40 rounded-md border border-dashed border-input" />
       </GhostCard>
       <GhostCardBody lines={2} />
     </div>
@@ -375,43 +429,56 @@ export function ContactLoading() {
 }
 
 /* ------------------------------------------------------------------------------------------------
- * Documents: the upload card, then what is on file.
+ * Documents: what is on file, with the upload card beside it on wide screens and above it on
+ * narrow ones.
  * ---------------------------------------------------------------------------------------------- */
 
 function DocumentsLoading() {
+  // The Limit is part of the sentence under the title; written when the browser already holds it.
+  const limit = useQueryClient().getQueryData<Limits>(limitsCache.key)?.documents;
+
   return (
     <div className="flex flex-1 flex-col bg-background">
       <AppHeader leading={<BrandLogo href="/board" />} loading />
+      <PageWait>Loading your documents…</PageWait>
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
-        <div className="flex min-h-9 items-center">
-          <Bar className="h-7 w-40" />
-        </div>
-        <Bar className="mt-2 h-3.5 w-full max-w-md" />
+      <PageMain>
+        <SectionTitle>Documents</SectionTitle>
+        <SectionLede>
+          Your resumes and cover letters{typeof limit === "number" && ` — up to ${limit} at a time`}. Attach
+          them to jobs from each job’s page.
+        </SectionLede>
 
-        <GhostCard className="mt-6">
-          <Bar className="h-5 w-20" />
-          <div className="mt-3 flex min-h-28 items-center justify-center rounded-md border border-dashed border-input">
-            <LoadingTrail size="lg">Loading your documents…</LoadingTrail>
-          </div>
-        </GhostCard>
+        <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
+          <GhostCard className="lg:col-start-2 lg:row-start-1">
+            <p aria-hidden="true" className="font-heading text-lg">
+              Upload
+            </p>
+            <Bar className="mt-3 h-28 w-full rounded-md" />
+          </GhostCard>
 
-        <div className="mt-8">
-          <Bar className="h-5 w-28" />
-          <div className="mt-3 space-y-3">
-            {[0, 1].map((i) => (
-              <div key={i} className="flex items-start gap-3 rounded-lg bg-card p-4 ring-1 ring-foreground/10">
-                <Bar className="mt-0.5 size-5 shrink-0" />
-                <div className="min-w-0 flex-1 space-y-2">
-                  <Bar className="h-4 w-1/2" />
-                  <Bar className="h-3.5 w-3/4" />
-                  <Bar className="h-3.5 w-1/3" />
+          <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <p aria-hidden="true" className="font-heading text-lg">
+                On file
+              </p>
+              <Bar className="h-3.5 w-12" />
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-3 2xl:grid-cols-2">
+              {[0, 1].map((i) => (
+                <div key={i} className="flex items-start gap-3 rounded-lg bg-card p-4 ring-1 ring-foreground/10">
+                  <Bar className="mt-0.5 size-5 shrink-0" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Bar className="h-4 w-1/2" />
+                    <Bar className="h-3.5 w-3/4" />
+                    <Bar className="h-3.5 w-1/3" />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
-      </main>
+      </PageMain>
     </div>
   );
 }

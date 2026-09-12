@@ -61,9 +61,9 @@ test.describe("performance ticket 02: loading states", () => {
   test("between Contacts: the list stays, and only the detail side waits", async ({ page }) => {
     const name = `Loading Lee ${Math.random().toString(36).slice(2, 6)}`;
     await page.goto("/contacts");
-    await page.getByRole("button", { name: "Add contact" }).first().click();
-    await page.getByRole("dialog", { name: "Add a contact" }).getByLabel("Name").fill(name);
-    await page.getByRole("dialog", { name: "Add a contact" }).getByRole("button", { name: "Save contact" }).click();
+    const add = page.getByRole("region", { name: "Add a contact" });
+    await add.getByLabel("Name").fill(name);
+    await add.getByRole("button", { name: "Save contact" }).click();
     await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
 
     await page.goto("/contacts");

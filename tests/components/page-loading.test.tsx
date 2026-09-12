@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
 
@@ -42,6 +42,23 @@ describe("the wait itself", () => {
     const region = screen.getByRole("status");
     expect(region).toHaveTextContent("Loading your trail…");
     expect(region.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+});
+
+describe("where the wait stands", () => {
+  it.each([
+    ["/board", "Loading your trail…"],
+    [`/board/${SEED_JOBS[0].id}`, "Loading this job…"],
+    ["/contacts", "Loading your contacts…"],
+    ["/contacts/c1", "Loading this contact…"],
+    ["/documents", "Loading your documents…"],
+  ])("on %s it is in the header, beside the account menu, and nowhere in the page", (path, message) => {
+    pathname = path;
+    renderLoading(<PageLoading />);
+
+    const status = within(screen.getByRole("banner")).getByRole("status");
+    expect(status).toHaveTextContent(message);
+    expect(screen.getAllByRole("status")).toHaveLength(1);
   });
 });
 

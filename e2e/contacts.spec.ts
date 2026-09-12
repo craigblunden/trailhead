@@ -122,14 +122,7 @@ test.describe("ticket 14: contacts", () => {
       await expectAccessible(page);
     }
 
-    // The contacts page's own add dialog, and a contact's delete confirmation.
-    await page.goto("/contacts");
-    await page.getByRole("button", { name: "Add contact" }).first().click();
-    await expect(page.getByRole("dialog", { name: "Add a contact" })).toBeVisible();
-    await expectAccessible(page);
-    await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog")).toBeHidden();
-
+    // A contact's delete confirmation.
     await page.goto(contactHref);
     await page.getByRole("button", { name: "Delete contact" }).click();
     const confirm = page.getByRole("dialog", { name: /^Delete .+\?$/ });

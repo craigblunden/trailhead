@@ -248,6 +248,18 @@
   animation: none;
 }
 
+/* A navigation’s wait sits in the pinned header, above it, and fades out with the outline. */
+::view-transition-group(page-wait) {
+  animation: none;
+  z-index: 101;
+}
+::view-transition-old(page-wait) {
+  animation: 160ms ease-in both page-fade reverse;
+}
+::view-transition-new(page-wait) {
+  animation: none;
+}
+
 ::view-transition-old(.page-outline) {
   animation: 160ms ease-in both page-fade reverse;
 }
