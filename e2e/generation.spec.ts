@@ -21,9 +21,9 @@ const POSTING =
 async function saveDescription(page: Page, text: string) {
   const field = page.getByRole("textbox", { name: "Job description" });
   await field.fill(text);
-  await field.blur();
-  // The draft saves on blur; confirm the server holds it before generating from it. The server
-  // trims free text, so that is what it holds.
+  await page.getByRole("button", { name: "Save description" }).click();
+  // Confirm the server holds it before generating from it. The server trims free text, so that is
+  // what it holds.
   await expect
     .poll(async () => {
       await page.reload();
@@ -87,7 +87,7 @@ test.describe("ticket 18: generate a cover letter", () => {
     // arrive while the letter is still being written.
     const samePageSave = waitForActionAnswer(page, "Prep the growth case study.");
     await page.getByRole("textbox", { name: "Notes" }).fill("Prep the growth case study.");
-    await page.getByRole("textbox", { name: "Notes" }).blur();
+    await page.getByRole("button", { name: "Save notes" }).click();
     await samePageSave;
     await expect(writing).toBeVisible();
 
@@ -99,7 +99,7 @@ test.describe("ticket 18: generate a cover letter", () => {
     const notes = other.getByRole("textbox", { name: "Notes" });
     const notesSaved = answered("Asked about the size of the growth team.");
     await notes.fill("Asked about the size of the growth team.");
-    await notes.blur();
+    await other.getByRole("button", { name: "Save notes" }).click();
     await notesSaved;
     const stageSaved = answered('"applied"');
     await other.getByRole("combobox", { name: "Application stage" }).click();

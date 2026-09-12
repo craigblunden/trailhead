@@ -26,7 +26,8 @@ type JobsContextValue = {
   status: JobsStatus;
   getJob: (id: string) => Job | undefined;
   addJob: (input: NewJobInput) => void;
-  updateJob: (id: string, patch: JobPatch) => void;
+  /** Resolves true once the server holds the patch, false once a refusal has been rolled back. */
+  updateJob: (id: string, patch: JobPatch) => Promise<boolean>;
   /** Moves a Job to a Stage. False when there was nothing to do: no such Job, or already there. */
   setStage: (id: string, stage: Stage) => boolean;
   /** The most recent write failure, already rolled back. Null when there is none. */
@@ -100,15 +101,17 @@ export function JobsProvider({
           )
           .then(report);
       },
-      updateJob: (id, patch) => {
-        void cache
+      updateJob: (id, patch) =>
+        cache
           .update(id, {
             apply: (job) => ({ ...job, ...patch }),
             send: () => client.update(id, patch),
             fallback: "That edit wasn't saved. Check your connection and try again.",
           })
-          .then(report);
-      },
+          .then((result) => {
+            report(result);
+            return result.ok;
+          }),
       setStage: (id, stage) => {
         // Re-selecting the current stage is a no-op all the way down: no request, no entry.
         const current = jobs.find((job) => job.id === id);

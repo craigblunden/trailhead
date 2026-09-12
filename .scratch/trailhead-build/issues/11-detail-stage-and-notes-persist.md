@@ -81,3 +81,16 @@ same-day tiebreak; description and notes persist and the allowlist rejects `stag
 **user B cannot read, edit, or restage user A's job through any action**, and A's job is untouched.
 
 **Status:** ready-for-review
+
+### 2026-09-12 — agent
+
+**Description and notes now save by a button, not on a pause or blur.** The job page's two free-text
+fields each get a "Save description" / "Save notes" button, live only while the text differs from
+what the server holds. A pasted posting is long and edited in one sitting, so an explicit save reads
+better than a timer firing mid-edit, and the page no longer needs `useDraft()`'s timer and unmount
+flush for them. What stays: the optimistic update shows at once, and a refusal rolls back visibly
+with the server's message. What changes: a refused save now keeps the typed text in the field with
+the button live again, so there is something to fix; and text left unsaved when leaving the page is
+dropped rather than flushed. The salary fields in the details card still use `useDraft()`.
+`updateJob` resolves to whether the write was accepted so the field knows when to let go of its
+draft. Tests: `tests/components/job-detail.test.tsx` (DET-6).

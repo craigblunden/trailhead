@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
 
 import { AppHeader } from "@/components/app-header";
@@ -11,7 +12,6 @@ import { ApplicationKitCard } from "@/components/job/application-kit";
 import { ContactsCard } from "@/components/job/job-contacts";
 import { CoverLetterCard } from "@/components/job/cover-letter";
 import { DetailsCard } from "@/components/job/details-card";
-import { useDraft } from "@/components/job/use-draft";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -95,16 +95,56 @@ type JobDetailViewProps = {
   job: Job;
   error: string | null;
   dismissError: () => void;
-  onPatch: (patch: JobPatch) => void;
+  onPatch: (patch: JobPatch) => Promise<boolean>;
   onStage: (stage: Stage) => void;
 };
 
-/** Free text is typed into a local draft and saved after a pause or on blur, not per keystroke. */
-function JobDetailView({ job, error, dismissError, onPatch, onStage }: JobDetailViewProps) {
-  const [description, setDescription, flushDescription] = useDraft(job.description, (value) =>
-    onPatch({ description: value }),
+/**
+ * Text the user edits in one sitting and saves with a button. The draft is `null` while untouched,
+ * so the field follows what the server holds until the user types, and again once a save is
+ * accepted. A refused save leaves the text in the field, with the button live again, so there is
+ * something to fix rather than retype.
+ */
+function useSavedText(saved: string, save: (value: string) => Promise<boolean>) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const value = draft ?? saved;
+  return {
+    value,
+    // False while a save is in flight too: the optimistic value already matches the draft.
+    changed: value !== saved,
+    set: setDraft,
+    save: async () => {
+      const sent = value;
+      if (await save(sent)) setDraft((current) => (current === sent ? null : current));
+    },
+  };
+}
+
+function SaveRow({
+  changed,
+  onSave,
+  children,
+}: {
+  changed: boolean;
+  onSave: () => Promise<void>;
+  children: string;
+}) {
+  return (
+    <div className="mt-3 flex items-center justify-end gap-3">
+      <span aria-live="polite" className="text-sm text-muted-foreground">
+        {changed ? "Unsaved changes" : null}
+      </span>
+      <Button type="button" className="h-9 px-3.5" disabled={!changed} onClick={() => void onSave()}>
+        {children}
+      </Button>
+    </div>
   );
-  const [notes, setNotes, flushNotes] = useDraft(job.notes, (value) => onPatch({ notes: value }));
+}
+
+/** Each free-text field is saved by its own button, so a long paste is never saved mid-edit. */
+function JobDetailView({ job, error, dismissError, onPatch, onStage }: JobDetailViewProps) {
+  const description = useSavedText(job.description, (value) => onPatch({ description: value }));
+  const notes = useSavedText(job.notes, (value) => onPatch({ notes: value }));
   const posting = webLink(job.postingUrl);
 
   return (
@@ -188,11 +228,13 @@ function JobDetailView({ job, error, dismissError, onPatch, onStage }: JobDetail
               <Textarea
                 aria-labelledby="description-heading"
                 aria-describedby="description-hint"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                onBlur={flushDescription}
+                value={description.value}
+                onChange={(event) => description.set(event.target.value)}
                 className="mt-3 min-h-56 resize-y"
               />
+              <SaveRow changed={description.changed} onSave={description.save}>
+                Save description
+              </SaveRow>
             </section>
 
             <section
@@ -205,11 +247,13 @@ function JobDetailView({ job, error, dismissError, onPatch, onStage }: JobDetail
               <Textarea
                 aria-labelledby="notes-heading"
                 placeholder="Interview prep, follow-ups, anything worth remembering."
-                value={notes}
-                onChange={(event) => setNotes(event.target.value)}
-                onBlur={flushNotes}
+                value={notes.value}
+                onChange={(event) => notes.set(event.target.value)}
                 className="mt-3 min-h-32 resize-y"
               />
+              <SaveRow changed={notes.changed} onSave={notes.save}>
+                Save notes
+              </SaveRow>
             </section>
 
             <CoverLetterCard job={job} />

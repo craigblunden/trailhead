@@ -142,24 +142,106 @@ describe("changing the stage", () => {
 });
 
 describe("editing free text", () => {
-  it("DET-6: keeps description edits in the shared store", async () => {
-    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />);
+  const saveButton = () => screen.getByRole("button", { name: "Save description" });
+
+  it("DET-6: saves the description when asked, not while typing", async () => {
+    const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
     const field = screen.getByRole("textbox", { name: "Job description" });
+    expect(saveButton()).toBeDisabled();
 
     await user.clear(field);
     await user.type(field, "Rewritten description.");
+    await user.tab();
 
     expect(field).toHaveValue("Rewritten description.");
+    expect(trail.jobs.update).not.toHaveBeenCalled();
+    expect(saveButton()).toBeEnabled();
+
+    await user.click(saveButton());
+
+    expect(trail.jobs.update).toHaveBeenCalledTimes(1);
+    expect(trail.jobs.update).toHaveBeenCalledWith(HARVEST, {
+      description: "Rewritten description.",
+    });
+    expect(field).toHaveValue("Rewritten description.");
+    expect(saveButton()).toBeDisabled();
   });
 
-  it("DET-6: keeps notes edits in the shared store", async () => {
-    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />);
+  it("DET-6: typing the description back to what is saved leaves nothing to save", async () => {
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, {
+      initialJobs: [{ ...harvest, description: "Short" }],
+    });
+    const field = screen.getByRole("textbox", { name: "Job description" });
+
+    await user.type(field, "!");
+    expect(saveButton()).toBeEnabled();
+    await user.keyboard("{Backspace}");
+
+    expect(field).toHaveValue("Short");
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it("DET-6: a refused description save says why and keeps the text to fix", async () => {
+    const trail = createTrail({ jobs: SEED_JOBS });
+    const update = vi.fn<(id: string, patch: JobPatch) => Promise<Job>>().mockRejectedValue(
+      new ActionError("invalid", "Check the highlighted fields.", {
+        description: "Keep the description under 20,000 characters",
+      }),
+    );
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, {
+      trail,
+      client: { ...trail.jobs, update },
+    });
+    const field = screen.getByRole("textbox", { name: "Job description" });
+
+    await user.clear(field);
+    await user.type(field, "Too long, apparently.");
+    await user.click(saveButton());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Keep the description under 20,000 characters",
+    );
+    expect(field).toHaveValue("Too long, apparently.");
+    expect(saveButton()).toBeEnabled();
+    expect(trail.jobsNow().find((job) => job.id === HARVEST)?.description).toBe(
+      harvest.description,
+    );
+  });
+
+  it("DET-6: saves notes when asked, not while typing", async () => {
+    const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
     const field = screen.getByRole("textbox", { name: "Notes" });
+    const save = screen.getByRole("button", { name: "Save notes" });
+    expect(save).toBeDisabled();
 
     await user.clear(field);
     await user.type(field, "Ask about the design team's size.");
+    await user.tab();
 
     expect(field).toHaveValue("Ask about the design team's size.");
+    expect(trail.jobs.update).not.toHaveBeenCalled();
+    expect(save).toBeEnabled();
+
+    await user.click(save);
+
+    expect(trail.jobs.update).toHaveBeenCalledTimes(1);
+    expect(trail.jobs.update).toHaveBeenCalledWith(HARVEST, {
+      notes: "Ask about the design team's size.",
+    });
+    expect(field).toHaveValue("Ask about the design team's size.");
+    expect(save).toBeDisabled();
+  });
+
+  it("DET-6: each field saves on its own, without touching the other", async () => {
+    const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
+
+    await user.type(screen.getByRole("textbox", { name: "Job description" }), " More.");
+    await user.type(screen.getByRole("textbox", { name: "Notes" }), " Later.");
+    await user.click(screen.getByRole("button", { name: "Save notes" }));
+
+    expect(trail.jobs.update).toHaveBeenCalledTimes(1);
+    expect(trail.jobs.update).toHaveBeenCalledWith(HARVEST, { notes: `${harvest.notes} Later.` });
+    expect(saveButton()).toBeEnabled();
   });
 });
 
