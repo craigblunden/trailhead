@@ -6,6 +6,7 @@ import { useActionState, useId } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BRAND_NAME } from "@/lib/brand";
 import type { AuthState } from "@/server/auth/actions";
 
 type Props = {
@@ -28,7 +29,7 @@ export function ForgotPasswordForm({ action, notice }: Props) {
       <div className="rounded-lg bg-card p-7 ring-1 ring-foreground/10">
         <h1 className="text-2xl tracking-tight">Check your email</h1>
         <p className="mt-2 text-sm text-muted-foreground" role="status">
-          If <strong className="text-foreground">{state.email}</strong> has a Trailhead account, a
+          If <strong className="text-foreground">{state.email}</strong> has a {BRAND_NAME} account, a
           link to choose a new password is on its way. It expires in an hour.
         </p>
         <p className="mt-6 text-sm text-muted-foreground">

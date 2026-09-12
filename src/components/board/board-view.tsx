@@ -7,7 +7,7 @@ import { AddJobDialog } from "@/components/board/add-job-dialog";
 import { BoardColumn } from "@/components/board/board-column";
 import { AppHeader } from "@/components/app-header";
 import { useJobs } from "@/components/jobs-provider";
-import { TrailheadLogo } from "@/components/trailhead-logo";
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import {
   ACTIVE_STAGES,
@@ -69,7 +69,7 @@ export function BoardView({ scene }: BoardViewProps = {}) {
   return (
     <div className="scene-wash flex flex-1 flex-col">
       <AppHeader
-        leading={<TrailheadLogo href="/board" />}
+        leading={<BrandLogo href="/board" />}
         actions={
           <Button className="h-9 px-3.5" onClick={openAddJob}>
             <Plus aria-hidden="true" />

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PASSWORD_MIN_LENGTH } from "@/lib/auth-rules";
+import { BRAND_NAME } from "@/lib/brand";
 import type { AuthState } from "@/server/auth/actions";
 
 type AuthAction = (state: AuthState, formData: FormData) => Promise<AuthState>;
@@ -38,7 +39,7 @@ const COPY = {
     subtitle: "Pick up your trail where you left off.",
     submit: "Sign in",
     pending: "Signing you in…",
-    switchPrompt: "New to Trailhead?",
+    switchPrompt: `New to ${BRAND_NAME}?`,
     switchLabel: "Create an account",
     switchHref: "/signup",
   },

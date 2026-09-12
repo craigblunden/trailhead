@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const ReadyToHitTheTrail = () => {
   return (
@@ -15,7 +16,7 @@ export const ReadyToHitTheTrail = () => {
         <Link href="/signup">Create your account</Link>
       </Button>
       <p className="mt-6 text-sm text-muted-foreground">
-        Trailhead — keep every application on the trail.
+        {BRAND_NAME} — keep every application on the trail.
       </p>
     </section>
   );

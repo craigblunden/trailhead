@@ -5,7 +5,7 @@ type HikerMarkProps = {
 };
 
 /**
- * The Trailhead mark: a hiker mid-stride on a meadow, in a round badge. It is
+ * The Trail to Offer mark: a hiker mid-stride on a meadow, in a round badge. It is
  * the same figure that walks the board's trail, tidied to read at favicon size.
  *
  * Colours are literal rather than theme tokens so the inline mark and the

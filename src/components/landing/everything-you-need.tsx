@@ -17,6 +17,7 @@ import {
   type Stage,
 } from "@/lib/jobs";
 import { SAMPLE_JOBS } from "@/components/landing/sample-jobs";
+import { BRAND_NAME } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
 /*
@@ -372,7 +373,7 @@ export const EveryThingYouNeed = () => {
             heading="Cover letters, on the way"
             preview={<MiniCoverLetter />}
           >
-            Keep each job description current. Soon Trailhead will draft a
+            Keep each job description current. Soon {BRAND_NAME} will draft a
             tailored cover letter from it and the resume you attached.
           </Feature>
         </div>

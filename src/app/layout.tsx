@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Karla, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 
+import { BRAND_NAME } from "@/lib/brand";
+
 const karla = Karla({
   variable: "--font-karla",
   subsets: ["latin"],
@@ -16,8 +18,8 @@ const sourceSerif = Source_Serif_4({
 
 export const metadata: Metadata = {
   title: {
-    default: "Trailhead — every application, one trail",
-    template: "%s · Trailhead",
+    default: `${BRAND_NAME} — every application, one trail`,
+    template: `%s · ${BRAND_NAME}`,
   },
   description:
     "Track every role from first spark to signed offer — with the resume you used, the posting link, and the details that matter, all in one basecamp.",

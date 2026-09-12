@@ -1,9 +1,10 @@
 import Link from "next/link";
 
 import { HikerMark } from "@/components/hiker-mark";
+import { BRAND_NAME } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
-type TrailheadLogoProps = {
+type BrandLogoProps = {
   size?: "sm" | "lg";
   /** Renders as a link to `href`; omit for a plain, non-interactive mark. */
   href?: string;
@@ -20,16 +21,16 @@ const WORD = {
   lg: "text-2xl",
 } as const;
 
-export function TrailheadLogo({
+export function BrandLogo({
   size = "sm",
   href,
   className,
-}: TrailheadLogoProps) {
+}: BrandLogoProps) {
   const content = (
     <>
       <HikerMark className={cn("shrink-0", MARK[size])} />
       <span className={cn("font-heading font-semibold tracking-tight", WORD[size])}>
-        Trailhead
+        {BRAND_NAME}
       </span>
     </>
   );

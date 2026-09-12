@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { BRAND_NAME } from "@/lib/brand";
 import { STAGES, STAGE_META, webLink, type Job, type Stage } from "@/lib/jobs";
 
 function DetailHeader() {
@@ -35,7 +36,7 @@ function DetailHeader() {
             </Link>
           </Button>
           <span className="font-heading text-xl font-semibold tracking-tight">
-            Trailhead
+            {BRAND_NAME}
           </span>
         </>
       }

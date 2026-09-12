@@ -1,13 +1,13 @@
 import Link from "next/link";
 
-import { TrailheadLogo } from "@/components/trailhead-logo";
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 
 export function SiteHeader() {
   return (
     <header className="w-full">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-        <TrailheadLogo href="/" />
+        <BrandLogo href="/" />
         <nav aria-label="Account" className="flex items-center gap-2">
           {/* The hero repeats this link, so it can drop away on tiny screens
               rather than crowding the wordmark. */}

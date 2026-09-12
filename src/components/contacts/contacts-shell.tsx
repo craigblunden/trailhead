@@ -8,7 +8,7 @@ import { Plus } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
 import { useContactList } from "@/components/contacts/contacts-provider";
-import { TrailheadLogo } from "@/components/trailhead-logo";
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { kindLine } from "@/lib/contacts";
 import { pluralize } from "@/lib/jobs";
@@ -33,7 +33,7 @@ export function ContactsShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-1 flex-col bg-background">
       <AppHeader
-        leading={<TrailheadLogo href="/board" />}
+        leading={<BrandLogo href="/board" />}
         actions={
           <Button className="h-9 px-3.5" onClick={openAdd}>
             <Plus aria-hidden="true" />

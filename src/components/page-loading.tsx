@@ -1,5 +1,5 @@
 import { AppHeader } from "@/components/app-header";
-import { TrailheadLogo } from "@/components/trailhead-logo";
+import { BrandLogo } from "@/components/brand-logo";
 
 /**
  * What a signed-in page shows the moment someone navigates to it, while the server checks the
@@ -9,7 +9,7 @@ import { TrailheadLogo } from "@/components/trailhead-logo";
 export function PageLoading() {
   return (
     <div className="flex flex-1 flex-col bg-background">
-      <AppHeader leading={<TrailheadLogo href="/board" />} loading />
+      <AppHeader leading={<BrandLogo href="/board" />} loading />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
         <LoadingStatus />
       </main>

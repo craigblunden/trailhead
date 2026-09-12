@@ -7,7 +7,7 @@ import { describeFailure } from "@/components/action-client";
 import { AppHeader } from "@/components/app-header";
 import { useDocumentActions, useDocumentList } from "@/components/documents/documents-provider";
 import { UploadDocument } from "@/components/documents/upload-document";
-import { TrailheadLogo } from "@/components/trailhead-logo";
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -61,7 +61,7 @@ export function DocumentsView() {
 
   return (
     <div className="flex flex-1 flex-col bg-background">
-      <AppHeader leading={<TrailheadLogo href="/board" />} />
+      <AppHeader leading={<BrandLogo href="/board" />} />
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
         <h1 className="text-3xl tracking-tight">Documents</h1>
