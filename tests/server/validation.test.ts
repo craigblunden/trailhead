@@ -126,10 +126,39 @@ describe("jobPatchSchema", () => {
     expect(tooLong.ok).toBe(false);
   });
 
+  it("VAL-8: allows the details typed when adding, read by the same rules as adding", () => {
+    const result = parseInput(jobPatchSchema, {
+      company: "  Renamed Co ",
+      role: "Staff Designer",
+      location: "   ",
+      postingUrl: " https://renamed.example.com/jobs/2 ",
+    });
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        company: "Renamed Co",
+        role: "Staff Designer",
+        location: LOCATION_FALLBACK,
+        postingUrl: "https://renamed.example.com/jobs/2",
+      },
+    });
+
+    expect(parseInput(jobPatchSchema, { postingUrl: "" })).toEqual({ ok: true, data: { postingUrl: "" } });
+
+    for (const patch of [
+      { company: "  " },
+      { role: "" },
+      { postingUrl: "javascript:alert(1)" },
+      { location: "l".repeat(JOB_LIMITS.location + 1) },
+    ]) {
+      expect(parseInput(jobPatchSchema, patch).ok, JSON.stringify(patch)).toBe(false);
+    }
+  });
+
   it("VAL-8: is an allowlist — a field outside it is rejected, not silently dropped", () => {
     for (const patch of [
       { stage: "offer" },
-      { company: "Renamed Co" },
+      { accent: "teal" },
       { userId: "someone-else" },
       { notes: "fine", appliedOn: "2026-01-01" },
     ]) {

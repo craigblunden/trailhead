@@ -259,6 +259,7 @@ export function JobLoading({ id }: { id: string }) {
           <div className="flex w-full shrink-0 flex-wrap items-center gap-3 sm:w-auto">
             <Bar className="h-9 w-full rounded-lg sm:w-40" />
             <Bar className="h-9 w-32 rounded-lg" />
+            <Bar className="h-9 w-32 rounded-lg" />
           </div>
         </div>
 

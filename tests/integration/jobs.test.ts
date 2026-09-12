@@ -258,8 +258,37 @@ describe("ticket 11: the detail page is real, and stage and notes persist", () =
     expect(rejected).toMatchObject({ ok: false, error: "invalid" });
     expect((await getJob(job.id))?.stage).toBe("interested");
 
-    const company = await updateJobAction(job.id, { company: "Renamed" });
-    expect(company).toMatchObject({ ok: false, error: "invalid" });
+    const addedOn = await updateJobAction(job.id, { addedOn: "2020-01-01" });
+    expect(addedOn).toMatchObject({ ok: false, error: "invalid" });
+  });
+
+  it("edits to company, role, location and posting link persist, without writing history", async () => {
+    signInAs(newUserId());
+    const job = await createJob(input, FROZEN);
+
+    const renamed = await updateJobAction(job.id, {
+      company: "Renamed Robotics",
+      role: "Design Lead",
+      location: "",
+      postingUrl: "https://renamed.example.com/jobs/2",
+    });
+    expect(renamed).toMatchObject({ ok: true });
+    expect(await getJob(job.id)).toMatchObject({
+      company: "Renamed Robotics",
+      role: "Design Lead",
+      location: "Location TBD",
+      postingUrl: "https://renamed.example.com/jobs/2",
+      stage: "interested",
+      activity: [expect.objectContaining({ label: "Added to board — Interested" })],
+    });
+    expect((await getJob(job.id))?.activity).toHaveLength(1);
+
+    expect(await updateJobAction(job.id, { company: " " })).toMatchObject({ ok: false, error: "invalid" });
+    expect(await updateJobAction(job.id, { postingUrl: "javascript:alert(1)" })).toMatchObject({
+      ok: false,
+      error: "invalid",
+    });
+    expect((await getJob(job.id))?.company).toBe("Renamed Robotics");
   });
 
   it("user B cannot read, edit, or restage user A's job through any action", async () => {

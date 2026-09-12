@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ActionError } from "@/components/action-client";
 import { JobDetail } from "@/components/job/job-detail";
+import { LOCATION_FALLBACK } from "@/lib/job-fields";
 import type { Job } from "@/lib/jobs";
 import type { JobPatch } from "@/lib/jobs-client";
 import { createTrail } from "../fakes/trail";
@@ -242,6 +243,103 @@ describe("editing free text", () => {
     expect(trail.jobs.update).toHaveBeenCalledTimes(1);
     expect(trail.jobs.update).toHaveBeenCalledWith(HARVEST, { notes: `${harvest.notes} Later.` });
     expect(saveButton()).toBeEnabled();
+  });
+});
+
+describe("editing the job's details", () => {
+  const editButton = () => screen.getByRole("button", { name: "Edit details" });
+  const dialog = () => screen.getByRole("dialog", { name: "Edit job details" });
+
+  it("DET-13: opens on what the job holds, and saves only what changed, shown at once", async () => {
+    const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
+
+    await user.click(editButton());
+    const form = within(dialog());
+    expect(form.getByLabelText("Company")).toHaveValue(harvest.company);
+    expect(form.getByLabelText("Role title")).toHaveValue(harvest.role);
+    expect(form.getByLabelText("Location")).toHaveValue(harvest.location);
+    expect(form.getByLabelText("Application link")).toHaveValue(harvest.postingUrl);
+
+    await user.clear(form.getByLabelText("Role title"));
+    await user.type(form.getByLabelText("Role title"), "  Design Director ");
+    await user.clear(form.getByLabelText("Application link"));
+    await user.type(form.getByLabelText("Application link"), "https://harvest.example.com/jobs/9");
+    await user.click(form.getByRole("button", { name: "Save details" }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(editButton()).toHaveFocus();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Design Director");
+    expect(screen.getByRole("link", { name: /Open posting/ })).toHaveAttribute(
+      "href",
+      "https://harvest.example.com/jobs/9",
+    );
+    expect(trail.jobs.update).toHaveBeenCalledTimes(1);
+    expect(trail.jobs.update).toHaveBeenCalledWith(HARVEST, {
+      role: "Design Director",
+      postingUrl: "https://harvest.example.com/jobs/9",
+    });
+  });
+
+  it("DET-13: a cleared location saves as the default, and reads blank when opened again", async () => {
+    const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
+
+    await user.click(editButton());
+    await user.clear(within(dialog()).getByLabelText("Location"));
+    await user.click(within(dialog()).getByRole("button", { name: "Save details" }));
+
+    expect(trail.jobs.update).toHaveBeenCalledWith(HARVEST, { location: LOCATION_FALLBACK });
+    expect(screen.getByText(`${harvest.company} · ${LOCATION_FALLBACK}`)).toBeInTheDocument();
+
+    await user.click(editButton());
+    expect(within(dialog()).getByLabelText("Location")).toHaveValue("");
+  });
+
+  it("DET-13: refuses a link that is not a web address in the dialog, and sends nothing", async () => {
+    const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
+
+    await user.click(editButton());
+    const link = within(dialog()).getByLabelText("Application link");
+    await user.clear(link);
+    await user.type(link, "javascript:alert(1)");
+    await user.click(within(dialog()).getByRole("button", { name: "Save details" }));
+
+    expect(dialog()).toBeInTheDocument();
+    expect(link).toHaveAttribute("aria-invalid", "true");
+    expect(link).toHaveAccessibleDescription("Enter a web address starting with http:// or https://");
+    expect(trail.jobs.update).not.toHaveBeenCalled();
+  });
+
+  it("DET-13: saving with nothing changed, or cancelling, sends nothing", async () => {
+    const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
+
+    await user.click(editButton());
+    await user.click(within(dialog()).getByRole("button", { name: "Save details" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    await user.click(editButton());
+    await user.type(within(dialog()).getByLabelText("Company"), " Group");
+    await user.click(within(dialog()).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByText(`${harvest.company} · ${harvest.location}`)).toBeInTheDocument();
+
+    expect(trail.jobs.update).not.toHaveBeenCalled();
+  });
+
+  it("DET-13: a refused save rolls back and says why, in the server's own words", async () => {
+    const trail = createTrail({ jobs: SEED_JOBS });
+    const update = vi.fn<(id: string, patch: JobPatch) => Promise<Job>>().mockRejectedValue(
+      new ActionError("invalid", "Check the highlighted fields.", {
+        company: "Keep this under 120 characters",
+      }),
+    );
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { trail, client: { ...trail.jobs, update } });
+
+    await user.click(editButton());
+    await user.type(within(dialog()).getByLabelText("Company"), " Group");
+    await user.click(within(dialog()).getByRole("button", { name: "Save details" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Keep this under 120 characters");
+    expect(screen.getByText(`${harvest.company} · ${harvest.location}`)).toBeInTheDocument();
   });
 });
 

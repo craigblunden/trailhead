@@ -5,6 +5,16 @@
  * nothing.
  */
 
+/** The longest each typed-in field may be. Validation refuses past these; the forms stop typing at them. */
+export const JOB_LIMITS = {
+  company: 120,
+  role: 120,
+  location: 120,
+  postingUrl: 2048,
+  description: 20_000,
+  notes: 20_000,
+} as const;
+
 export const LOCATION_FALLBACK = "Location TBD";
 
 /** A blank location reads as the Phase-1 default. */

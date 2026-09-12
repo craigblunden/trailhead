@@ -12,6 +12,7 @@ import { ContactsCard } from "@/components/job/job-contacts";
 import { CoverLetterCard } from "@/components/job/cover-letter";
 import { JobDetailHeader } from "@/components/job/job-detail-header";
 import { DetailsCard } from "@/components/job/details-card";
+import { EditJobDialog } from "@/components/job/edit-job-dialog";
 import { JobLoading } from "@/components/page-loading";
 import { PageMain } from "@/components/page-main";
 import { Button } from "@/components/ui/button";
@@ -163,6 +164,8 @@ function JobDetailView({ job, error, dismissError, onPatch, onStage }: JobDetail
                 ))}
               </SelectContent>
             </Select>
+
+            <EditJobDialog job={job} onPatch={onPatch} />
 
             {/* `disabled` does nothing to an anchor, so a job with no usable
                 URL gets a real disabled button instead of a dead link. */}

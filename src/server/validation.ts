@@ -3,7 +3,7 @@ import { z } from "zod";
 import { CONTACT_KINDS, CONTACT_LIMITS } from "@/lib/contacts";
 import { todayUtc } from "@/lib/dates";
 import { DOCUMENT_KINDS, MAX_UPLOAD_BYTES, UPLOAD_REFUSALS, extensionOf } from "@/lib/documents";
-import { locationOrFallback, salaryFromText } from "@/lib/job-fields";
+import { JOB_LIMITS, locationOrFallback, salaryFromText } from "@/lib/job-fields";
 import { STAGES } from "@/lib/jobs";
 
 /**
@@ -16,14 +16,7 @@ import { STAGES } from "@/lib/jobs";
  * Pure: no database, no session. Importable from both sides of the boundary.
  */
 
-export const JOB_LIMITS = {
-  company: 120,
-  role: 120,
-  location: 120,
-  postingUrl: 2048,
-  description: 20_000,
-  notes: 20_000,
-} as const;
+export { JOB_LIMITS };
 
 /** Thousands per year. Nobody is paid a billion; this bounds accidental and hostile input alike. */
 const SALARY_MAX = 100_000;
@@ -76,7 +69,7 @@ const webAddress = (max: number) =>
 
 const postingUrl = webAddress(JOB_LIMITS.postingUrl);
 
-export const newJobSchema = z.object({
+const jobFields = {
   company: requiredText(JOB_LIMITS.company),
   role: requiredText(JOB_LIMITS.role),
   location: z.preprocess(
@@ -90,17 +83,25 @@ export const newJobSchema = z.object({
     (value) => (value === null || value === undefined ? "" : value),
     boundedText(JOB_LIMITS.description),
   ),
-});
+};
+
+export const newJobSchema = z.object(jobFields);
 
 export type NewJobInput = z.infer<typeof newJobSchema>;
 
 /**
- * Editing is an allowlist, not a filter. Description, notes, and the salary expectation (which
- * the Phase-1 details card already edits) are writable; any other field in the patch is REJECTED
- * rather than dropped — so a field added later cannot become writable by accident. Stage changes
- * go through their own action because they write history.
+ * Editing is an allowlist, not a filter. What the user typed when adding the Job — company, role,
+ * location, salary, posting link, description — and the notes are writable, read by the same rules
+ * as when the Job was added: a blank company or role is refused, a blank location reads as the
+ * default. Any other field in the patch is REJECTED rather than dropped — so a field added later
+ * cannot become writable by accident. Stage changes go through their own action because they write
+ * history.
  */
 export const jobPatchSchema = z.strictObject({
+  company: jobFields.company.optional(),
+  role: jobFields.role.optional(),
+  location: jobFields.location.optional(),
+  postingUrl: jobFields.postingUrl.optional(),
   description: boundedText(JOB_LIMITS.description).optional(),
   notes: boundedText(JOB_LIMITS.notes).optional(),
   salaryMin: salaryBound.optional(),
