@@ -2,6 +2,7 @@ import { HydrationBoundary } from "@tanstack/react-query";
 import type { Metadata } from "next";
 
 import { DocumentsView } from "@/components/documents/documents-view";
+import { PageArrive } from "@/components/page-transition";
 import { documentsCache } from "@/lib/documents-client";
 import { requirePageSession } from "@/server/auth/session";
 import { listDocuments } from "@/server/data/documents";
@@ -15,8 +16,10 @@ export default async function DocumentsPage() {
     queryClient.prefetchQuery(documentsCache.options(listDocuments)),
   );
   return (
-    <HydrationBoundary state={state}>
-      <DocumentsView />
-    </HydrationBoundary>
+    <PageArrive>
+      <HydrationBoundary state={state}>
+        <DocumentsView />
+      </HydrationBoundary>
+    </PageArrive>
   );
 }

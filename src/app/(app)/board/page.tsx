@@ -2,6 +2,7 @@ import { HydrationBoundary } from "@tanstack/react-query";
 import type { Metadata } from "next";
 
 import { BoardView } from "@/components/board/board-view";
+import { PageArrive } from "@/components/page-transition";
 import { TrailScene } from "@/components/trail-scene";
 import { requirePageSession } from "@/server/auth/session";
 import { listJobs } from "@/server/data/jobs";
@@ -13,8 +14,11 @@ export default async function BoardPage() {
   // The page, not the layout, decides who may see it.
   await requirePageSession();
   return (
-    <HydrationBoundary state={await prefetchJobs(listJobs)}>
-      <BoardView scene={<TrailScene variant="trail" />} />
-    </HydrationBoundary>
+    // Fades in over the loading outline when it arrives (see `../loading.tsx`).
+    <PageArrive>
+      <HydrationBoundary state={await prefetchJobs(listJobs)}>
+        <BoardView scene={<TrailScene variant="trail" />} />
+      </HydrationBoundary>
+    </PageArrive>
   );
 }

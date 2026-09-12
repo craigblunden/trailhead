@@ -8,6 +8,7 @@ import { BoardColumn } from "@/components/board/board-column";
 import { AppHeader } from "@/components/app-header";
 import { useJobs } from "@/components/jobs-provider";
 import { BrandLogo } from "@/components/brand-logo";
+import { LoadingTrail } from "@/components/loading-trail";
 import { Button } from "@/components/ui/button";
 import {
   ACTIVE_STAGES,
@@ -99,9 +100,7 @@ export function BoardView({ scene }: BoardViewProps = {}) {
         )}
 
         {status === "pending" ? (
-          <p role="status" className="mt-8 text-sm text-muted-foreground">
-            Loading your trail…
-          </p>
+          <LoadingTrail className="mt-8">Loading your trail…</LoadingTrail>
         ) : status === "error" ? (
           <div
             role="alert"

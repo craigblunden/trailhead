@@ -8,6 +8,7 @@ import { AppHeader } from "@/components/app-header";
 import { useDocumentActions, useDocumentList } from "@/components/documents/documents-provider";
 import { UploadDocument } from "@/components/documents/upload-document";
 import { BrandLogo } from "@/components/brand-logo";
+import { LoadingTrail } from "@/components/loading-trail";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -105,9 +106,7 @@ export function DocumentsView() {
           </h2>
 
           {documents.isPending ? (
-            <p role="status" className="mt-3 text-sm text-muted-foreground">
-              Loading your documents…
-            </p>
+            <LoadingTrail className="mt-3">Loading your documents…</LoadingTrail>
           ) : documents.isError ? (
             <div role="alert" className="mt-3 rounded-md border border-dashed border-border p-4 text-sm">
               <p>We couldn’t load your documents.</p>

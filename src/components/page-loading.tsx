@@ -1,27 +1,417 @@
+"use client";
+
+import { useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+
 import { AppHeader } from "@/components/app-header";
 import { BrandLogo } from "@/components/brand-logo";
+import { CompanyAvatar } from "@/components/company-avatar";
+import { JobDetailHeader } from "@/components/job/job-detail-header";
+import { LoadingTrail } from "@/components/loading-trail";
+import { Button } from "@/components/ui/button";
+import { kindLine, type ContactListItem } from "@/lib/contacts";
+import { contactsCache } from "@/lib/contacts-client";
+import { STAGES, STAGE_META, type Job, type Stage } from "@/lib/jobs";
+import { jobsCache } from "@/lib/jobs-cache";
+import { cn } from "@/lib/utils";
 
 /**
  * What a signed-in page shows the moment someone navigates to it, while the server checks the
- * session and reads the page's data (performance ticket 02). The header has the page's own layout,
- * so nothing moves when the content arrives, and the wait is announced, not only shown.
+ * session and reads the page's data (performance ticket 02).
+ *
+ * It is the destination page with its data not yet written: the same header, the same grid, the
+ * same cards, in outline. So when the page arrives nothing moves; the outline fills in. Where the
+ * browser already holds the answer — a Job's name from the board it just left, a Contact's name
+ * from the list beside it — it is shown at once rather than drawn as a bar. The one thing that
+ * moves is the hiker on the trail, beside a sentence that says what is on its way.
+ *
+ * The route is read from the URL because a loading state is handed no params, and one file covers
+ * every section (see `(app)/loading.tsx`). Nothing here is interactive except the way back: a live
+ * control drawn here would be replaced under the user's click when the page arrives.
  */
 export function PageLoading() {
+  const pathname = usePathname() ?? "";
+
+  if (pathname === "/board") return <BoardLoading />;
+  if (pathname.startsWith("/board/")) return <JobLoading id={pathname.slice("/board/".length)} />;
+  if (pathname.startsWith("/contacts")) return <ContactsLoading selectedId={contactIdIn(pathname)} />;
+  if (pathname.startsWith("/documents")) return <DocumentsLoading />;
+  // A section this file does not know yet: say so plainly rather than draw another page's outline.
+  return <SectionLoading />;
+}
+
+/** The Contact a `/contacts/…` URL is about, or null on the list's own URL. */
+function contactIdIn(pathname: string): string | null {
+  return pathname.slice("/contacts/".length) || null;
+}
+
+function SectionLoading() {
   return (
     <div className="flex flex-1 flex-col bg-background">
       <AppHeader leading={<BrandLogo href="/board" />} loading />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
-        <LoadingStatus />
+        <LoadingTrail>Loading…</LoadingTrail>
       </main>
     </div>
   );
 }
 
-/** The announced wait on its own, for a loading state inside a layout that already has a header. */
-export function LoadingStatus() {
+/* ------------------------------------------------------------------------------------------------
+ * The outline's vocabulary: a bar where text will be, a button-shaped space in the header.
+ * Bars are empty elements, so assistive tech has nothing to read in them. Anything that carries
+ * text for the eye alone says so.
+ * ---------------------------------------------------------------------------------------------- */
+
+function Bar({ className }: { className?: string }) {
+  return <span className={cn("block rounded-sm bg-foreground/8", className)} />;
+}
+
+/** The header's action, the size of the button that will stand there, so the account menu does not shift. */
+function HeaderAction({ className }: { className?: string }) {
+  return <span aria-hidden="true" className={cn("block h-9 rounded-lg bg-muted", className)} />;
+}
+
+/**
+ * A page's title when the browser already knows it: the heading's type, but not a heading, since
+ * that is the page's to render. `font-heading` is spelled out because only real headings inherit it.
+ */
+function GhostTitle({ children, width }: { children?: string; width: string }) {
+  if (!children) return <Bar className={cn("mt-1 h-7 max-w-full", width)} />;
+  return <p className="font-heading text-3xl leading-tight tracking-tight text-balance">{children}</p>;
+}
+
+/** A card exactly as the pages draw one, holding the outline of its content. */
+function GhostCard({ className, children }: { className?: string; children: React.ReactNode }) {
+  return <div className={cn("rounded-lg bg-card p-5 ring-1 ring-foreground/10", className)}>{children}</div>;
+}
+
+/** A card's heading and a few lines beneath it. */
+function GhostCardBody({ lines = 2 }: { lines?: number }) {
   return (
-    <p role="status" className="text-sm text-muted-foreground">
-      Loading…
-    </p>
+    <GhostCard>
+      <Bar className="h-5 w-32" />
+      <div className="mt-4 space-y-2.5">
+        {Array.from({ length: lines }, (_, i) => (
+          <Bar key={i} className={cn("h-3.5", i % 2 === 0 ? "w-full" : "w-2/3")} />
+        ))}
+      </div>
+    </GhostCard>
+  );
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * The board: five columns, each with as many card outlines as the browser last saw at that Stage.
+ * ---------------------------------------------------------------------------------------------- */
+
+/** Card outlines per column when the browser has never seen this user's jobs. */
+const UNSEEN_COLUMNS: Record<Stage, number> = {
+  interested: 2,
+  applied: 2,
+  interviewing: 1,
+  offer: 1,
+  rejected: 1,
+};
+
+const MOST_GHOST_CARDS = 6;
+
+function BoardLoading() {
+  const queryClient = useQueryClient();
+  const seen = queryClient.getQueryData<Job[]>(jobsCache.key);
+  const counts = seen
+    ? Object.fromEntries(
+        STAGES.map((stage) => [stage, Math.min(MOST_GHOST_CARDS, seen.filter((job) => job.stage === stage).length)]),
+      )
+    : UNSEEN_COLUMNS;
+
+  return (
+    <div className="scene-wash flex flex-1 flex-col">
+      <AppHeader leading={<BrandLogo href="/board" />} actions={<HeaderAction className="w-24" />} loading />
+
+      <main className="mx-auto w-full max-w-[110rem] flex-1 px-4 py-8 sm:px-6">
+        {/* The title row: the heading's bar, and the wait where the count of active jobs will be. */}
+        <div className="flex min-h-9 flex-wrap items-center gap-x-4 gap-y-1">
+          <Bar className="h-7 w-36" />
+          <LoadingTrail>Loading your trail…</LoadingTrail>
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {STAGES.map((stage) => (
+            <div key={stage} className="flex h-fit flex-col rounded-lg bg-card/55 ring-1 ring-foreground/10">
+              <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
+                <span
+                  aria-hidden="true"
+                  style={{ backgroundColor: STAGE_META[stage].dot }}
+                  className="size-2 shrink-0 rounded-full"
+                />
+                {/* The Stages are fixed, so their names are known before any data is. Said for the
+                    eye only: the page's own headings announce them when they arrive. */}
+                <span
+                  aria-hidden="true"
+                  className="font-sans text-xs font-bold tracking-widest text-muted-foreground uppercase"
+                >
+                  {STAGE_META[stage].label}
+                </span>
+                <Bar className="ml-auto h-4 w-5 bg-muted" />
+              </div>
+              {counts[stage] === 0 ? (
+                <div className="px-3 py-6">
+                  <Bar className="mx-auto h-3 w-28" />
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3 p-3">
+                  {Array.from({ length: counts[stage] }, (_, i) => (
+                    <GhostJobCard key={i} />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function GhostJobCard() {
+  return (
+    <div className="rounded-md bg-card p-3 ring-1 ring-foreground/10">
+      <div className="flex items-start gap-2.5">
+        <Bar className="size-7 shrink-0" />
+        <div className="min-w-0 flex-1 space-y-2 pt-0.5">
+          <Bar className="h-3.5 w-3/4" />
+          <Bar className="h-3 w-1/2" />
+        </div>
+      </div>
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
+        <Bar className="h-5 w-20 bg-chip" />
+        <Bar className="h-5 w-16 bg-chip" />
+      </div>
+      <div className="mt-3 border-t border-border pt-2">
+        <Bar className="h-3 w-24" />
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * A Job's page: its name and company from the board the user just left, and the cards in outline.
+ * ---------------------------------------------------------------------------------------------- */
+
+/** Also the job page's own wait, for the rare load where the browser holds no jobs at all. */
+export function JobLoading({ id }: { id: string }) {
+  const queryClient = useQueryClient();
+  const job = queryClient.getQueryData<Job[]>(jobsCache.key)?.find((candidate) => candidate.id === id);
+
+  return (
+    <div className="flex flex-1 flex-col bg-background">
+      <JobDetailHeader loading />
+
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+          <div className="flex min-w-0 items-start gap-4">
+            {job ? (
+              <CompanyAvatar company={job.company} accent={job.accent} size="lg" />
+            ) : (
+              <Bar className="size-12 shrink-0 rounded-md" />
+            )}
+            <div className="min-w-0">
+              <GhostTitle width="w-64">{job?.role}</GhostTitle>
+              {job ? (
+                <p className="mt-1 text-muted-foreground">
+                  {job.company} · {job.location}
+                </p>
+              ) : (
+                <Bar className="mt-3 h-4 w-44" />
+              )}
+            </div>
+          </div>
+
+          <div className="flex w-full shrink-0 flex-wrap items-center gap-3 sm:w-auto">
+            <Bar className="h-9 w-full rounded-lg sm:w-40" />
+            <Bar className="h-9 w-32 rounded-lg" />
+          </div>
+        </div>
+
+        <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
+          {/* min-w-0: a grid track is never made wider than the screen by what it holds. */}
+          <div className="min-w-0 space-y-6">
+            {/* The description card is where the wait is shown: the largest space on the page. */}
+            <GhostCard>
+              <Bar className="h-5 w-36" />
+              <Bar className="mt-2.5 h-3.5 w-72 max-w-full" />
+              <div className="mt-3 flex min-h-56 items-center justify-center rounded-md border border-dashed border-input">
+                <LoadingTrail size="lg">Loading this job…</LoadingTrail>
+              </div>
+              <div className="mt-3 flex justify-end">
+                <Bar className="h-9 w-36 rounded-lg" />
+              </div>
+            </GhostCard>
+            <GhostCard>
+              <Bar className="h-5 w-16" />
+              <Bar className="mt-3 h-32 w-full rounded-md" />
+              <div className="mt-3 flex justify-end">
+                <Bar className="h-9 w-28 rounded-lg" />
+              </div>
+            </GhostCard>
+            <GhostCardBody lines={3} />
+          </div>
+
+          <div className="min-w-0 space-y-6">
+            <GhostCardBody lines={4} />
+            <GhostCardBody lines={2} />
+            <GhostCardBody lines={2} />
+            <GhostCardBody lines={3} />
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Contacts: the list beside the detail, as the page lays them out; below `lg` only the half the
+ * URL is about, the same way the page decides. Seen only when the contacts layout was not
+ * prefetched; otherwise the layout is already there and `ContactLoading` below is what waits.
+ * ---------------------------------------------------------------------------------------------- */
+
+function ContactsLoading({ selectedId }: { selectedId: string | null }) {
+  return (
+    <div className="flex flex-1 flex-col bg-background">
+      <AppHeader leading={<BrandLogo href="/board" />} actions={<HeaderAction className="w-32" />} loading />
+
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[19rem_minmax(0,1fr)]">
+          <div className={cn(selectedId && "hidden lg:block")}>
+            <div className="flex min-h-9 items-center">
+              <Bar className="h-7 w-32" />
+            </div>
+            <Bar className="mt-2 h-3.5 w-full max-w-64" />
+            {/* One wait is said, not two: the list's when the list is the point of the URL, and
+                the Contact's otherwise, on the detail side. */}
+            {!selectedId && <LoadingTrail className="mt-6">Loading your contacts…</LoadingTrail>}
+            <div className="mt-6 space-y-2">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="rounded-md bg-card px-3 py-2.5 ring-1 ring-foreground/10">
+                  <Bar className="h-4 w-2/3" />
+                  <Bar className="mt-2 h-3 w-1/2" />
+                  <Bar className="mt-2 h-3 w-1/3" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className={cn("min-w-0", !selectedId && "hidden lg:block")}>
+            {selectedId ? (
+              <ContactLoading />
+            ) : (
+              <div className="rounded-lg border border-dashed border-border px-6 py-16">
+                <Bar className="mx-auto h-3.5 w-72 max-w-full" />
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/**
+ * The detail side on its own: the list and header stay put in their layout, and only this side
+ * waits. This is what most moves into Contacts show, not the section outline above it: Next
+ * prefetches a route down to its deepest loading boundary, so the layout and its list are usually
+ * in place before the click. The name is taken from that list when the browser holds it.
+ *
+ * On the list's own URL the pane that will arrive is the "choose a contact" hint, so its outline
+ * is drawn, and the wait speaks for the page it belongs to.
+ */
+export function ContactLoading() {
+  const id = contactIdIn(usePathname() ?? "");
+  const queryClient = useQueryClient();
+  const contact = queryClient
+    .getQueryData<ContactListItem[]>(contactsCache.listKey)
+    ?.find((candidate) => candidate.id === id);
+
+  if (!id) {
+    return (
+      <div className="flex justify-center rounded-lg border border-dashed border-border px-6 py-16">
+        <LoadingTrail>Loading your contacts…</LoadingTrail>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-w-0 space-y-6">
+      <div>
+        {/* The way back, live, as on the page itself: below `lg` the list is hidden behind this side. */}
+        <Button asChild variant="ghost" size="sm" className="-ml-2 mb-3 lg:hidden">
+          <Link href="/contacts">
+            <ArrowLeft aria-hidden="true" />
+            All contacts
+          </Link>
+        </Button>
+        <GhostTitle width="w-56">{contact?.name}</GhostTitle>
+        {contact ? (
+          <p className="mt-1 text-muted-foreground">
+            {kindLine(contact)}
+            {contact.title && ` · ${contact.title}`}
+          </p>
+        ) : (
+          <Bar className="mt-3 h-4 w-40" />
+        )}
+        <Bar className="mt-3 h-3.5 w-48" />
+      </div>
+
+      <GhostCard>
+        <Bar className="h-5 w-24" />
+        <div className="mt-4 flex min-h-40 items-center justify-center rounded-md border border-dashed border-input">
+          <LoadingTrail size="lg">Loading this contact…</LoadingTrail>
+        </div>
+      </GhostCard>
+      <GhostCardBody lines={2} />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Documents: the upload card, then what is on file.
+ * ---------------------------------------------------------------------------------------------- */
+
+function DocumentsLoading() {
+  return (
+    <div className="flex flex-1 flex-col bg-background">
+      <AppHeader leading={<BrandLogo href="/board" />} loading />
+
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8 sm:px-6">
+        <div className="flex min-h-9 items-center">
+          <Bar className="h-7 w-40" />
+        </div>
+        <Bar className="mt-2 h-3.5 w-full max-w-md" />
+
+        <GhostCard className="mt-6">
+          <Bar className="h-5 w-20" />
+          <div className="mt-3 flex min-h-28 items-center justify-center rounded-md border border-dashed border-input">
+            <LoadingTrail size="lg">Loading your documents…</LoadingTrail>
+          </div>
+        </GhostCard>
+
+        <div className="mt-8">
+          <Bar className="h-5 w-28" />
+          <div className="mt-3 space-y-3">
+            {[0, 1].map((i) => (
+              <div key={i} className="flex items-start gap-3 rounded-lg bg-card p-4 ring-1 ring-foreground/10">
+                <Bar className="mt-0.5 size-5 shrink-0" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Bar className="h-4 w-1/2" />
+                  <Bar className="h-3.5 w-3/4" />
+                  <Bar className="h-3.5 w-1/3" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </main>
+    </div>
   );
 }

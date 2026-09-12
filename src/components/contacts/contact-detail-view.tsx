@@ -8,6 +8,7 @@ import { ArrowLeft, CalendarCheck, Trash2 } from "lucide-react";
 import { ContactKindSelect } from "@/components/contacts/contact-kind-select";
 import { useContactDetail, useContactMutations } from "@/components/contacts/contacts-provider";
 import { ActionError, describeFailure } from "@/components/action-client";
+import { LoadingTrail } from "@/components/loading-trail";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,13 +30,7 @@ export function ContactDetailView({ contactId }: { contactId: string }) {
   const contact = useContactDetail(contactId);
 
   if (contact.data) return <ContactProfile key={contact.data.id} contact={contact.data} />;
-  if (contact.isPending) {
-    return (
-      <p role="status" className="text-sm text-muted-foreground">
-        Loading this contact…
-      </p>
-    );
-  }
+  if (contact.isPending) return <LoadingTrail>Loading this contact…</LoadingTrail>;
   if (contact.error instanceof ActionError && contact.error.kind === "not-found") {
     return <ContactMissing />;
   }

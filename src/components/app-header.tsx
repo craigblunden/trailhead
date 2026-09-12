@@ -20,7 +20,11 @@ export function AppHeader({ leading, actions, loading = false }: AppHeaderProps)
   const user = useSessionUser();
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-card/90 backdrop-blur">
+    // Named for the view transition between pages, where it is pinned: the one thing that never moves.
+    <header
+      style={{ viewTransitionName: "app-header" }}
+      className="sticky top-0 z-30 border-b border-border bg-card/90 backdrop-blur"
+    >
       <div className="mx-auto flex w-full max-w-[110rem] items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           {leading}

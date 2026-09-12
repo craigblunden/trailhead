@@ -23,7 +23,8 @@ async function holdNavigations(page: Page) {
   });
 }
 
-const loading = (page: Page) => page.getByRole("status").filter({ hasText: /^Loading…$/ });
+/** The wait names what is on its way: "Loading your trail…", "Loading this job…". */
+const loading = (page: Page) => page.getByRole("status").filter({ hasText: /^Loading (your|this) \w+…$/ });
 
 test.describe("performance ticket 02: loading states", () => {
   test("from the board to Documents: an announced, accessible loading state, then the page", async ({ page }) => {
@@ -48,7 +49,12 @@ test.describe("performance ticket 02: loading states", () => {
 
     await page.getByRole("link", { name: job.role, exact: true }).click();
 
-    await expect(loading(page)).toBeVisible({ timeout: 2_000 });
+    await expect(loading(page)).toHaveText("Loading this job…", { timeout: 2_000 });
+    // The board already knew the Job, so its name is shown at once — as text, not yet as the heading.
+    await expect(page.getByText(job.role, { exact: true })).toBeVisible();
+    expect(await page.getByRole("heading", { level: 1 }).count()).toBe(0);
+    await expect(page.getByRole("link", { name: "Board" }).first()).toBeVisible();
+    await expectAccessible(page);
     await expect(page.getByRole("heading", { level: 1, name: job.role })).toBeVisible({ timeout: HOLD_MS + 10_000 });
   });
 
@@ -67,8 +73,11 @@ test.describe("performance ticket 02: loading states", () => {
 
     await list.click();
 
-    await expect(loading(page)).toBeVisible({ timeout: 2_000 });
+    await expect(loading(page)).toHaveText("Loading this contact…", { timeout: 2_000 });
     await expect(page.getByRole("heading", { level: 1, name: "Contacts" })).toBeVisible();
+    // The list beside it already knew the name, so the detail side shows it at once, as text.
+    await expect(page.getByRole("main").locator("p", { hasText: name })).toBeVisible();
+    await expectAccessible(page);
     await expect(page.getByRole("heading", { level: 1, name })).toBeVisible({ timeout: HOLD_MS + 10_000 });
 
     // Leave the worker's account as it was.

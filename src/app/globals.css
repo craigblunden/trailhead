@@ -202,3 +202,76 @@
     ),
     linear-gradient(180deg, #e9f1e6 0%, #f8f9f4 28%, #f8f9f4 72%, #e3eedc 100%);
 }
+
+/* ------------------------------------------------------------------------------------------------
+ * Waiting and arriving.
+ *
+ * While a page loads, the trail under the hiker in `LoadingTrail` moves back beneath their feet.
+ * One dash and one gap per cycle (13 + 10), so the pattern loops without a jump.
+ * ---------------------------------------------------------------------------------------------- */
+
+@keyframes trail-march {
+  to {
+    stroke-dashoffset: 23;
+  }
+}
+
+.loading-trail-path {
+  animation: trail-march 0.9s linear infinite;
+}
+
+/*
+ * Moving between pages. A click swaps the page for its outline at once, and the page then fills the
+ * outline in: the outline fades out as the page fades in, in place. The root snapshot is turned off
+ * so nothing outside those two freezes, and the header is pinned so it is the one thing that never
+ * moves. Only the page's own boundary carries a class; see the `ViewTransition` in each page and
+ * loading file.
+ */
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-old(root) {
+  display: none;
+}
+::view-transition-new(root) {
+  animation: none;
+}
+
+::view-transition-group(app-header) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(app-header) {
+  display: none;
+}
+::view-transition-new(app-header) {
+  animation: none;
+}
+
+::view-transition-old(.page-outline) {
+  animation: 160ms ease-in both page-fade reverse;
+}
+::view-transition-new(.page-arrive) {
+  animation: 240ms ease-out 80ms both page-fade;
+}
+
+@keyframes page-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-trail-path {
+    animation: none;
+  }
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}

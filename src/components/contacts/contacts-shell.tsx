@@ -9,6 +9,7 @@ import { AppHeader } from "@/components/app-header";
 import { AddContactDialog } from "@/components/contacts/add-contact-dialog";
 import { useContactList } from "@/components/contacts/contacts-provider";
 import { BrandLogo } from "@/components/brand-logo";
+import { LoadingTrail } from "@/components/loading-trail";
 import { Button } from "@/components/ui/button";
 import { kindLine } from "@/lib/contacts";
 import { pluralize } from "@/lib/jobs";
@@ -58,9 +59,7 @@ export function ContactsShell({ children }: { children: React.ReactNode }) {
             </p>
 
             {contacts.isPending ? (
-              <p role="status" className="mt-6 text-sm text-muted-foreground">
-                Loading your contacts…
-              </p>
+              <LoadingTrail className="mt-6">Loading your contacts…</LoadingTrail>
             ) : contacts.isError ? (
               <div role="alert" className="mt-6 rounded-md border border-dashed border-border p-4 text-sm">
                 <p>We couldn’t load your contacts.</p>

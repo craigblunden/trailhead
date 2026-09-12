@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 
-import { AppHeader } from "@/components/app-header";
 import { CompanyAvatar } from "@/components/company-avatar";
 import { useJobs, type JobPatch } from "@/components/jobs-provider";
 import { ActivityCard } from "@/components/job/activity-card";
 import { ApplicationKitCard } from "@/components/job/application-kit";
 import { ContactsCard } from "@/components/job/job-contacts";
 import { CoverLetterCard } from "@/components/job/cover-letter";
+import { JobDetailHeader } from "@/components/job/job-detail-header";
 import { DetailsCard } from "@/components/job/details-card";
+import { JobLoading } from "@/components/page-loading";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -21,34 +22,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { BRAND_NAME } from "@/lib/brand";
 import { STAGES, STAGE_META, webLink, type Job, type Stage } from "@/lib/jobs";
-
-function DetailHeader() {
-  return (
-    <AppHeader
-      leading={
-        <>
-          <Button asChild variant="outline" className="h-9 px-3">
-            <Link href="/board">
-              <ArrowLeft aria-hidden="true" />
-              Board
-            </Link>
-          </Button>
-          <span className="font-heading text-xl font-semibold tracking-tight">
-            {BRAND_NAME}
-          </span>
-        </>
-      }
-    />
-  );
-}
 
 export function JobDetail({ jobId }: { jobId: string }) {
   const { getJob, updateJob, setStage, status, error, dismissError } = useJobs();
   const job = getJob(jobId);
 
-  if (!job && status === "pending") return <DetailLoading />;
+  // The same outline the navigation showed; here it stays until the client's own fetch answers.
+  if (!job && status === "pending") return <JobLoading id={jobId} />;
   // An unknown id and another user's id are the same thing here, on purpose.
   if (!job) return <DetailMissing />;
   return (
@@ -62,23 +43,10 @@ export function JobDetail({ jobId }: { jobId: string }) {
   );
 }
 
-function DetailLoading() {
-  return (
-    <div className="flex flex-1 flex-col bg-background">
-      <DetailHeader />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
-        <p role="status" className="text-sm text-muted-foreground">
-          Loading this job…
-        </p>
-      </main>
-    </div>
-  );
-}
-
 function DetailMissing() {
   return (
     <div className="flex flex-1 flex-col bg-background">
-      <DetailHeader />
+      <JobDetailHeader />
       <main className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center px-6 py-20 text-center">
         <h1 className="text-2xl">This job isn&rsquo;t on your trail</h1>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -150,7 +118,7 @@ function JobDetailView({ job, error, dismissError, onPatch, onStage }: JobDetail
 
   return (
     <div className="flex flex-1 flex-col bg-background">
-      <DetailHeader />
+      <JobDetailHeader />
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
         {error && (
