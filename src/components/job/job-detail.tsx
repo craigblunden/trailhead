@@ -13,6 +13,7 @@ import { CoverLetterCard } from "@/components/job/cover-letter";
 import { JobDetailHeader } from "@/components/job/job-detail-header";
 import { DetailsCard } from "@/components/job/details-card";
 import { JobLoading } from "@/components/page-loading";
+import { PageMain } from "@/components/page-main";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -120,7 +121,7 @@ function JobDetailView({ job, error, dismissError, onPatch, onStage }: JobDetail
     <div className="flex flex-1 flex-col bg-background">
       <JobDetailHeader />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+      <PageMain>
         {error && (
           <div
             role="alert"
@@ -182,8 +183,10 @@ function JobDetailView({ job, error, dismissError, onPatch, onStage }: JobDetail
           </div>
         </div>
 
-        <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
-          <div className="space-y-6">
+        {/* The side cards in one column beside the writing, and in two from `2xl`, where one column
+            of text boxes would otherwise run the full width of the page. */}
+        <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] 2xl:grid-cols-[minmax(0,1fr)_43.5rem]">
+          <div className="min-w-0 space-y-6">
             <section
               aria-labelledby="description-heading"
               className="rounded-lg bg-card p-5 ring-1 ring-foreground/10"
@@ -228,14 +231,18 @@ function JobDetailView({ job, error, dismissError, onPatch, onStage }: JobDetail
             <CoverLetterCard job={job} />
           </div>
 
-          <aside className="space-y-6">
-            <DetailsCard job={job} onChange={onPatch} />
-            <ApplicationKitCard job={job} />
-            <ContactsCard job={job} />
-            <ActivityCard entries={job.activity} />
+          <aside className="grid min-w-0 grid-cols-1 items-start gap-6 2xl:grid-cols-2">
+            <div className="min-w-0 space-y-6">
+              <DetailsCard job={job} onChange={onPatch} />
+              <ApplicationKitCard job={job} />
+            </div>
+            <div className="min-w-0 space-y-6">
+              <ContactsCard job={job} />
+              <ActivityCard entries={job.activity} />
+            </div>
           </aside>
         </div>
-      </main>
+      </PageMain>
     </div>
   );
 }

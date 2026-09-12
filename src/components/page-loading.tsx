@@ -236,7 +236,7 @@ export function JobLoading({ id }: { id: string }) {
       <JobDetailHeader loading />
       <PageWait>Loading this job…</PageWait>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+      <PageMain>
         <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
           <div className="flex min-w-0 items-start gap-4">
             {job ? (
@@ -262,7 +262,9 @@ export function JobLoading({ id }: { id: string }) {
           </div>
         </div>
 
-        <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
+        {/* The side cards in one column beside the writing, and in two from `2xl`, where one column
+            of text boxes would otherwise run the full width of the page. */}
+        <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] 2xl:grid-cols-[minmax(0,1fr)_43.5rem]">
           {/* min-w-0: a grid track is never made wider than the screen by what it holds. */}
           <div className="min-w-0 space-y-6">
             {/* The description card is where the wait is shown: the largest space on the page. */}
@@ -284,14 +286,18 @@ export function JobLoading({ id }: { id: string }) {
             <GhostCardBody lines={3} />
           </div>
 
-          <div className="min-w-0 space-y-6">
-            <GhostCardBody lines={4} />
-            <GhostCardBody lines={2} />
-            <GhostCardBody lines={2} />
-            <GhostCardBody lines={3} />
+          <div className="grid min-w-0 grid-cols-1 items-start gap-6 2xl:grid-cols-2">
+            <div className="min-w-0 space-y-6">
+              <GhostCardBody lines={4} />
+              <GhostCardBody lines={2} />
+            </div>
+            <div className="min-w-0 space-y-6">
+              <GhostCardBody lines={2} />
+              <GhostCardBody lines={3} />
+            </div>
           </div>
         </div>
-      </main>
+      </PageMain>
     </div>
   );
 }

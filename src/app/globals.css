@@ -169,6 +169,10 @@
   }
   html {
     @apply font-sans;
+    /* Room for the scrollbar is kept whether or not the page scrolls. A loading outline is often
+       shorter than the page it stands in for; without this the scrollbar comes and goes with it, the
+       page's width changes, and the header's contents shift sideways on every navigation. */
+    scrollbar-gutter: stable;
   }
   body {
     @apply bg-background text-foreground;
