@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 
-import pg from "pg";
-
 import type { Plan } from "@/lib/plans";
+
+import { setPlanForUser, withMigrator, type SqlClient } from "../../scripts/plan/set-plan";
 
 /** The application tables, in an order TRUNCATE … CASCADE is happy with. */
 const APPLICATION_TABLES = [
@@ -15,16 +15,8 @@ const APPLICATION_TABLES = [
   "UserPlan",
 ] as const;
 
-/** Runs one statement as `trailhead_migrator` over the direct URL. */
-async function asMigrator<T>(fn: (client: pg.Client) => Promise<T>): Promise<T> {
-  const client = new pg.Client({ connectionString: process.env.DIRECT_URL });
-  await client.connect();
-  try {
-    return await fn(client);
-  } finally {
-    await client.end();
-  }
-}
+/** Runs work as `trailhead_migrator` over the direct URL. */
+const asMigrator = <T>(fn: (client: SqlClient) => Promise<T>) => withMigrator(process.env.DIRECT_URL ?? "", fn);
 
 /**
  * Empties every application table so no test depends on another's leftovers.
@@ -39,20 +31,9 @@ export async function resetTables() {
   );
 }
 
-/**
- * Puts a Tenant on a Plan the way `npm run db:plan` does: as the migrator, the only role with a
- * write grant on "UserPlan" (ADR-0001). The default Plan is the absence of a row.
- */
+/** Puts a Tenant on a Plan the way `npm run db:plan` does: the script's own statements, as the migrator. */
 export async function setPlan(userId: string, plan: Plan) {
-  await asMigrator((client) =>
-    plan === "free"
-      ? client.query(`delete from "UserPlan" where "userId" = $1`, [userId])
-      : client.query(
-          `insert into "UserPlan" ("userId", "plan", "updatedAt") values ($1, $2, now())
-           on conflict ("userId") do update set "plan" = excluded."plan", "updatedAt" = now()`,
-          [userId, plan],
-        ),
-  );
+  await asMigrator((client) => setPlanForUser(client, userId, plan));
 }
 
 /** A fresh tenant id. The database has no foreign key to `auth.users`, so any uuid is a user. */

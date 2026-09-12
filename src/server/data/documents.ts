@@ -8,15 +8,15 @@ import {
   MAX_UPLOAD_BYTES,
   UPLOAD_REFUSALS,
   WRONG_KIND_REFUSALS,
-  capReachedRefusal,
   extensionOf,
+  limitReachedRefusal,
   type DocumentKind,
   type DocumentSummary,
   type UploadRefusal,
   type UploadTicket,
 } from "@/lib/documents";
 import type { Job } from "@/lib/jobs";
-import { limitsOf } from "@/lib/plans";
+import { limitsOf, withinLimit } from "@/lib/plans";
 import { requireSession } from "@/server/auth/session";
 import { DOCUMENT_SUMMARY_INCLUDE, toDocumentSummary } from "@/server/db/mappers";
 import { withTenant } from "@/server/db/tenant";
@@ -93,14 +93,14 @@ export async function startUpload(input: StartUploadInput, defer: Defer = inline
 
   const row = await withTenant(userId, async (tx, tenant) => {
     await tx.$executeRaw`select pg_advisory_xact_lock(hashtext(${userId}))`;
-    const held = await tx.document.count({
-      where: { userId, deletedAt: null, ingestion: { not: "failed" } },
-    });
     // The Tenant's Limit, read in the same transaction as the count it guards (plans issue 03). A
     // Tenant over its Limit — moved to a smaller Plan — keeps everything and adds nothing.
     const limit = limitsOf(await planOf(tenant)).documents;
-    if (limit !== "unlimited" && held >= limit) {
-      throw new RuleError("cap-reached", capReachedRefusal(limit));
+    if (limit !== "unlimited") {
+      const held = await tx.document.count({
+        where: { userId, deletedAt: null, ingestion: { not: "failed" } },
+      });
+      if (!withinLimit(held, limit)) throw new RuleError("cap-reached", limitReachedRefusal(limit));
     }
     return tx.document.create({
       data: {

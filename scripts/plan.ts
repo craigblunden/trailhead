@@ -5,19 +5,18 @@
  * as the local stack. The SQL it runs is in `docs/provisioning.md` for the dashboard.
  */
 import nextEnv from "@next/env";
-import pg from "pg";
 
 import { PLANS, type Plan } from "@/lib/plans";
 
 // Same precedence as the running app (`.env.local` over `.env`).
 nextEnv.loadEnvConfig(process.cwd());
 
-const { listPlans, setPlanByEmail } = await import("./plan/set-plan");
+const { listPlans, setPlanByEmail, withMigrator } = await import("./plan/set-plan");
 
 const USAGE = `Usage:
-  npm run db:plan                     list every account on a plan other than free
-  npm run db:plan -- <email> pro      put the account with that email on pro
-  npm run db:plan -- <email> free     put it back on free`;
+  npm run db:plan                     list everyone on a plan other than free
+  npm run db:plan -- <email> pro      put the person with that email on pro
+  npm run db:plan -- <email> free     put them back on free`;
 
 function isPlan(value: string): value is Plan {
   return (PLANS as readonly string[]).includes(value);
@@ -35,26 +34,24 @@ if (!url) {
   process.exit(2);
 }
 
-const client = new pg.Client({ connectionString: url });
 try {
-  await client.connect();
-  if (email && plan && isPlan(plan)) {
-    await setPlanByEmail(client, email, plan);
-    console.log(`${email} is on ${plan}.`);
-  } else {
+  await withMigrator(url, async (client) => {
+    if (email && plan && isPlan(plan)) {
+      await setPlanByEmail(client, email, plan);
+      console.log(`${email} is on ${plan}.`);
+      return;
+    }
     const rows = await listPlans(client);
     if (rows.length === 0) {
-      console.log("Every account is on free.");
-    } else {
-      const width = Math.max(...rows.map((row) => row.email.length));
-      for (const row of rows) {
-        console.log(`${row.email.padEnd(width)}  ${row.plan}  ${row.updatedAt.toISOString().slice(0, 10)}`);
-      }
+      console.log("Everyone is on free.");
+      return;
     }
-  }
+    const width = Math.max(...rows.map((row) => row.email.length));
+    for (const row of rows) {
+      console.log(`${row.email.padEnd(width)}  ${row.plan}  ${row.updatedAt.toISOString().slice(0, 10)}`);
+    }
+  });
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exitCode = 1;
-} finally {
-  await client.end();
 }

@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import pg from "pg";
 
 import { PrismaClient, type Prisma } from "@/generated/prisma/client";
 import { todayUtc } from "@/lib/dates";
@@ -11,7 +10,7 @@ import { weekStartOf } from "@/lib/generation";
 import { toDateColumn } from "@/server/db/mappers";
 
 import { waitForMail } from "../../e2e/mail";
-import { setPlanForUser } from "../plan/set-plan";
+import { setPlanForUser, withMigrator } from "../plan/set-plan";
 
 import { assertLocalStack } from "./local-only";
 import { planAccount, type PlannedAccount, type SeedAccount } from "./plan";
@@ -301,12 +300,6 @@ export async function seedAccount(
 
   // Seeding resets the account to its plan, and the Plan is part of it: an account seeded as free
   // comes off pro too.
-  const migrator = new pg.Client({ connectionString: requireEnv("DIRECT_URL") });
-  await migrator.connect();
-  try {
-    await setPlanForUser(migrator, ensured.userId, plan.plan);
-  } finally {
-    await migrator.end();
-  }
+  await withMigrator(requireEnv("DIRECT_URL"), (migrator) => setPlanForUser(migrator, ensured.userId, plan.plan));
   return null;
 }

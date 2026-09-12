@@ -42,3 +42,11 @@ render either.
 1. `tests/lib/plans.test.ts` — `withinLimit` for numbers and unlimited; `PLAN_LIMITS.free` equals
    the numbers the app shipped with, so a change there is deliberate.
 2. Existing tests of `roomLeft`, `quotaStatus`, and the refusal messages pass a Limit.
+
+## Comments
+
+**Review pass.** `withinLimit(count, limit)` was dropped during the build and put back after the
+code review asked for it: the upload check, the upload control, and the seed planner use it. The
+refusal helper is `limitReachedRefusal` — the glossary avoids "cap" — and the map's default for the
+`cap-reached` code (the wire code predates Plans and stays) names no number, so it can never state
+someone else's Limit.

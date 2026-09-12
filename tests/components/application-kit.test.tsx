@@ -4,6 +4,7 @@ import { axe } from "vitest-axe";
 import { JobDetail } from "@/components/job/job-detail";
 import { ActionError } from "@/components/action-client";
 import type { Job } from "@/lib/jobs";
+import type { Plan } from "@/lib/plans";
 import { SEED_JOBS } from "../fixtures/jobs";
 import { createTrail, summary } from "../fakes/trail";
 import { freezeClock, renderWithJobs, screen, waitFor, within } from "../test-utils";
@@ -34,7 +35,7 @@ const fernwood: Job = {
   contacts: [],
 };
 
-function renderKit(documents = [growth, staff, letter], job: Job = harvest, plan: "free" | "pro" = "free") {
+function renderKit(documents = [growth, staff, letter], job: Job = harvest, plan: Plan = "free") {
   const trail = createTrail({ jobs: [job, fernwood], documents, plan });
   const rendered = renderWithJobs(<JobDetail jobId={job.id} />, { trail });
   return { client: trail.documents, ...rendered };

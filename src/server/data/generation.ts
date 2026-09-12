@@ -1,5 +1,6 @@
 import "server-only";
 
+import { Prisma } from "@/generated/prisma/client";
 import { GENERATION_FAILURES, quotaStatus, weekStartOf, type QuotaStatus } from "@/lib/generation";
 import { limitsOf } from "@/lib/plans";
 import { requireSession } from "@/server/auth/session";
@@ -77,23 +78,16 @@ export async function reserveCoverLetter(
   const weekStart = weekStartOf(now);
   const { rows, limit } = await withTenant(userId, async (tx, tenant) => {
     const limit = await lettersPerWeek(tenant);
-    const rows =
-      limit === "unlimited"
-        ? await tx.$queryRaw<{ used: number }[]>`
-            insert into "GenerationQuota" ("userId", "weekStart", "used", "updatedAt")
-            values (${userId}::uuid, ${weekStart}::date, 1, now())
-            on conflict ("userId", "weekStart") do update
-              set "used" = "GenerationQuota"."used" + 1, "updatedAt" = now()
-            returning "used"
-          `
-        : await tx.$queryRaw<{ used: number }[]>`
-            insert into "GenerationQuota" ("userId", "weekStart", "used", "updatedAt")
-            values (${userId}::uuid, ${weekStart}::date, 1, now())
-            on conflict ("userId", "weekStart") do update
-              set "used" = "GenerationQuota"."used" + 1, "updatedAt" = now()
-              where "GenerationQuota"."used" < ${limit}
-            returning "used"
-          `;
+    // The update applies only below the Limit; under an unlimited one, always.
+    const belowLimit = limit === "unlimited" ? Prisma.sql`true` : Prisma.sql`"GenerationQuota"."used" < ${limit}`;
+    const rows = await tx.$queryRaw<{ used: number }[]>`
+      insert into "GenerationQuota" ("userId", "weekStart", "used", "updatedAt")
+      values (${userId}::uuid, ${weekStart}::date, 1, now())
+      on conflict ("userId", "weekStart") do update
+        set "used" = "GenerationQuota"."used" + 1, "updatedAt" = now()
+        where ${belowLimit}
+      returning "used"
+    `;
     return { rows, limit };
   });
   if (rows.length === 0) throw new RuleError("quota", GENERATION_FAILURES.quota);

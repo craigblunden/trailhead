@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { UPLOAD_REFUSALS, capReachedRefusal, roomLeft } from "@/lib/documents";
+import { UPLOAD_REFUSALS, limitReachedRefusal, roomLeft } from "@/lib/documents";
 import { quotaStatus } from "@/lib/generation";
 
 describe("the copy at the two Limit sites takes a Limit (plans issue 01)", () => {
@@ -11,12 +11,12 @@ describe("the copy at the two Limit sites takes a Limit (plans issue 01)", () =>
     expect(roomLeft(0, "unlimited")).toBeNull();
   });
 
-  it("the cap refusal names the Tenant's own number, and the free number is the map's default", () => {
-    expect(capReachedRefusal(3)).toBe(
+  it("the Limit refusal names the Tenant's own number, and the code's default names none", () => {
+    expect(limitReachedRefusal(3)).toBe(
       "All 3 slots are used. Delete a document you no longer send, then upload this one.",
     );
-    expect(capReachedRefusal(50)).toMatch(/^All 50 slots are used\./);
-    expect(UPLOAD_REFUSALS["cap-reached"]).toBe(capReachedRefusal(3));
+    expect(limitReachedRefusal(50)).toMatch(/^All 50 slots are used\./);
+    expect(UPLOAD_REFUSALS["cap-reached"]).not.toMatch(/\d/);
   });
 
   it("quotaStatus reports what is left under a finite Limit, and 'unlimited' under none", () => {

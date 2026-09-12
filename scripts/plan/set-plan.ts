@@ -1,3 +1,5 @@
+import pg from "pg";
+
 import type { Plan } from "@/lib/plans";
 
 /**
@@ -15,6 +17,17 @@ export type SqlClient = {
 };
 
 export type PlanRow = { email: string; plan: Plan; updatedAt: Date };
+
+/** One connection as the migrator over the direct URL, closed whatever `fn` does. */
+export async function withMigrator<T>(connectionString: string, fn: (client: SqlClient) => Promise<T>): Promise<T> {
+  const client = new pg.Client({ connectionString });
+  await client.connect();
+  try {
+    return await fn(client);
+  } finally {
+    await client.end();
+  }
+}
 
 export async function setPlanForUser(client: SqlClient, userId: string, plan: Plan): Promise<void> {
   if (plan === "free") {
@@ -42,11 +55,12 @@ export async function setPlanByEmail(client: SqlClient, email: string, plan: Pla
   return { userId: id };
 }
 
-/** Every Tenant off the default Plan, by email. */
+/** Every Tenant off the default Plan, by email. A row saying `free` by hand is the default too. */
 export async function listPlans(client: SqlClient): Promise<PlanRow[]> {
   const { rows } = await client.query<PlanRow>(
     `select public.auth_email_of("userId") as email, "plan", "updatedAt"
        from "UserPlan"
+      where "plan" <> 'free'
       order by 1`,
   );
   return rows;

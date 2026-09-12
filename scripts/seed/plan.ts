@@ -3,7 +3,7 @@ import { isoDate } from "@/lib/dates";
 import { ACCEPTED_TYPES, DOCUMENT_KIND_LABEL, extensionOf, type DocumentKind } from "@/lib/documents";
 import type { Accent, ActivityEntry, Stage } from "@/lib/jobs";
 import { newJobFacts, stageChange } from "@/lib/jobs-rules";
-import { DEFAULT_PLAN, limitsOf, type Plan } from "@/lib/plans";
+import { DEFAULT_PLAN, limitsOf, withinLimit, type Plan } from "@/lib/plans";
 import {
   jobPatchSchema,
   newContactSchema,
@@ -291,10 +291,11 @@ export function planAccount(account: SeedAccount, today: string): PlannedAccount
   if (!account.verified && (documents.length > 0 || contacts.length > 0 || jobs.length > 0 || lettersUsed > 0)) {
     throw new SeedPlanError(`${where}: an unverified account has never signed in, so it can own nothing`);
   }
-  if (limits.documents !== "unlimited" && documents.length > limits.documents) {
+  // Holding exactly the Limit is allowed; the app refuses the one after.
+  if (documents.length > 0 && !withinLimit(documents.length - 1, limits.documents)) {
     throw new SeedPlanError(`${where}: an account on ${plan} holds at most ${limits.documents} documents`);
   }
-  if (lettersUsed < 0 || (limits.lettersPerWeek !== "unlimited" && lettersUsed > limits.lettersPerWeek)) {
+  if (lettersUsed < 0 || (lettersUsed > 0 && !withinLimit(lettersUsed - 1, limits.lettersPerWeek))) {
     throw new SeedPlanError(`${where}: a week on ${plan} holds at most ${limits.lettersPerWeek} cover letters`);
   }
   checkUniqueKeys(where, documents);

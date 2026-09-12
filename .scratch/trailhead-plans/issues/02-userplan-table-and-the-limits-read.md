@@ -62,3 +62,6 @@ SELECT-only policy would have stopped the migrator from writing the row it exist
 migrator is named in a policy of its own, and the tenant-isolation test asserts exactly that pair.
 And the planned `grant select on auth.users` cannot work on Supabase (see issue 04's comment); the
 email lookup is two definer functions instead.
+
+Seam 1's "the app role cannot insert or update a row" is asserted in `tests/integration/plans.test.ts`
+(PLAN-6) rather than in the tenant-isolation file, which checks the policies' shape instead.

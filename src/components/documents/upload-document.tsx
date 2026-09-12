@@ -14,7 +14,7 @@ import {
   type DocumentKind,
   type DocumentSummary,
 } from "@/lib/documents";
-import type { Limit } from "@/lib/plans";
+import { withinLimit, type Limit } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 type UploadDocumentProps = {
@@ -25,7 +25,7 @@ type UploadDocumentProps = {
   defaultKind?: DocumentKind;
   /** Called with the new Document once its text has been read. */
   onUploaded?: (document: DocumentSummary) => void;
-  /** Where the at-cap line points; omit on the documents page itself. */
+  /** Where the at-the-Limit line points; omit on the documents page itself. */
   manageHref?: string;
   className?: string;
 };
@@ -50,7 +50,7 @@ export function UploadDocument({
   const { state, upload } = useDocumentUpload({ onUploaded });
   const busy = state.phase === "uploading" || state.phase === "reading";
   const room = roomLeft(held, limit);
-  const full = limit !== "unlimited" && held >= limit;
+  const full = !withinLimit(held, limit);
 
   if (full && !busy) {
     return (

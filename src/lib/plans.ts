@@ -35,3 +35,8 @@ export const PLAN_LIMITS = {
 export function limitsOf(plan: Plan): Limits {
   return PLAN_LIMITS[plan];
 }
+
+/** True while one more would still be allowed: below the number, or any count when unlimited. */
+export function withinLimit(count: number, limit: Limit): boolean {
+  return limit === "unlimited" || count < limit;
+}
