@@ -182,6 +182,19 @@ describe("a seeded account is one the app could have produced", () => {
     expect(planAccount(account(), TODAY).lettersUsed).toBe(0);
   });
 
+  it("SEED-4: an account is held to its own Plan's Limits, and the default Plan is free", () => {
+    const resume = { kind: "resume", fileName: "resume.pdf", lines: ["Sam Rivera"], uploadedDaysAgo: 5 } as const;
+    const four = ["a", "b", "c", "d"].map((key) => ({ ...resume, key }));
+
+    const pro = planAccount(account({ plan: "pro", documents: four, lettersUsed: 7 }), TODAY);
+    expect(pro.plan).toBe("pro");
+    expect(pro.documents).toHaveLength(4);
+    expect(pro.lettersUsed).toBe(7);
+
+    expect(planAccount(account(), TODAY).plan).toBe("free");
+    expect(() => planAccount(account({ documents: four }), TODAY)).toThrow(/on free holds at most 3 documents/);
+  });
+
   it("SEED-5: refuses an account the app could never have produced, and says what is wrong", () => {
     const job = { company: "Fernwood", role: "Product Designer", location: "Remote (US)", addedDaysAgo: 10 };
     const resume = {
@@ -205,7 +218,8 @@ describe("a seeded account is one the app could have produced", () => {
       ["a key used twice", { contacts: [dana, dana] }, /"dana" twice/],
       ["a document the app would not accept", { documents: [{ ...resume, fileName: "resume.docx" }] }, /\.pdf/],
       ["a file name longer than an upload allows", { documents: [{ ...resume, fileName: `${"r".repeat(252)}.pdf` }] }, /fileName/],
-      ["more letters than the quota", { lettersUsed: 6 }, /at most 5 cover letters/],
+      ["more letters than the quota", { lettersUsed: 6 }, /on free holds at most 5 cover letters/],
+      ["more letters than pro's week", { plan: "pro", lettersUsed: 26 }, /on pro holds at most 25 cover letters/],
       ["a move to the stage it is in", { jobs: [{ ...job, moves: [{ stage: "interested", daysAgo: 5 }] }] }, /already/],
       ["a move before it was added", { jobs: [{ ...job, moves: [{ stage: "applied", daysAgo: 12 }] }] }, /before/],
       [

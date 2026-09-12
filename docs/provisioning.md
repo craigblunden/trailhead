@@ -53,6 +53,7 @@ server. Never enable it on the hosted project, and never `supabase config push` 
 | Concern | Owner | File |
 | --- | --- | --- |
 | Extensions, the two roles, schema grants, the `documents` bucket, storage policies, the janitor's cron schedule | Supabase CLI migration, run as `postgres` | `supabase/migrations/20260911000000_provision_trailhead.sql` |
+| The migrator's read of `auth.users`, for `npm run db:plan` to find a user by email | Supabase CLI migration, run as `postgres` | `supabase/migrations/20260912000000_plans.sql` |
 | Local bucket declaration, auth settings (confirmations on, 8-character minimum), redirect allow-list, social providers | Supabase CLI config | `supabase/config.toml` |
 | Application tables, enums, indexes, RLS policies, the sweep function | Prisma migrations, run as `trailhead_migrator` | `prisma/migrations/` |
 | Development passwords for the two roles (never pushed) | Local seed | `supabase/seed.sql` |
@@ -64,7 +65,7 @@ An applied migration is never edited. A change is a new migration.
 
 | Role | Connects | Used by |
 | --- | --- | --- |
-| `trailhead_migrator` | direct, session mode (5432 hosted, 54322 local) — `DIRECT_URL` | `prisma migrate` only |
+| `trailhead_migrator` | direct, session mode (5432 hosted, 54322 local) — `DIRECT_URL` | `prisma migrate`, and `npm run db:plan` |
 | `trailhead_app` | Supavisor, transaction mode (6543 hosted, 54329 local) — `DATABASE_URL` | the running application |
 
 Supabase's own Prisma quickstart creates the app role `with … bypassrls`. That leaves every tenant
@@ -106,6 +107,30 @@ Things only a dashboard login can do. Do them once, in this order.
    reach.
 9. **Confirm the bucket** under _Storage_: `documents`, private, 5 MB limit, MIME types
    `application/pdf` and the DOCX type. The migration creates it; this is a check.
+
+## Putting an account on a Plan
+
+A Tenant's Plan is a row in `"UserPlan"` that only the migrator may write (ADR-0001); the
+application role reads it and nothing more. With `DIRECT_URL` set for the project in question:
+
+```sh
+npm run db:plan                          # who is on pro
+npm run db:plan -- you@example.com pro   # put an account on pro
+npm run db:plan -- you@example.com free  # back to free (the row is removed)
+```
+
+The same thing from the SQL editor, should the script not be to hand:
+
+```sql
+insert into "UserPlan" ("userId", "plan", "updatedAt")
+select id, 'pro', now() from auth.users where lower(email) = lower('you@example.com')
+on conflict ("userId") do update set "plan" = excluded."plan", "updatedAt" = now();
+
+-- back to free
+delete from "UserPlan" where "userId" = (select id from auth.users where lower(email) = lower('you@example.com'));
+```
+
+What each Plan allows is code, not rows: `src/lib/plans.ts`.
 
 ## Hosted: Vercel
 

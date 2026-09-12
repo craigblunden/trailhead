@@ -80,6 +80,7 @@ Auth are on this machine.
 | `new@trailhead.test` | First run: the empty board, contacts, and documents |
 | `searching@trailhead.test` | Mid-search: eight jobs across all five stages, a recruiter on three of them, a resume and a cover letter in kits, and two of this week's five letters used. Harvest & Co is ready to write a letter, Cobalt's description is short, and Meridian has no resume |
 | `at-limits@trailhead.test` | At every limit: all three document slots used, so upload refuses, and this week's letters used, so Tidewater's card says when the next ones arrive |
+| `pro@trailhead.test` | On the pro plan: four documents on file and seven of this week's 25 letters used, both past what free allows. Summit Devtools is ready to write another |
 | `unverified@trailhead.test` | Signed up and never verified: sign-in asks to verify, and the resent link lands in Mailpit |
 
 - **Cover-letter states need `ANTHROPIC_API_KEY`.** Without it, every job's cover-letter card says
@@ -91,6 +92,9 @@ Auth are on this machine.
   it verified and says so; `npm run db:reset` starts it over.
 - **`npm run test:integration` empties every application table**, including the seeded accounts'
   data. Seed again afterwards.
+- **Any account can be put on pro by hand**: `npm run db:plan -- you@example.com pro`, and `free`
+  to take it back. With no arguments it lists who is on pro. It runs as the migrator over
+  `DIRECT_URL`, so it works against the hosted project too (`docs/provisioning.md`).
 
 The accounts are written in `scripts/seed/accounts.ts`. The seed builds them with the app's own
 rules and validation, and `tests/seed/` fails if an account stops showing its flow.

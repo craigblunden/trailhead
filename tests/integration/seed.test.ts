@@ -8,6 +8,7 @@ import { listContacts } from "@/server/data/contacts";
 import { documentDownloadUrl, listDocuments } from "@/server/data/documents";
 import { generationQuota } from "@/server/data/generation";
 import { createJob, listJobs } from "@/server/data/jobs";
+import { currentPlan } from "@/server/data/plans";
 
 import { uniqueEmail, waitForMail } from "../../e2e/mail";
 import { planAccount, type SeedAccount } from "../../scripts/seed/plan";
@@ -232,6 +233,29 @@ describe("npm run db:seed", () => {
     await expect(seedAccount(account, { email, password: PASSWORD })).resolves.toMatch(/already verified/);
     expect((await passwordSignIn(email)).error).toBeNull();
   }, 90_000);
+
+  it("SEED-12: an account on pro is put on pro, holds more than free allows, and goes back to free when seeded as free", async () => {
+    const email = uniqueEmail("seed");
+    const four = ["a", "b", "c", "d"].map((key) => ({
+      key,
+      kind: "resume" as const,
+      fileName: `resume-${key}.pdf`,
+      lines: [`Sam Rivera - Product Designer (${key})`],
+      uploadedDaysAgo: 3,
+    }));
+    const pro: SeedAccount = { key: "pro", name: "Sam Rivera", verified: true, plan: "pro", documents: four, lettersUsed: 7 };
+
+    await seedAccount(pro, { email, password: PASSWORD });
+    await signInTo(email);
+    expect(await currentPlan()).toBe("pro");
+    expect(await listDocuments()).toHaveLength(4);
+    expect(await generationQuota()).toMatchObject({ limit: 25, used: 7 });
+
+    await seedAccount({ key: "pro", name: "Sam Rivera", verified: true }, { email, password: PASSWORD });
+    await signInTo(email);
+    expect(await currentPlan()).toBe("free");
+    expect(await listDocuments()).toHaveLength(0);
+  }, 120_000);
 
   it("SEED-11: refuses an existing account whose password is no longer the seed's, rather than guessing", async () => {
     const email = uniqueEmail("seed");

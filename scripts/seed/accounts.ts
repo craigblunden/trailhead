@@ -83,6 +83,56 @@ const MORGAN_LETTER = [
   "Morgan Hale",
 ];
 
+const JORDAN_RESUME = [
+  "Jordan Reyes - Staff Product Designer",
+  "Denver, CO | jordan.reyes@example.com",
+  "Ten years designing developer tools and data products; leads a team of five.",
+  "EXPERIENCE",
+  "Cinder Cloud - Staff Product Designer - 2022 to present",
+  "- Lead design for the deploy pipeline and logs; time to first deploy down 40 percent.",
+  "- Set up the research practice: 60 customer sessions a year, shared across three teams.",
+  "Ridgeline Data - Senior Product Designer - 2018 to 2022",
+  "- Designed the query builder used by 2,000 analysts; adoption doubled after the redesign.",
+  "- Shipped the design system used by every Ridgeline product.",
+  "SKILLS",
+  "Product strategy, developer tools, data visualization, design systems, code prototypes.",
+];
+
+const JORDAN_PLATFORM_RESUME = [
+  "Jordan Reyes - Staff Product Designer, Platform",
+  "Denver, CO | jordan.reyes@example.com",
+  "Ten years on developer platforms: CLIs, APIs, dashboards, and the docs that explain them.",
+  "EXPERIENCE",
+  "Cinder Cloud - Staff Product Designer - 2022 to present",
+  "- Own the developer platform surface: CLI, API console, and onboarding for new accounts.",
+  "- Built a getting-started flow with docs and DevRel; 70 percent of sign-ups finish it.",
+  "Ridgeline Data - Senior Product Designer - 2018 to 2022",
+  "- Designed the public API console and the SDK reference used by partner engineers.",
+  "SKILLS",
+  "Developer experience, API design, information architecture, technical writing.",
+];
+
+const JORDAN_SUMMIT_LETTER = [
+  "Jordan Reyes | jordan.reyes@example.com",
+  "Dear Summit Devtools team,",
+  "I'm applying for the Principal Product Designer role. At Cinder Cloud I lead design",
+  "for the deploy pipeline and logs; at Ridgeline I designed the query builder analysts use.",
+  "Summit's focus on the first hour of a developer's experience is exactly the work I want to",
+  "keep doing. I'd welcome a conversation about your onboarding roadmap.",
+  "Thank you,",
+  "Jordan Reyes",
+];
+
+const JORDAN_ORBIT_LETTER = [
+  "Jordan Reyes | jordan.reyes@example.com",
+  "Dear Orbit Analytics team,",
+  "I'm writing about the Design Lead, Data Products role. I've spent ten years on data and",
+  "developer products, most recently leading a team of five at Cinder Cloud, and I'd love to",
+  "bring that to Orbit's dashboards and alerting.",
+  "Thank you for your time,",
+  "Jordan Reyes",
+];
+
 export const SEED_ACCOUNTS: readonly SeedAccount[] = [
   {
     key: "new",
@@ -369,6 +419,82 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
       },
     ],
     lettersUsed: 5,
+  },
+  {
+    key: "pro",
+    name: "Jordan Reyes",
+    verified: true,
+    plan: "pro",
+    about:
+      "On pro: four documents on file and seven letters written this week, both past what free allows. " +
+      "Summit Devtools is ready to write another.",
+    documents: [
+      {
+        key: "resume",
+        kind: "resume",
+        fileName: "jordan-reyes-resume.pdf",
+        lines: JORDAN_RESUME,
+        uploadedDaysAgo: 30,
+      },
+      {
+        key: "platform-resume",
+        kind: "resume",
+        fileName: "jordan-reyes-resume-platform.pdf",
+        lines: JORDAN_PLATFORM_RESUME,
+        uploadedDaysAgo: 18,
+      },
+      {
+        key: "summit-letter",
+        kind: "cover_letter",
+        fileName: "jordan-reyes-summit-cover-letter.pdf",
+        lines: JORDAN_SUMMIT_LETTER,
+        uploadedDaysAgo: 10,
+      },
+      {
+        key: "orbit-letter",
+        kind: "cover_letter",
+        fileName: "jordan-reyes-orbit-cover-letter.pdf",
+        lines: JORDAN_ORBIT_LETTER,
+        uploadedDaysAgo: 4,
+      },
+    ],
+    jobs: [
+      {
+        company: "Summit Devtools",
+        role: "Principal Product Designer",
+        location: "Remote (US)",
+        salaryMin: 190,
+        salaryMax: 230,
+        postingUrl: "https://summitdevtools.example.com/careers/principal-product-designer",
+        description:
+          "Summit Devtools builds the local development environment used by 40,000 engineers. We're hiring a " +
+          "Principal Product Designer to own the first hour of a developer's experience: install, first run, " +
+          "and the moment a project builds. You'll work directly with the founders and two engineering teams, " +
+          "run the research that decides what we build next, and set the bar for craft across the product. " +
+          "Ten years in developer tools, and a record of shipping onboarding that measurably moved activation, " +
+          "are required.",
+        addedDaysAgo: 14,
+        moves: [{ stage: "applied", daysAgo: 10 }],
+        resume: "platform-resume",
+        coverLetter: "summit-letter",
+      },
+      {
+        company: "Orbit Analytics",
+        role: "Design Lead, Data Products",
+        location: "Hybrid · Denver",
+        salaryMin: 170,
+        salaryMax: 200,
+        postingUrl: "https://orbitanalytics.example.com/jobs/design-lead-data-products",
+        description:
+          "Orbit Analytics makes dashboards and alerting for on-call teams. The Design Lead will run a team of " +
+          "four across dashboards, alert routing, and the mobile app, and partner with product on the roadmap. " +
+          "Experience leading designers on data-heavy products is required.",
+        addedDaysAgo: 6,
+        resume: "resume",
+        coverLetter: "orbit-letter",
+      },
+    ],
+    lettersUsed: 7,
   },
   {
     key: "unverified",

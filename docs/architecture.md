@@ -104,7 +104,7 @@ sequenceDiagram
 
   B->>A: startUpload(name, kind, size)
   A->>D: validated input
-  D->>PG: lock tenant · check cap of 3 · insert pending row + key
+  D->>PG: lock tenant · check the Plan's Document Limit · insert pending row + key
   D->>S: createSignedUploadUrl(key) as the user
   D-->>B: path + token
   B->>S: PUT bytes (bucket enforces 5 MB, PDF/DOCX)
@@ -157,7 +157,7 @@ sequenceDiagram
   B->>R: POST /api/jobs/:id/cover-letter
   R->>G: generateCoverLetter(job, Claude client)
   G->>D: coverLetterInputs(job) — not yours, or no resume or description
-  G->>D: reserveCoverLetter() — upsert, only while used < 5 this week
+  G->>D: reserveCoverLetter() — upsert, only while used < the Plan's letters this week
   D->>PG: quota row under RLS
   G->>C: messages.create (claude-opus-5, adaptive thinking, refusal fallback)
   alt stop_reason end_turn
@@ -231,10 +231,20 @@ erDiagram
     date weekStart
     int used
   }
+  UserPlan {
+    uuid userId
+    enum plan
+  }
 ```
 
 Every table carries its own `userId`, so every policy tests a column rather than reaching through a
 parent. Users themselves live in Supabase's `auth` schema, which Prisma does not model.
+
+`UserPlan` is the one table the application role can read but not write (ADR-0001): a Tenant's
+Plan decides its Limits — Documents held, cover letters per week — and is set by
+`npm run db:plan`, as the migrator. No row means the free Plan. The numbers each Plan allows are
+code, in `src/lib/plans.ts`, and the two sites that enforce them read the Plan inside the same
+transaction as the count it guards.
 
 ## Where the decisions are
 

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import pg from "pg";
 
 import { PrismaClient, type Prisma } from "@/generated/prisma/client";
 import { todayUtc } from "@/lib/dates";
@@ -10,6 +11,7 @@ import { weekStartOf } from "@/lib/generation";
 import { toDateColumn } from "@/server/db/mappers";
 
 import { waitForMail } from "../../e2e/mail";
+import { setPlanForUser } from "../plan/set-plan";
 
 import { assertLocalStack } from "./local-only";
 import { planAccount, type PlannedAccount, type SeedAccount } from "./plan";
@@ -21,6 +23,8 @@ import { planAccount, type PlannedAccount, type SeedAccount } from "./plan";
  *   real verification mail out of Mailpit — exactly as `tests/integration/social-helpers.ts` does.
  * - **Rows** are written as `trailhead_app` under the account's own tenant id, so the same row-level
  *   security that guards the app decides what the seed may write.
+ * - **The Plan** is the one row the app role may not write (ADR-0001), so it is set the way
+ *   `npm run db:plan` sets it: as `trailhead_migrator`, over `DIRECT_URL`.
  * - **Files** go to Storage through the account's own session, under the same storage policies.
  *
  * Seeding an account that already exists resets it to its plan: the tenant's files and rows go, then
@@ -293,6 +297,16 @@ export async function seedAccount(
     await writeTenant(prisma, bucket, ensured.userId, plan, now);
   } finally {
     await prisma.$disconnect();
+  }
+
+  // Seeding resets the account to its plan, and the Plan is part of it: an account seeded as free
+  // comes off pro too.
+  const migrator = new pg.Client({ connectionString: requireEnv("DIRECT_URL") });
+  await migrator.connect();
+  try {
+    await setPlanForUser(migrator, ensured.userId, plan.plan);
+  } finally {
+    await migrator.end();
   }
   return null;
 }

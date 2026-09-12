@@ -1,6 +1,6 @@
 # 04: The `db:plan` script and the seeded `pro` account
 
-**Status:** ready
+**Status:** ready-for-review
 **Blocked by:** 02
 
 ## What to build
@@ -38,3 +38,16 @@ account's** Limits, not the free ones, so `free` accounts still cannot be seeded
    has used more than `free`'s weekly letters; every other account stays within `free`.
 2. `tests/seed/plan.test.ts` — an account over its own Plan's Limits is refused by the planner.
 3. `tests/integration/seed.test.ts` — after seeding, the `pro` account reads as `pro`.
+
+## Comments
+
+**Built as written, with one deviation.** Issue 02 planned `grant select on auth.users to
+trailhead_migrator`. On Supabase the `auth` schema is owned by `supabase_admin`, and `postgres` holds
+usage on it without grant option, so the grant on the table succeeds and is useless: the migrator
+still cannot enter the schema. The Supabase migration instead creates two `security definer`
+functions owned by `postgres` — `auth_user_id_by_email(text)` and `auth_email_of(uuid)` — executable
+by the migrator only. The script and the seed go through them; nothing else in `auth` is opened.
+
+The script's core (`scripts/plan/set-plan.ts`) takes a `pg` client so the CLI, the seed, and the
+integration test share one set of statements. `tests/integration/plan-script.test.ts` runs it against
+real Auth users.

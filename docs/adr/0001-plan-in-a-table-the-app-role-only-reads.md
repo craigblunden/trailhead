@@ -28,3 +28,6 @@ only by `trailhead_migrator` (through `npm run db:plan`) or by hand in the dashb
   surprising.
 - The Limit numbers themselves are code (`src/lib/plans.ts`), not rows. Raising what `pro` gets
   is a deploy; moving one Tenant between Plans is a row.
+- The script takes an email and the table stores an id. The `auth` schema is not ours to open
+  (`postgres` cannot grant usage on it), so two `security definer` functions owned by `postgres`
+  do the two lookups, executable by the migrator alone.

@@ -27,6 +27,7 @@ function isLoopback(url: string | undefined, protocols: readonly string[]): bool
 export function assertLocalStack(env: Record<string, string | undefined>): void {
   const checks: [string, string | undefined, readonly string[]][] = [
     ["DATABASE_URL", env.DATABASE_URL, ["postgresql:", "postgres:"]],
+    ["DIRECT_URL", env.DIRECT_URL, ["postgresql:", "postgres:"]],
     ["NEXT_PUBLIC_SUPABASE_URL", env.NEXT_PUBLIC_SUPABASE_URL, ["http:"]],
   ];
   if (env.TEST_MAIL_API_URL !== undefined) checks.push(["TEST_MAIL_API_URL", env.TEST_MAIL_API_URL, ["http:"]]);

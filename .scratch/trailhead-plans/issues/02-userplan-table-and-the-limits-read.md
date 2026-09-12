@@ -54,3 +54,11 @@ Both call `requireSession()` first, like every data function, and read under `wi
    proves the grant).
 2. `tests/integration/plans.test.ts` — no row reads as `free`; a `pro` row (written as the
    migrator, the way the script will) reads as `pro` with `pro`'s Limits.
+
+## Comments
+
+**Two things the migration learned.** Forced row-level security binds the table's owner too, so a
+SELECT-only policy would have stopped the migrator from writing the row it exists to write: the
+migrator is named in a policy of its own, and the tenant-isolation test asserts exactly that pair.
+And the planned `grant select on auth.users` cannot work on Supabase (see issue 04's comment); the
+email lookup is two definer functions instead.

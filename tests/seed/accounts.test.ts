@@ -27,8 +27,8 @@ const holdings = (account: PlannedAccount) => ({
 const descriptionLength = (job: PlannedAccount["jobs"][number]) => job.description.trim().length;
 
 describe("the seeded accounts", () => {
-  it("SEED-6: are the four agreed accounts, each plans cleanly, and every document passes extraction as stored", async () => {
-    expect(SEED_ACCOUNTS.map((account) => account.key)).toEqual(["new", "searching", "at-limits", "unverified"]);
+  it("SEED-6: are the five agreed accounts, each plans cleanly, and every document passes extraction as stored", async () => {
+    expect(SEED_ACCOUNTS.map((account) => account.key)).toEqual(["new", "searching", "at-limits", "pro", "unverified"]);
 
     for (const account of SEED_ACCOUNTS) {
       for (const document of planAccount(account, TODAY).documents) {
@@ -81,6 +81,19 @@ describe("the seeded accounts", () => {
     expect(account.documents).toHaveLength(PLAN_LIMITS.free.documents);
     expect(account.lettersUsed).toBe(PLAN_LIMITS.free.lettersPerWeek);
     expect(account.jobs.some((job) => job.resume && descriptionLength(job) >= SHORT_DESCRIPTION_CHARS)).toBe(true);
+  });
+
+  it("SEED-7: on pro — past free's Document Limit and past free's letters this week, with a job ready to write", () => {
+    const account = planned("pro");
+    expect(account.plan).toBe("pro");
+    expect(account.documents.length).toBeGreaterThan(PLAN_LIMITS.free.documents);
+    expect(account.lettersUsed).toBeGreaterThan(PLAN_LIMITS.free.lettersPerWeek);
+    expect(account.lettersUsed).toBeLessThan(PLAN_LIMITS.pro.lettersPerWeek);
+    expect(account.jobs.some((job) => job.resume && descriptionLength(job) >= SHORT_DESCRIPTION_CHARS)).toBe(true);
+
+    for (const other of SEED_ACCOUNTS.filter((candidate) => candidate.key !== "pro")) {
+      expect(other.plan, other.key).toBeUndefined();
+    }
   });
 
   it("SEED-7: unverified — signed up, never verified, owning nothing", () => {

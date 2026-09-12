@@ -19,6 +19,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx scripts/seed.ts",
+    "db:plan": "tsx scripts/plan.ts",
     "icons": "tsx scripts/icons.tsx",
     "db:reset": "supabase db reset && prisma migrate deploy",
     "db:studio": "prisma studio",
