@@ -120,15 +120,19 @@ npm run db:plan -- you@example.com pro     # put an account on pro
 npm run db:plan -- you@example.com free    # back to free (the row is removed)
 ```
 
-The same thing from the SQL editor, should the script not be to hand:
+The same thing in SQL, should the script not be to hand. Run it connected as `trailhead_migrator`
+over `DIRECT_URL` (with `psql`, say), not from the dashboard's SQL editor: that runs as `postgres`,
+which has no grant on `"UserPlan"`. An email nobody signed up with fails on the empty `"userId"`
+rather than writing nothing.
 
 ```sql
+-- 'basic' or 'pro'
 insert into "UserPlan" ("userId", "plan", "updatedAt")
-select id, 'pro', now() from auth.users where lower(email) = lower('you@example.com')
+values (public.auth_user_id_by_email('you@example.com'), 'pro', now())
 on conflict ("userId") do update set "plan" = excluded."plan", "updatedAt" = now();
 
 -- back to free
-delete from "UserPlan" where "userId" = (select id from auth.users where lower(email) = lower('you@example.com'));
+delete from "UserPlan" where "userId" = public.auth_user_id_by_email('you@example.com');
 ```
 
 What each Plan allows is code, not rows: `src/lib/plans.ts`.
