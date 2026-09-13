@@ -1,9 +1,11 @@
 "use client";
 
+import { AppFeedback, AppFeedbackPlaceholder } from "@/components/app-feedback";
 import { AppNav } from "@/components/app-nav";
 import { PageWaitSlot } from "@/components/page-wait";
 import { useSessionUser } from "@/components/session-provider";
 import { UserMenu } from "@/components/user-menu";
+import { sendAppFeedbackAction } from "@/server/actions/app-feedback";
 import { signOutAction } from "@/server/auth/actions";
 
 type AppHeaderProps = {
@@ -11,8 +13,9 @@ type AppHeaderProps = {
   leading: React.ReactNode;
   actions?: React.ReactNode;
   /**
-   * While the page is still loading, the account menu is drawn as a placeholder. A live menu would be
-   * replaced by the page's own header when it arrives, closing itself under an open click.
+   * While the page is still loading, the Feedback button and account menu are drawn as placeholders. A
+   * live one would be replaced by the page's own header when it arrives, closing itself under an open
+   * click.
    */
   loading?: boolean;
 };
@@ -39,14 +42,20 @@ export function AppHeader({ leading, actions, loading = false }: AppHeaderProps)
           <PageWaitSlot />
           {user &&
             (loading ? (
-              <span aria-hidden="true" className="size-8 rounded-full bg-muted" />
+              <>
+                <AppFeedbackPlaceholder />
+                <span aria-hidden="true" className="size-8 rounded-full bg-muted" />
+              </>
             ) : (
-              <UserMenu
-                name={user.name}
-                email={user.email}
-                plan={user.plan}
-                signOut={signOutAction}
-              />
+              <>
+                <AppFeedback send={sendAppFeedbackAction} />
+                <UserMenu
+                  name={user.name}
+                  email={user.email}
+                  plan={user.plan}
+                  signOut={signOutAction}
+                />
+              </>
             ))}
         </div>
       </div>

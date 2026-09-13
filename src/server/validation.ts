@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+import {
+  APP_FEEDBACK_MAX_CHARS,
+  APP_FEEDBACK_REFUSALS,
+  appFeedbackWords,
+  isAppFeedbackRating,
+  type AppFeedbackRating,
+} from "@/lib/app-feedback";
 import { CONTACT_KINDS, CONTACT_LIMITS } from "@/lib/contacts";
 import { todayUtc } from "@/lib/dates";
 import { DOCUMENT_KINDS, MAX_UPLOAD_BYTES, UPLOAD_REFUSALS, extensionOf } from "@/lib/documents";
@@ -212,6 +219,26 @@ export const coverLetterRequestSchema = z.object({
 });
 
 export type CoverLetterRequestInput = z.infer<typeof coverLetterRequestSchema>;
+
+/**
+ * App feedback (`src/lib/app-feedback.ts`): a whole rating from one to five and the user's words,
+ * stripped of invisible characters and bounded, since they land in the owner's inbox. Strict, so
+ * nothing else — a recipient, a subject — can ride along.
+ */
+export const appFeedbackSchema = z.strictObject({
+  rating: z.custom<AppFeedbackRating>(isAppFeedbackRating, APP_FEEDBACK_REFUSALS.rating),
+  message: z
+    .string(APP_FEEDBACK_REFUSALS.message)
+    .transform(appFeedbackWords)
+    .pipe(
+      z
+        .string()
+        .min(1, APP_FEEDBACK_REFUSALS.message)
+        .max(APP_FEEDBACK_MAX_CHARS, `Keep this under ${APP_FEEDBACK_MAX_CHARS} characters`),
+    ),
+});
+
+export type AppFeedbackInput = z.infer<typeof appFeedbackSchema>;
 
 /** Ids are opaque cuids; this only stops a caller handing us a novel. */
 export const idSchema = z.string().trim().min(1).max(64);

@@ -1,8 +1,9 @@
 # Architecture
 
 Trailhead is one Next.js application deployed to Vercel, backed by one Supabase project (Postgres,
-Auth, Storage), with a single outbound AI call to the Anthropic API. There is no queue, no worker,
-and no second service: generation and document ingestion run in-request, and `pg_cron` runs one
+Auth, Storage), with a single outbound AI call to the Anthropic API and one outbound mail call to
+Resend, which carries App feedback to the owner. There is no queue, no worker, and no second
+service: generation, document ingestion, and that mail run in-request, and `pg_cron` runs one
 janitor.
 
 The terms below are the glossary's (`CONTEXT.md`): a **Job**, a **Contact**, a **Document**, a
@@ -33,6 +34,7 @@ flowchart LR
 
   anthropic["Anthropic API<br/>claude-sonnet-5"]
   smtp["SMTP<br/>(Mailpit locally)"]
+  resend["Resend API<br/>App feedback to the owner"]
 
   browser -->|"pages, navigation"| proxy --> pages
   browser -->|"Server Action POSTs"| actions
@@ -44,6 +46,7 @@ flowchart LR
   actions --> dal
   route --> dal
   route --> anthropic
+  actions -->|"requireSession, then send"| resend
   dal -->|"validate session: getUser"| auth
   dal -->|"trailhead_app, tenant set per transaction"| pooler --> pg
   dal -->|"as the user: sign, download, remove"| storage

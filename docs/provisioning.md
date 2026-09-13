@@ -163,6 +163,20 @@ tenant and the source (`feedback` or `hidden`) and never the text.
    without touching anything else.
 3. Deploy. Then add the deployment URL to the Supabase redirect allow-list (step 6 above).
 
+## App feedback mail
+
+The header's Feedback button emails the owner a rating and the user's words through Resend
+(`src/server/mail/app-feedback.ts`). Nothing is stored; the email's Reply-To is the user's address.
+
+1. Add the Resend integration to the Vercel project (Marketplace → Resend, or
+   `vercel integration add resend/resend-email`). It sets `RESEND_API_KEY`.
+2. Set `APP_FEEDBACK_TO_EMAIL` to the inbox that should receive it.
+3. Optionally verify a sending domain in Resend and set `APP_FEEDBACK_FROM_EMAIL`
+   (`Trailhead <feedback@your-domain>`). Until then Resend's test sender is used, which only
+   delivers to the address the Resend account belongs to — so `APP_FEEDBACK_TO_EMAIL` must be that one.
+
+A send that Resend refuses is logged as operation `appFeedback.send` with the status, never the words.
+
 ## What ticket 01 verified against a real stack
 
 Recorded here because the tickets that depend on it must not re-derive it.

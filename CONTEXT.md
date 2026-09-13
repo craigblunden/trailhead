@@ -118,6 +118,14 @@ week and lasting until that week ends. Nothing else about the Tenant changes: th
 and Contacts are untouched.
 _Avoid_: Ban, Suspension, Block, Lockout
 
+### Hearing from users
+
+**App feedback**:
+What the user tells the people who make Trailhead — a rating from one to five and their own words
+about an issue they hit, a feature they want, or how it is going. Emailed to the owner and stored
+nowhere. The header's button says "Feedback", but the code and this glossary say App feedback.
+_Avoid_: Feedback (which is about a letter), Report, Ticket, Review
+
 ### Boundaries
 
 **Tenant**:
