@@ -19,6 +19,8 @@ export const SEED_JOBS: Job[] = [
     appliedOn: null,
     resume: null,
     coverLetter: null,
+    draft: "",
+    draftWrittenAt: null,
     description:
       "Meridian Labs is building measurement tooling for climate teams. We're looking for a Senior Product Designer to own the analytics surface end to end.",
     notes:
@@ -40,6 +42,8 @@ export const SEED_JOBS: Job[] = [
     appliedOn: "2026-07-15",
     resume: { id: "seed-resume_growth_v2.pdf", fileName: "resume_growth_v2.pdf" },
     coverLetter: null,
+    draft: "",
+    draftWrittenAt: null,
     description:
       "Fernwood is a subscription plant company. The Growth design team owns onboarding, pricing, and the referral loop.",
     notes: "Recruiter said they move fast — expect a screen within a week.",
@@ -77,6 +81,8 @@ export const SEED_JOBS: Job[] = [
     appliedOn: "2026-07-09",
     resume: { id: "seed-resume_staff_v1.pdf", fileName: "resume_staff_v1.pdf" },
     coverLetter: null,
+    draft: "",
+    draftWrittenAt: null,
     description:
       "Cobalt Systems sells infrastructure monitoring to platform teams. The Staff UX role leads design for the incident response product.",
     notes:
@@ -101,6 +107,8 @@ export const SEED_JOBS: Job[] = [
     appliedOn: "2026-06-30",
     resume: { id: "seed-resume_lead_v1.pdf", fileName: "resume_lead_v1.pdf" },
     coverLetter: null,
+    draft: "",
+    draftWrittenAt: null,
     description:
       "Harvest & Co is a food-tech company hiring a Lead Product Designer to build out our merchant experience.",
     notes:
@@ -146,6 +154,8 @@ export const SEED_JOBS: Job[] = [
     appliedOn: "2026-07-04",
     resume: { id: "seed-resume_generalist_v3.pdf", fileName: "resume_generalist_v3.pdf" },
     coverLetter: null,
+    draft: "",
+    draftWrittenAt: null,
     description:
       "Northbeam builds route planning for regional freight. This role sits on the dispatcher tools team.",
     notes: "No band posted. Ask the recruiter before the second round.",
@@ -184,6 +194,8 @@ export const SEED_JOBS: Job[] = [
     appliedOn: "2026-06-14",
     resume: { id: "seed-resume_senior_v4.pdf", fileName: "resume_senior_v4.pdf" },
     coverLetter: null,
+    draft: "",
+    draftWrittenAt: null,
     description:
       "Bramble is a family scheduling app. The Senior UX role owns the shared-calendar experience across web and mobile.",
     notes: "Offer verbal on Jul 21. Written offer expected this week — compare against Harvest.",
@@ -219,6 +231,8 @@ export const SEED_JOBS: Job[] = [
     appliedOn: "2026-06-24",
     resume: { id: "seed-resume_generalist_v3.pdf", fileName: "resume_generalist_v3.pdf" },
     coverLetter: null,
+    draft: "",
+    draftWrittenAt: null,
     description:
       "Quill Health builds intake software for small clinics. The role covers patient-facing forms and scheduling.",
     notes: "Passed after the screen — they wanted more healthcare domain depth.",

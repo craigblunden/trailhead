@@ -284,7 +284,18 @@ export function JobLoading({ id }: { id: string }) {
                 <Bar className="h-9 w-28 rounded-lg" />
               </div>
             </GhostCard>
-            <GhostCardBody lines={3} />
+            {/* The cover letter: its line, the letter block, and the Feedback box and buttons beneath it. */}
+            <GhostCard>
+              <Bar className="h-5 w-28" />
+              <Bar className="mt-2.5 h-3.5 w-full max-w-md" />
+              <Bar className="mt-4 h-32 w-full rounded-md" />
+              <Bar className="mt-4 h-3.5 w-36" />
+              <Bar className="mt-2 h-20 w-full rounded-md" />
+              <div className="mt-3 flex gap-3">
+                <Bar className="h-9 w-24 rounded-lg" />
+                <Bar className="h-9 w-28 rounded-lg" />
+              </div>
+            </GhostCard>
           </div>
 
           <div className="grid min-w-0 grid-cols-1 items-start gap-6 2xl:grid-cols-2">

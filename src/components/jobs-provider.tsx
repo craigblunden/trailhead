@@ -9,7 +9,7 @@ import { todayUtc } from "@/lib/dates";
 import type { Job, Stage } from "@/lib/jobs";
 import { jobsCache } from "@/lib/jobs-cache";
 import type { JobPatch, JobsClient, NewJobInput } from "@/lib/jobs-client";
-import { movedJob, newJob } from "@/lib/jobs-rules";
+import { movedJob, newJob, optimisticId } from "@/lib/jobs-rules";
 import {
   createJobAction,
   listJobsAction,
@@ -46,11 +46,6 @@ const defaultClient: JobsClient = {
   update: unwrapping(updateJobAction),
   setStage: unwrapping(setJobStageAction),
 };
-
-/** Optimistic ids are stamped so a stray one is recognisable in a bug report. */
-function optimisticId(): string {
-  return `optimistic-${crypto.randomUUID()}`;
-}
 
 /**
  * Job state lives in TanStack Query. The server prefetches the list under `jobsCache.key` and

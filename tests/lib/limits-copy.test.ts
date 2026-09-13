@@ -20,18 +20,25 @@ describe("the copy at the two Limit sites takes a Limit (plans issue 01)", () =>
   });
 
   it("quotaStatus reports what is left under a finite Limit, and 'unlimited' under none", () => {
-    expect(quotaStatus(2, "2026-07-20", 5)).toEqual({
+    expect(quotaStatus({ used: 2, flagged: 0 }, "2026-07-20", 5)).toEqual({
       limit: 5,
       used: 2,
       remaining: 3,
       resetsOn: "2026-07-27",
+      flags: 0,
+      held: false,
     });
-    expect(quotaStatus(9, "2026-07-20", 5)).toMatchObject({ used: 5, remaining: 0 });
-    expect(quotaStatus(40, "2026-07-20", "unlimited")).toEqual({
+    expect(quotaStatus({ used: 9, flagged: 0 }, "2026-07-20", 5)).toMatchObject({ used: 5, remaining: 0 });
+    // On Hold at two Flags, whatever is left; one Flag is only a count.
+    expect(quotaStatus({ used: 1, flagged: 1 }, "2026-07-20", 5)).toMatchObject({ flags: 1, held: false, remaining: 4 });
+    expect(quotaStatus({ used: 1, flagged: 2 }, "2026-07-20", 5)).toMatchObject({ flags: 2, held: true, remaining: 4 });
+    expect(quotaStatus({ used: 40, flagged: 0 }, "2026-07-20", "unlimited")).toEqual({
       limit: "unlimited",
       used: 40,
       remaining: "unlimited",
       resetsOn: "2026-07-27",
+      flags: 0,
+      held: false,
     });
   });
 });

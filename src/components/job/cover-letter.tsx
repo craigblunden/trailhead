@@ -1,13 +1,25 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { Copy, RotateCcw, Sparkles } from "lucide-react";
 
+import { jobCache } from "@/components/job-cache";
 import { coverLetterClient } from "@/components/job/cover-letter-client";
 import { Button } from "@/components/ui/button";
-import { SHORT_DESCRIPTION_CHARS, formatResetDay } from "@/lib/generation";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { todayUtc } from "@/lib/dates";
+import { FEEDBACK_MAX_CHARS, SHORT_DESCRIPTION_CHARS, formatResetDay, type Verdict } from "@/lib/generation";
 import type { Job } from "@/lib/jobs";
+import { optimisticId, withDraft } from "@/lib/jobs-rules";
 import type { GenerationStatus } from "@/server/actions/generation";
 
 const STATUS_KEY = ["generation-status"] as const;
@@ -15,48 +27,79 @@ const STATUS_KEY = ["generation-status"] as const;
 const WAITING =
   "Writing your cover letter. This usually takes 10 to 25 seconds — you can keep editing this page.";
 
+/** The count under the Feedback box appears from here, so the cap is seen before it is hit. */
+const COUNT_FROM = 400;
+
 type State =
   | { phase: "idle" }
-  | { phase: "writing"; startedAt: number }
-  | { phase: "written"; letter: string }
+  | { phase: "writing"; startedAt: number; rewrite: boolean }
+  | { phase: "written"; letter: string; verdict: Verdict; setAside: boolean }
   | { phase: "failed"; error: string; message: string; refunded: boolean };
 
 /**
- * The cover letter (tickets 13, 18, 19). The letter is never stored: it is text on this screen with
- * a copy button, and writing another replaces it.
+ * The cover letter (tickets 13, 18, 19; feedback issue 05). The Job keeps its last Draft (ADR-0002):
+ * the card shows it on return with Copy, and under it a Feedback box. Rewrite writes the letter again
+ * from the same resume and posting, the Draft, and the Feedback; Write again with the box empty asks
+ * first, then writes fresh. Each costs one letter, and each leaves an Activity entry.
  *
  * The waiting state is honest about what it knows. Generation is one request, so there are no fake
  * steps and no Cancel (the request would keep running and the letter would still be counted): an
  * elapsed count against the usual 10–25 seconds, announced once, and a note that the rest of the
  * page stays editable — which it does, because this is a Route Handler, not a queued Server Action.
+ *
+ * What the writer said about the material comes back with the letter and is explained here: a
+ * posting carrying directions aimed at AI tools, a request set aside for going beyond the resume, a
+ * first Flag and what a second one means, and a Hold until Monday. On Hold both buttons are off and
+ * the Draft stays copyable; nothing else about the page changes.
  */
 export function CoverLetterCard({ job }: { job: Job }) {
   const headingId = useId();
+  const feedbackId = useId();
   const queryClient = useQueryClient();
+  const cache = useMemo(() => jobCache(queryClient), [queryClient]);
   const status = useQuery({ queryKey: STATUS_KEY, queryFn: coverLetterClient.status, staleTime: 60_000 });
   const [state, setState] = useState<State>({ phase: "idle" });
+  const [feedback, setFeedback] = useState("");
+  const [confirming, setConfirming] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const quota = status.data;
   // The Plan's letters per week, when there is a number to show; an unlimited Limit has none.
   const perWeek = quota && quota.limit !== "unlimited" ? quota.limit : null;
   const atQuota = quota ? quota.remaining === 0 : false;
+  const held = quota?.held === true;
   const writing = state.phase === "writing";
   const hasDescription = job.description.trim().length > 0;
-  const canWrite = Boolean(quota?.available) && !atQuota && Boolean(job.resume) && hasDescription && !writing;
+  const canWrite =
+    Boolean(quota?.available) && !atQuota && !held && Boolean(job.resume) && hasDescription && !writing;
+  // The letter on show: the one just written, else the Job's Draft as the page holds it.
+  const letter = state.phase === "written" ? state.letter : job.draft;
+  const change = feedback.trim();
+  const canRewrite = canWrite && letter.length > 0 && change.length > 0;
 
-  async function write() {
+  async function write(withFeedback: string) {
+    const rewrite = withFeedback.length > 0;
     setCopied(false);
-    setState({ phase: "writing", startedAt: Date.now() });
-    const result = await coverLetterClient.generate(job.id);
+    setConfirming(false);
+    setState({ phase: "writing", startedAt: Date.now(), rewrite });
+    const result = await coverLetterClient.generate(job.id, withFeedback);
     if (result.quota && quota) {
       queryClient.setQueryData<GenerationStatus>(STATUS_KEY, { ...result.quota, available: quota.available });
     }
     if (result.ok) {
-      setState({ phase: "written", letter: result.letter });
+      // The server stored the Draft and its Activity entry; the cached Job is told the same.
+      const writtenAt = new Date().toISOString();
+      cache.record(job.id, (current) =>
+        withDraft(current, { letter: result.letter, rewrite, writtenAt, today: todayUtc() }, optimisticId),
+      );
+      setFeedback("");
+      setState({ phase: "written", letter: result.letter, verdict: result.verdict, setAside: result.setAside });
+    } else if (result.error === "held" && result.quota?.held) {
+      // The status now says letters are paused, and until when; the card needs no second line for it.
+      setState({ phase: "idle" });
     } else {
       // Only the server knows whether the letter was given back; a guess from the error code could
-      // tell the user a letter was not used when it was.
+      // tell the user a letter was not used when it was. The Feedback stays in the box to fix or resend.
       setState({
         phase: "failed",
         error: result.error,
@@ -66,14 +109,17 @@ export function CoverLetterCard({ job }: { job: Job }) {
     }
   }
 
-  async function copy(letter: string) {
+  async function copy(text: string) {
     try {
-      await navigator.clipboard.writeText(letter);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
     } catch {
       setCopied(false);
     }
   }
+
+  const resetDay = quota ? formatResetDay(quota.resetsOn) : "";
+  const firstFlag = state.phase === "written" && state.verdict === "feedback" && quota?.flags === 1 && !held;
 
   return (
     <section
@@ -92,8 +138,10 @@ export function CoverLetterCard({ job }: { job: Job }) {
         )}
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        Written fresh from this job’s description and the resume in its application kit. Each letter is
-        written by a paid AI model{perWeek !== null && `, so there are ${perWeek} a week`}.
+        Written from this job’s description and the resume in its application kit. The letter comes back
+        as plain text, with no formatting and nothing hidden in it, ready to paste into your own
+        cover-letter template. Each letter is written by a paid AI model
+        {perWeek !== null && `, so there are ${perWeek} a week`}.
       </p>
       {/* On the page from the start: a live region that arrives already holding its text is often
           not announced, so the wait is announced by filling this one. */}
@@ -129,23 +177,29 @@ export function CoverLetterCard({ job }: { job: Job }) {
             </p>
           ) : null}
 
-          {atQuota && perWeek !== null && !writing && (
-            <p className="mt-4 text-sm">
-              You’ve used all {perWeek} letters this week. Each one is written fresh by a paid AI
-              model; your next {perWeek} arrive {formatResetDay(quota.resetsOn)}.
+          {held ? (
+            <p role="status" className="mt-4 text-sm">
+              Cover letters are paused until {resetDay}.
             </p>
+          ) : (
+            atQuota &&
+            perWeek !== null &&
+            !writing && (
+              <p className="mt-4 text-sm">
+                You’ve used all {perWeek} letters this week. Each one is written fresh by a paid AI
+                model; your next {perWeek} arrive {resetDay}.
+              </p>
+            )
           )}
 
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Button className="h-9 px-3.5" disabled={!canWrite} onClick={write}>
-              <Sparkles aria-hidden="true" />
-              {writing
-                ? "Writing…"
-                : state.phase === "written" || state.phase === "failed"
-                  ? "Write another"
-                  : "Write cover letter"}
-            </Button>
-          </div>
+          {!letter && (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button className="h-9 px-3.5" disabled={!canWrite} onClick={() => write("")}>
+                <Sparkles aria-hidden="true" />
+                {writing ? "Writing…" : "Write cover letter"}
+              </Button>
+            </div>
+          )}
 
           {writing && <Writing startedAt={state.startedAt} />}
 
@@ -153,8 +207,9 @@ export function CoverLetterCard({ job }: { job: Job }) {
             <div role="alert" className="mt-4 rounded-md border border-destructive/40 bg-card px-4 py-3 text-sm">
               <p>{state.message}</p>
               {state.refunded && <p className="mt-1 text-muted-foreground">This didn’t use one of your letters.</p>}
-              {canWrite && (
-                <Button variant="outline" size="sm" className="mt-3" onClick={write}>
+              {/* Hidden characters are the user's to remove; resending the same text would be a second Flag. */}
+              {canWrite && state.error !== "hidden-feedback" && (letter ? change.length > 0 : true) && (
+                <Button variant="outline" size="sm" className="mt-3" onClick={() => write(change)}>
                   <RotateCcw aria-hidden="true" />
                   Try again
                 </Button>
@@ -162,17 +217,17 @@ export function CoverLetterCard({ job }: { job: Job }) {
             </div>
           )}
 
-          {state.phase === "written" && (
+          {letter && (
             <div className="mt-4">
               <div
                 role="region"
                 aria-label="Your cover letter"
                 className="rounded-md bg-card p-5 text-sm leading-relaxed whitespace-pre-wrap ring-1 ring-foreground/10"
               >
-                {state.letter}
+                {letter}
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <Button variant="outline" className="h-9 px-3.5" onClick={() => copy(state.letter)}>
+                <Button variant="outline" className="h-9 px-3.5" onClick={() => copy(letter)}>
                   <Copy aria-hidden="true" />
                   Copy letter
                 </Button>
@@ -180,13 +235,89 @@ export function CoverLetterCard({ job }: { job: Job }) {
                   {copied ? "Copied to your clipboard." : ""}
                 </p>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                This letter isn’t saved. Copy it before you leave the page.
-              </p>
+              <p className="mt-2 text-xs text-muted-foreground">Saved with this job. Each write replaces it.</p>
+
+              {state.phase === "written" && state.verdict === "material" && (
+                <p role="status" className="mt-3 text-sm">
+                  This posting contains instructions aimed at AI tools. The letter ignored them; you may
+                  want to read the posting for them.
+                </p>
+              )}
+              {state.phase === "written" && state.setAside && (
+                <p role="status" className="mt-3 text-sm">
+                  The letter keeps to what the resume shows; feedback asking for more than that was set
+                  aside.
+                </p>
+              )}
+              {firstFlag && (
+                <p role="alert" className="mt-3 rounded-md border border-destructive/40 bg-card px-4 py-3 text-sm">
+                  Your feedback contained directions to the writer, which it ignores. A second this week
+                  pauses letters until {resetDay}.
+                </p>
+              )}
+
+              <div className="mt-4">
+                <label htmlFor={feedbackId} className="block text-sm font-medium">
+                  What should change?
+                </label>
+                <p id={`${feedbackId}-hint`} className="mt-1 text-xs text-muted-foreground">
+                  A couple of sentences about this letter. A rewrite uses one of your letters.
+                </p>
+                <Textarea
+                  id={feedbackId}
+                  aria-describedby={`${feedbackId}-hint`}
+                  value={feedback}
+                  maxLength={FEEDBACK_MAX_CHARS}
+                  disabled={writing || held}
+                  onChange={(event) => setFeedback(event.target.value)}
+                  placeholder="Shorter, and lead with the marketplace redesign."
+                  className="mt-2 min-h-20 resize-y"
+                />
+                {feedback.length >= COUNT_FROM && (
+                  <p className="mt-1 text-xs text-muted-foreground tabular-nums" aria-live="polite">
+                    {feedback.length} of {FEEDBACK_MAX_CHARS}
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <Button className="h-9 px-3.5" disabled={!canRewrite} onClick={() => write(change)}>
+                  <Sparkles aria-hidden="true" />
+                  {writing && state.rewrite ? "Rewriting…" : "Rewrite"}
+                </Button>
+                {change.length === 0 && (
+                  <Button
+                    variant="outline"
+                    className="h-9 px-3.5"
+                    disabled={!canWrite}
+                    onClick={() => setConfirming(true)}
+                  >
+                    <RotateCcw aria-hidden="true" />
+                    {writing && !state.rewrite ? "Writing…" : "Write again"}
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </>
       )}
+
+      <Dialog open={confirming} onOpenChange={(next) => !next && setConfirming(false)}>
+        <DialogContent className="gap-0 p-6 sm:max-w-md">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-xl">Write a fresh letter?</DialogTitle>
+            <DialogDescription>It replaces the current draft and uses one of your letters.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mx-0 mb-0 gap-2 border-t-0 bg-transparent p-0 pt-2">
+            <Button variant="outline" className="h-10 px-4" onClick={() => setConfirming(false)}>
+              Keep the draft
+            </Button>
+            <Button className="h-10 px-4" onClick={() => write("")}>
+              Write a fresh letter
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

@@ -146,7 +146,7 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
     verified: true,
     about:
       "Mid-search: eight jobs across all five stages, a recruiter on three of them, two documents in kits, " +
-      "and cover letters ready to write (Harvest & Co), short on description (Cobalt), and missing a resume (Meridian).",
+      "and each cover-letter state: a draft to read and rewrite (Harvest & Co), short on description (Cobalt), and missing a resume (Meridian).",
     documents: [
       {
         key: "resume",
@@ -319,6 +319,16 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
           "Cobalt Systems sells infrastructure monitoring to platform teams. The Staff UX Designer leads design " +
           "for incident response.",
         notes: "Only the summary so far — paste the full posting before writing a letter.",
+        draft: {
+          paragraphs: [
+            "Dear Tom,",
+            "I'm applying for the Lead Product Designer role at Harvest & Co. Building out a merchant experience for 4,000 restaurant partners is close to the work I know best: at Parcelwise I designed the merchant onboarding flow and the pricing experiments behind it, and at Lumen Analytics I own the reporting surface end to end.",
+            "The Lumen redesign lifted weekly active use of dashboards by 18 percent, and the onboarding rework, shaped by more than forty customer interviews, halved the time to a first chart. Both started with research in the field and ended with a component library four product teams now share.",
+            "I've mentored designers through that work and partnered with engineering on a design-token pipeline that shipped to web and iOS. Leading two designers while running research with merchants is the shape of role I've been looking for, and I'd welcome a conversation about it.",
+            "Sincerely,\nSam Rivera",
+          ],
+          daysAgo: 12,
+        },
         addedDaysAgo: 18,
         moves: [{ stage: "applied", daysAgo: 15 }],
         contacts: ["dana"],

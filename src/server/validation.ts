@@ -3,6 +3,8 @@ import { z } from "zod";
 import { CONTACT_KINDS, CONTACT_LIMITS } from "@/lib/contacts";
 import { todayUtc } from "@/lib/dates";
 import { DOCUMENT_KINDS, MAX_UPLOAD_BYTES, UPLOAD_REFUSALS, extensionOf } from "@/lib/documents";
+import { FEEDBACK_MAX_CHARS } from "@/lib/generation";
+import { stripInvisible } from "@/lib/invisible";
 import { JOB_LIMITS, locationOrFallback, salaryFromText } from "@/lib/job-fields";
 import { STAGES } from "@/lib/jobs";
 
@@ -192,6 +194,24 @@ export const startUploadSchema = z.object({
 });
 
 export type StartUploadInput = z.infer<typeof startUploadSchema>;
+
+/**
+ * The cover-letter route's optional body (feedback issue 02). Feedback is short free text about the
+ * letter: stripped of invisible characters, trimmed, and at most `FEEDBACK_MAX_CHARS` after that —
+ * the same bound the card's box applies. Absent, null, or blank means a fresh write. Tag characters
+ * are not refused here: the generation module detects them and counts a Flag (issue 04).
+ */
+export const coverLetterRequestSchema = z.object({
+  feedback: z.preprocess(
+    (value) => (value === null || value === undefined ? "" : value),
+    z
+      .string("Feedback must be text")
+      .transform((text) => stripInvisible(text).trim())
+      .pipe(z.string().max(FEEDBACK_MAX_CHARS, `Keep feedback under ${FEEDBACK_MAX_CHARS} characters`)),
+  ),
+});
+
+export type CoverLetterRequestInput = z.infer<typeof coverLetterRequestSchema>;
 
 /** Ids are opaque cuids; this only stops a caller handing us a novel. */
 export const idSchema = z.string().trim().min(1).max(64);

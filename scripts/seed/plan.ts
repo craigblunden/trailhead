@@ -2,7 +2,7 @@ import type { ContactKind } from "@/lib/contacts";
 import { isoDate } from "@/lib/dates";
 import { ACCEPTED_TYPES, DOCUMENT_KIND_LABEL, extensionOf, type DocumentKind } from "@/lib/documents";
 import type { Accent, ActivityEntry, Stage } from "@/lib/jobs";
-import { newJobFacts, stageChange } from "@/lib/jobs-rules";
+import { COVER_LETTER_WRITTEN_LABEL, newJobFacts, stageChange } from "@/lib/jobs-rules";
 import { DEFAULT_PLAN, limitsOf, withinLimit, type Plan } from "@/lib/plans";
 import {
   jobPatchSchema,
@@ -68,6 +68,8 @@ export type SeedJob = {
   resume?: string | null;
   /** Key of this account's document sent as the job's cover letter. */
   coverLetter?: string | null;
+  /** The Draft a write left on this job (ADR-0002): its paragraphs, written this many days ago, after the last move. */
+  draft?: { paragraphs: readonly string[]; daysAgo: number };
 };
 
 export type SeedAccount = {
@@ -99,8 +101,10 @@ export type PlannedContact = Required<Omit<SeedContact, "lastSpokenDaysAgo">> & 
   lastSpokenOn: string | null;
 };
 
-export type PlannedJob = Required<Omit<SeedJob, "addedDaysAgo" | "moves" | "contacts">> & {
+export type PlannedJob = Required<Omit<SeedJob, "addedDaysAgo" | "moves" | "contacts" | "draft">> & {
   contacts: string[];
+  /** What the write stored: the Draft's text and the day it was written, with its Activity entry in `activity`. */
+  draft: { text: string; writtenOn: string } | null;
   stage: Stage;
   addedOn: string;
   appliedOn: string | null;
@@ -242,6 +246,16 @@ function planJob(
     lastDaysAgo = move.daysAgo;
   }
 
+  // A Draft is what a write left: the letter on the Job, and "Cover letter written" in its history.
+  let draft: PlannedJob["draft"] = null;
+  if (job.draft) {
+    checkDaysAgo(at, job.draft.daysAgo);
+    if (job.draft.daysAgo > lastDaysAgo) throw new SeedPlanError(`${at}: the draft is dated before the last move`);
+    const writtenOn = daysBefore(today, job.draft.daysAgo);
+    draft = { text: job.draft.paragraphs.join("\n\n"), writtenOn };
+    activity.push({ label: COVER_LETTER_WRITTEN_LABEL, date: writtenOn });
+  }
+
   for (const key of job.contacts ?? []) {
     if (!known.contacts.has(key)) throw new SeedPlanError(`${at}: no contact "${key}" in this account`);
   }
@@ -275,6 +289,7 @@ function planJob(
     contacts: [...(job.contacts ?? [])],
     resume: job.resume ?? null,
     coverLetter: job.coverLetter ?? null,
+    draft,
   };
 }
 

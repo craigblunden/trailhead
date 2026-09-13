@@ -42,6 +42,12 @@ export type JobCache = {
   add(build: (jobs: Job[]) => Job, write: Omit<JobWrite, "apply">): Promise<WriteResult>;
   /** The Jobs may have changed elsewhere — a Document deleted, a Contact renamed: resync once nothing is in flight. */
   refresh(): void;
+  /**
+   * A change the server has already made through another path — the cover-letter route storing a
+   * Draft — written into the cached Job as the caller says it looks. Nothing to roll back and
+   * nothing to resync: the server's answer is in hand, and a list fetch landing later carries it too.
+   */
+  record(jobId: string, next: (job: Job) => Job): void;
 };
 
 type Field = keyof Job;
@@ -167,6 +173,10 @@ export function jobCache(queryClient: QueryClient): JobCache {
     refresh() {
       // A write in flight resyncs the list when it settles; refetching now could land over it.
       if (inFlight.writes === 0) void queryClient.invalidateQueries({ queryKey: jobsCache.key });
+    },
+
+    record(jobId, next) {
+      change(jobId, next);
     },
   };
 }

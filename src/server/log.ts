@@ -26,6 +26,15 @@ export function describeError(error: unknown): { name: string; message: string }
   return { name: "UnknownError", message: String(error) };
 }
 
+/**
+ * A line that is not an error: something the owner wants to see happen, with the same care about
+ * what it carries. A Flag is logged this way — the operation, the tenant, and where the directions
+ * were found — and never the Feedback or the letter (feedback issue 04).
+ */
+export function logEvent(context: LogContext & Record<string, unknown>): void {
+  console.info(JSON.stringify({ level: "info", at: new Date().toISOString(), ...redact(context) }));
+}
+
 export function logError(context: LogContext, error: unknown): void {
   const line = {
     level: "error",

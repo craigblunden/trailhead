@@ -78,7 +78,7 @@ Auth are on this machine.
 | Account | What it shows |
 | --- | --- |
 | `new@trailhead.test` | First run: the empty board, contacts, and documents |
-| `searching@trailhead.test` | Mid-search: eight jobs across all five stages, a recruiter on three of them, a resume and a cover letter in kits, and two of this week's five letters used. Harvest & Co is ready to write a letter, Cobalt's description is short, and Meridian has no resume |
+| `searching@trailhead.test` | Mid-search: eight jobs across all five stages, a recruiter on three of them, a resume and a cover letter in kits, and two of this week's five letters used. Harvest & Co has a draft letter to read and rewrite, Cobalt's description is short, and Meridian has no resume |
 | `at-limits@trailhead.test` | At every limit: all three document slots used, so upload refuses, and this week's letters used, so Tidewater's card says when the next ones arrive |
 | `pro@trailhead.test` | On the pro plan: four documents on file and seven of this week's 25 letters used, both past what free allows. Summit Devtools is ready to write another |
 | `unverified@trailhead.test` | Signed up and never verified: sign-in asks to verify, and the resent link lands in Mailpit |
@@ -196,7 +196,7 @@ npx supabase db push          # roles, the private documents bucket, storage pol
 | `/signup`, `/login` | Create an account (with email verification), sign in — email or Google/GitHub |
 | `/forgot-password`, `/reset-password` | Request and use a password reset link |
 | `/board` | The board across five stages, and the "Add a job" dialog |
-| `/board/[id]` | A job: description, notes, stage and history, contacts, application kit, cover letter |
+| `/board/[id]` | A job: description, notes, stage and history, contacts, application kit, cover letter and its draft |
 | `/contacts`, `/contacts/[id]` | The people in the search, and every role each one is part of, grouped by stage |
 | `/documents` | Resumes and cover letters on file (up to three), upload and delete |
 | `POST /api/jobs/[id]/cover-letter` | Writes a cover letter from the job and the resume in its application kit |

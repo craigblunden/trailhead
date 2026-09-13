@@ -236,8 +236,9 @@ function MiniDetail() {
   );
 }
 
-/* ---------- Miniature: cover letter draft ---------- */
+/* ---------- Miniature: the cover letter and its Feedback box ---------- */
 
+/** The live card in small: the source line, the write button, a letter, and a Feedback box beneath it. */
 function MiniCoverLetter() {
   const job = detailJob;
   return (
@@ -248,11 +249,11 @@ function MiniCoverLetter() {
       <div className="rounded-md bg-accent/70 p-2.5 ring-1 ring-primary/15">
         <p className="text-xs font-bold">Cover letter</p>
         <p className="mt-0.5 text-[0.7rem] text-muted-foreground">
-          Drafted from the job description and {job.resume?.fileName}.
+          Written from the job description and {job.resume?.fileName}.
         </p>
-        <MiniButton variant="outline" className="mt-2.5 opacity-60">
+        <MiniButton className="mt-2.5">
           <Sparkles className="size-3" />
-          Generate — coming soon
+          Write cover letter
         </MiniButton>
       </div>
 
@@ -265,12 +266,23 @@ function MiniCoverLetter() {
           out a merchant experience is exactly the kind of work I&rsquo;ve led
           for the last four years, most recently on a marketplace redesign.
         </p>
-        {/* Draft still being written: the remaining lines are placeholders. */}
+        {/* The rest of the letter, in outline. */}
         <div className="mt-2.5 space-y-1.5">
           <div className="h-1.5 w-11/12 rounded-full bg-muted" />
           <div className="h-1.5 w-full rounded-full bg-muted" />
           <div className="h-1.5 w-3/5 rounded-full bg-muted" />
         </div>
+      </div>
+
+      {/* The Feedback box and Rewrite, as they sit under a letter on the job page. */}
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        <span className="flex h-6 min-w-0 flex-1 basis-40 items-center truncate rounded-md bg-card px-2 text-[0.65rem] text-muted-foreground ring-1 ring-input">
+          Shorter, and lead with the marketplace redesign
+        </span>
+        <MiniButton>
+          <Sparkles className="size-3" />
+          Rewrite
+        </MiniButton>
       </div>
     </div>
   );
@@ -353,11 +365,13 @@ export const EveryThingYouNeed = () => {
 
           <Feature
             id="feature-cover"
-            heading="Cover letters, on the way"
+            heading="A cover letter for this application"
             preview={<MiniCoverLetter />}
           >
-            Keep each job description current. Soon {BRAND_NAME} will draft a
-            tailored cover letter from it and the resume you attached.
+            Written fresh for each job from its own posting and the resume you
+            attached to it, nothing generic and nothing reused between jobs. Read
+            it, tell {BRAND_NAME} what should change, and it rewrites from your
+            feedback.
           </Feature>
         </ol>
       </div>

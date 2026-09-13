@@ -133,6 +133,23 @@ delete from "UserPlan" where "userId" = (select id from auth.users where lower(e
 What each Plan allows is code, not rows: `src/lib/plans.ts`.
 
 ## Hosted: Vercel
+## Lifting a Hold early
+
+A Tenant whose Feedback carried directions to the writer twice in one quota week is on Hold until
+the week rolls over on Monday (`CONTEXT.md`: Flag, Hold). The Hold is derived from `flagged` on
+the week's `"GenerationQuota"` row, so there is nothing to delete: to lift one early, as the
+migrator, zero this week's count for that user. No script exists for this yet, by choice.
+
+```sql
+update "GenerationQuota"
+   set "flagged" = 0, "updatedAt" = now()
+ where "userId" = (select id from auth.users where lower(email) = lower('you@example.com'))
+   and "weekStart" = date_trunc('week', now() at time zone 'utc')::date;
+```
+
+Who is being flagged is in the logs: one JSON line per Flag, operation `generation.flag`, with the
+tenant and the source (`feedback` or `hidden`) and never the text.
+
 
 1. Create the project from this repository. Framework preset: Next.js. Build command is the
    default (`npm run build`, which runs `prisma generate` first).

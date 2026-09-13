@@ -69,6 +69,12 @@ describe("the seeded accounts", () => {
     ).toBe(true);
     expect(jobs.some((job) => !job.resume && descriptionLength(job) > 0), "no resume in the kit").toBe(true);
     expect(jobs.some((job) => job.coverLetter), "a cover letter in a kit").toBe(true);
+    const drafted = jobs.filter((job) => job.draft !== null);
+    expect(drafted.length, "a draft to read and rewrite").toBeGreaterThan(0);
+    for (const job of drafted) {
+      expect(job.resume, `${job.company}: a draft was written from a resume`).not.toBeNull();
+      expect(job.activity.map((entry) => entry.label)).toContain("Cover letter written");
+    }
 
     const salaries = new Set(
       jobs.map((job) => `${job.salaryMin === null ? "?" : "min"}-${job.salaryMax === null ? "?" : "max"}`),

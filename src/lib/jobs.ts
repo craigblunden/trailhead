@@ -80,6 +80,10 @@ export type Job = {
   resume: AttachedDocument | null;
   /** The cover letter sent with this Job, if one is attached. Separate from the resume (ticket 17). */
   coverLetter: AttachedDocument | null;
+  /** The last letter written for this Job — its Draft (ADR-0002). Empty when none has been written. */
+  draft: string;
+  /** ISO timestamp of the Draft's write, or null when there is no Draft. */
+  draftWrittenAt: string | null;
   description: string;
   notes: string;
   contacts: Contact[];

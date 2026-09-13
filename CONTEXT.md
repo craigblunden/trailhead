@@ -88,6 +88,36 @@ still shown, and never silently recomputed — re-running is always the user's a
 One user and everything they own. Tenancy here means **isolation**, never collaboration: there is no
 row a second user may read, and no concept of a shared or public Job. Every Tenant is on exactly one
 Plan.
+### Writing letters
+
+**Feedback**:
+Short free text the user types about a letter they have just read ("shorter; lead with the Fernwood
+project"). Written by the user, sent only to the writer, and treated as material about the letter,
+never as directions to the writer.
+_Avoid_: Instructions, Prompt, Notes (which are the Job's private notes)
+
+**Rewrite**:
+Writing a letter again for the same Job from the same resume and posting, the letter it replaces, and
+the user's Feedback. Costs one letter, like a first write.
+_Avoid_: Regenerate, Retry (a retry is the same write again after a failure)
+
+**Draft**:
+The last letter written for one Job, kept so the user can read it on return and ask for a Rewrite.
+Each write replaces it, and it is never a Document: the user makes it one by uploading it.
+_Avoid_: Letter (as an entity), Generated letter, Output, Document (for a Draft)
+
+**Flag**:
+One write whose Feedback carried directions to the writer rather than changes to the letter, or
+Feedback refused before any write for carrying hidden characters. A letter that was written is still
+delivered and still counted; the Flag is remembered against the quota week.
+_Avoid_: Strike, Violation, Incident
+
+**Hold**:
+A pause on writing letters for one Tenant, placed by the system at the second Flag in one quota
+week and lasting until that week ends. Nothing else about the Tenant changes: the board, Documents,
+and Contacts are untouched.
+_Avoid_: Ban, Suspension, Block, Lockout
+
 _Avoid_: Organization, Workspace, Account (as a synonym — an _account_ is the user's login, which is
 a different idea)
 

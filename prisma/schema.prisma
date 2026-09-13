@@ -94,6 +94,10 @@ model Job {
   coverLetterId String?
   coverLetter   Document? @relation("JobCoverLetter", fields: [coverLetterId], references: [id], onDelete: SetNull)
   contacts    JobContact[]
+  /// The last letter written for this Job (ADR-0002): its Draft. Empty when none has been written.
+  /// Each write replaces it; it goes with the Job, and it is never a Document.
+  draft          String    @default("")
+  draftWrittenAt DateTime?
   activity    ActivityEntry[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -190,14 +194,16 @@ model Document {
   @@index([deletedAt])
 }
 
-/// Cover letters taken from one user's weekly quota (ticket 18) — the only thing generation
-/// persists. Weeks start Monday, UTC. Reserved atomically before the Claude call and given back if
-/// no letter is delivered (see src/server/data/generation.ts).
+/// Cover letters taken from one user's weekly quota (ticket 18). Weeks start Monday, UTC. Reserved
+/// atomically before the Claude call and given back if no letter is delivered (see
+/// src/server/data/generation.ts). `flagged` counts this week's Flags; a Tenant is on Hold while it
+/// is two or more, so a Hold lapses with the week and is never stored (feedback issue 01).
 model GenerationQuota {
   userId    String   @db.Uuid
   weekStart DateTime @db.Date
   used      Int      @default(0)
   updatedAt DateTime @default(now())
+  flagged   Int      @default(0)
 
   @@id([userId, weekStart])
 }

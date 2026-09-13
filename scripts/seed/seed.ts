@@ -251,6 +251,9 @@ async function writeTenant(prisma: PrismaClient, bucket: Bucket, userId: string,
           appliedOn: job.appliedOn ? toDateColumn(job.appliedOn) : null,
           resumeId: job.resume ? documentIds.get(job.resume) : null,
           coverLetterId: job.coverLetter ? documentIds.get(job.coverLetter) : null,
+          draft: job.draft?.text ?? "",
+          // After that day's other rows, as a write later in the day would be.
+          draftWrittenAt: job.draft ? createdOn(job.draft.writtenOn, 99) : null,
           createdAt: createdOn(job.addedOn, index),
           activity: {
             create: job.activity.map((entry, order) => ({

@@ -155,28 +155,40 @@ sequenceDiagram
   participant PG as Postgres
   participant C as Anthropic API
 
-  B->>R: POST /api/jobs/:id/cover-letter
-  R->>G: generateCoverLetter(job, Claude client)
-  G->>D: coverLetterInputs(job) — not yours, or no resume or description
-  G->>D: reserveCoverLetter() — upsert, only while used < the Plan's letters this week
+  B->>R: POST /api/jobs/:id/cover-letter · optional { feedback }
+  R->>G: generateCoverLetter(job, Claude client, feedback)
+  G->>D: coverLetterSources(job) — not yours, no resume or description, or no Draft to rewrite
+  Note over G: hidden characters in feedback: a Flag, refused before any reservation
+  G->>D: reserveCoverLetter() — upsert, only while used < the Plan's letters this week and not on Hold
   D->>PG: quota row under RLS
-  G->>C: messages.create (claude-sonnet-5, adaptive thinking, refusal fallback)
+  G->>C: messages.create (claude-sonnet-5, adaptive thinking, JSON answer, refusal fallback)
   alt stop_reason end_turn
-    C-->>G: letter text
-    G-->>R: letter · letters left
-    R-->>B: 200 · letter · letters left
-  else refusal, error, timeout, truncated, crash
+    C-->>G: { letter, verdict, set_aside }
+    G->>D: storeCoverLetter() — the Draft, its Activity entry, and a Flag if the verdict is feedback
+    G-->>R: letter · verdict · letters left · flags · held
+    R-->>B: 200 · letter · verdict · letters left
+  else error, timeout, truncated, malformed, crash
     G->>D: refundCoverLetter()
     G-->>R: failure · refunded only if the refund worked
-    R-->>B: 4xx or 5xx · refunded · letters left
+    R-->>B: 5xx · refunded · letters left
+  else refusal
+    G-->>R: refused · not refunded
+    R-->>B: 422 · letters left
   end
 ```
 
 It is a Route Handler, not a Server Action, because Next runs a page's Server Actions one at a time:
-a 10–25 second generation as an action would hold every other edit on the page behind it. Nothing is
-stored except the quota counter. The order — inputs, reservation, call, refund — and whether a refund
-really happened belong to the generation module (`src/server/generation/generate-cover-letter.ts`);
-the Route Handler checks the session and the id, makes one call, and maps the outcome to a status.
+a 10–25 second generation as an action would hold every other edit on the page behind it. What is
+stored: the quota counter, the Job's Draft (ADR-0002) with its Activity entry, and this week's Flags.
+Feedback is never stored. The order — sources, the hidden-character check, reservation, call, store,
+refund — and whether a refund really happened belong to the generation module
+(`src/server/generation/generate-cover-letter.ts`); the Route Handler checks the session, the id,
+and the body, makes one call, and maps the outcome to a status.
+
+A **Flag** is a write whose Feedback the writer reported as directions to it rather than changes to
+the letter; the verdict rides on the same call as the letter, so detection never costs a second
+model call. Two Flags in a quota week place a **Hold** on letters until Monday; it is derived from
+the week's row, never stored, and lifted early only by the migrator (`docs/provisioning.md`).
 
 ## The data model
 
@@ -231,6 +243,7 @@ erDiagram
     uuid userId
     date weekStart
     int used
+    int flagged
   }
   UserPlan {
     uuid userId

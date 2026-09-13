@@ -147,6 +147,8 @@ export function toJobDto(row: JobRow): Job {
     coverLetter: row.coverLetter
       ? { id: row.coverLetter.id, fileName: row.coverLetter.fileName }
       : null,
+    draft: row.draft,
+    draftWrittenAt: row.draftWrittenAt ? row.draftWrittenAt.toISOString() : null,
     description: row.description,
     notes: row.notes,
     contacts: sortContacts(row.contacts.map((link) => link.contact)).map(toContactDto),

@@ -57,7 +57,8 @@ query rather than an inference call. The glossary terms (`Requirement`, `Evidenc
 | **Dark mode** | Open since Phase 1 | Colour tokens are centralised in `src/app/globals.css`; contrast (A11Y-3) must be re-proven for a second palette |
 | **Removing orphaned objects for users who never return** | Removing a Storage object takes the owner's session; no `service_role` key exists by design (tickets 15, 16) | A server-side job with a narrowly scoped credential, e.g. `pg_net` from `pg_cron` with a key in Vault — a reversal of "no `service_role` anywhere", so a decision first |
 | Teams, sharing, multi-user tenants | Tenancy means isolation, never collaboration | Out of scope by definition |
-| Agency as a record; document versioning; storing generated letters | Decided against for this phase (`CONTEXT.md`, tickets 14, 18) | Each is a glossary change before it is a schema change |
+| Agency as a record; document versioning | Decided against for this phase (`CONTEXT.md`, tickets 14, 18) | Each is a glossary change before it is a schema change |
+| ~~Storing generated letters~~ | Reversed by ADR-0002: a Job keeps its last **Draft** so a Rewrite has a trusted starting point | — |
 | Account deletion and data export | Not in this phase | Needs the storage removal above solved for the deleting user |
 | Charts | Nothing needs one | Recharts via shadcn/ui is the standing choice |
 

@@ -47,6 +47,8 @@ describe("a new Job", () => {
       notes: "",
       resume: null,
       coverLetter: null,
+      draft: "",
+      draftWrittenAt: null,
       contacts: [],
       accent: nextAccent(0),
       activity: [{ id: "id-2", label: OPENING_ACTIVITY_LABEL, date: TODAY }],

@@ -43,6 +43,20 @@ describe("landing page", () => {
     expect(signIn.closest("a")).toHaveClass("hidden", "sm:inline-flex");
   });
 
+  it("LAND-4: the third feature says a letter is written for each application from its posting and resume, and rewritten from feedback — never 'soon'", () => {
+    render(<LandingPage />);
+    const feature = screen.getByRole("article", { name: "A cover letter for this application" });
+
+    expect(feature).not.toHaveTextContent(/soon|on the way/i);
+    expect(feature).toHaveTextContent(/posting/);
+    expect(feature).toHaveTextContent(/resume/);
+    expect(feature).toHaveTextContent(/feedback|rewrites/);
+    // The miniature stays decorative: its buttons and box are not controls, and it is hidden from AT.
+    expect(within(feature).queryByRole("button")).toBeNull();
+    expect(within(feature).queryByRole("textbox")).toBeNull();
+    expect(feature.querySelector("[aria-hidden='true']")).toHaveTextContent("Rewrite");
+  });
+
   it("LAND-1: hides the decorative scene from assistive technology", () => {
     const { container } = render(<LandingPage />);
 

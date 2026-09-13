@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import { FEEDBACK_MAX_CHARS } from "@/lib/generation";
 import { LOCATION_FALLBACK, locationOrFallback, salaryFromText } from "@/lib/job-fields";
 import {
   JOB_LIMITS,
+  coverLetterRequestSchema,
   jobPatchSchema,
   newJobSchema,
   parseInput,
@@ -197,5 +199,31 @@ describe("stageSchema", () => {
     }
     expect(parseInput(stageSchema, "Applied").ok).toBe(false);
     expect(parseInput(stageSchema, "archived").ok).toBe(false);
+  });
+});
+
+describe("coverLetterRequestSchema (feedback issue 02)", () => {
+  it("VAL-F1: no body, a null feedback, and blank feedback all read as a fresh write", () => {
+    for (const input of [{}, { feedback: null }, { feedback: "   " }]) {
+      expect(parseInput(coverLetterRequestSchema, input)).toEqual({ ok: true, data: { feedback: "" } });
+    }
+  });
+
+  it("VAL-F2: strips invisible characters and trims before measuring; exactly 500 is accepted, 501 is not", () => {
+    const stripped = parseInput(coverLetterRequestSchema, { feedback: "  sho\u200Brter\u200E, please \uFEFF " });
+    expect(stripped).toEqual({ ok: true, data: { feedback: "shorter, please" } });
+
+    // Invisible characters do not count: 500 visible characters padded with them is still 500.
+    const padded = `${"x".repeat(FEEDBACK_MAX_CHARS)}${"\u200B".repeat(40)}`;
+    expect(parseInput(coverLetterRequestSchema, { feedback: padded })).toMatchObject({ ok: true });
+    expect(parseInput(coverLetterRequestSchema, { feedback: "x".repeat(FEEDBACK_MAX_CHARS + 1) })).toEqual({
+      ok: false,
+      errors: { feedback: `Keep feedback under ${FEEDBACK_MAX_CHARS} characters` },
+    });
+  });
+
+  it("VAL-F3: feedback that is not text is refused, not coerced", () => {
+    expect(parseInput(coverLetterRequestSchema, { feedback: 42 })).toMatchObject({ ok: false });
+    expect(parseInput(coverLetterRequestSchema, { feedback: ["shorter"] })).toMatchObject({ ok: false });
   });
 });

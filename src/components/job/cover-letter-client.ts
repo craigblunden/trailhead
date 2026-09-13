@@ -1,20 +1,27 @@
 import { unwrapping } from "@/components/action-client";
 import { SESSION_ENDED_PATH } from "@/lib/auth-routing";
-import type { GenerationResponse } from "@/lib/generation";
+import type { GenerationRequest, GenerationResponse } from "@/lib/generation";
 import { generationStatusAction } from "@/server/actions/generation";
 
 /**
  * How the cover-letter card reaches the server. Generation is a plain POST to the Route Handler —
- * deliberately not a Server Action, so it never queues the page's other edits behind it. The
+ * deliberately not a Server Action, so it never queues the page's other edits behind it. With
+ * Feedback it carries a JSON body and is a Rewrite; without, no body, and a fresh write. The
  * status read is an ordinary action. Component tests replace this module.
  */
 export const coverLetterClient = {
   status: unwrapping(generationStatusAction),
 
-  generate: async (jobId: string): Promise<GenerationResponse> => {
+  generate: async (jobId: string, feedback = ""): Promise<GenerationResponse> => {
     let response: Response;
     try {
-      response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/cover-letter`, { method: "POST" });
+      const body: GenerationRequest = { feedback };
+      response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/cover-letter`, {
+        method: "POST",
+        ...(feedback
+          ? { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }
+          : {}),
+      });
     } catch {
       return {
         ok: false,

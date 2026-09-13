@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { describeError, logError, redact } from "@/server/log";
+import { describeError, logError, logEvent, redact } from "@/server/log";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -68,6 +68,23 @@ describe("logError (ticket 12)", () => {
       operation: "x",
       cookie: "[redacted]",
       tenant: null,
+    });
+  });
+});
+
+describe("logEvent (feedback issue 04)", () => {
+  it("LOG-4: writes one info line with the operation, the tenant, and the fields given, redacted like an error line", () => {
+    const line = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    logEvent({ operation: "generation.flag", tenant: "6a0c2e20-0000-4000-8000-000000000001", source: "feedback", token: "x" });
+
+    expect(line).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(line.mock.calls[0][0] as string)).toMatchObject({
+      level: "info",
+      operation: "generation.flag",
+      tenant: "6a0c2e20-0000-4000-8000-000000000001",
+      source: "feedback",
+      token: "[redacted]",
     });
   });
 });

@@ -18,12 +18,25 @@ import {
 
 const ACCENT_KEYS = Object.keys(ACCENTS) as Accent[];
 
+/** Optimistic ids are stamped so a stray one is recognisable in a bug report. */
+export function optimisticId(): string {
+  return `optimistic-${crypto.randomUUID()}`;
+}
+
 /** Round-robin over the accent keys keeps the board's visual variety. */
 export function nextAccent(existingCount: number): Accent {
   return ACCENT_KEYS[existingCount % ACCENT_KEYS.length];
 }
 
 export const OPENING_ACTIVITY_LABEL = "Added to board — Interested";
+
+/** The Activity entry a write leaves (feedback issue 01): one spelling for the data layer, the card, and the tests. */
+export const COVER_LETTER_WRITTEN_LABEL = "Cover letter written";
+export const COVER_LETTER_REWRITTEN_LABEL = "Cover letter rewritten";
+
+export function coverLetterLabel(rewrite: boolean): string {
+  return rewrite ? COVER_LETTER_REWRITTEN_LABEL : COVER_LETTER_WRITTEN_LABEL;
+}
 
 export function movedToLabel(stage: Stage): string {
   return `Moved to ${STAGE_META[stage].label}`;
@@ -43,6 +56,8 @@ export type NewJobFacts = {
   notes: string;
   resume: null;
   coverLetter: null;
+  draft: "";
+  draftWrittenAt: null;
   contacts: Contact[];
   accent: Accent;
   /** The one Activity entry a new Job starts with. */
@@ -51,7 +66,7 @@ export type NewJobFacts = {
 
 /**
  * A new Job starts at `interested`, dated today, with no applied date, no notes, an empty application
- * kit, no Contacts, and one opening Activity entry. Its accent comes round-robin from how many Jobs
+ * kit, no Draft, no Contacts, and one opening Activity entry. Its accent comes round-robin from how many Jobs
  * the user already has.
  */
 export function newJobFacts(today: string, existingCount: number): NewJobFacts {
@@ -62,6 +77,8 @@ export function newJobFacts(today: string, existingCount: number): NewJobFacts {
     notes: "",
     resume: null,
     coverLetter: null,
+    draft: "",
+    draftWrittenAt: null,
     contacts: [],
     accent: nextAccent(existingCount),
     opening: { label: OPENING_ACTIVITY_LABEL, date: today },
@@ -117,5 +134,24 @@ export function movedJob(job: Job, stage: Stage, today: string, newId: () => str
     stage: change.stage,
     appliedOn: change.appliedOn,
     activity: [{ id: newId(), ...change.entry }, ...job.activity],
+  };
+}
+
+/**
+ * The whole Job after a letter was written for it on `today`: the Draft replaced, and the write's
+ * Activity entry prepended — "Cover letter written", or "…rewritten" when it came from Feedback. The
+ * data layer writes the same two things in one transaction; the card applies this to the cached Job
+ * when the route answers, so the letter region and the Activity list agree without a refetch.
+ */
+export function withDraft(
+  job: Job,
+  { letter, rewrite, writtenAt, today }: { letter: string; rewrite: boolean; writtenAt: string; today: string },
+  newId: () => string,
+): Job {
+  return {
+    ...job,
+    draft: letter,
+    draftWrittenAt: writtenAt,
+    activity: [{ id: newId(), label: coverLetterLabel(rewrite), date: today }, ...job.activity],
   };
 }

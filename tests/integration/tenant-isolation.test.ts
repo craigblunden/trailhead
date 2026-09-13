@@ -17,6 +17,8 @@ async function seedEverything(tx: TenantClient, userId: string) {
       location: "Remote (US)",
       addedOn: new Date("2026-07-22"),
       accent: "moss",
+      draft: "Dear Hiring Team,",
+      draftWrittenAt: new Date("2026-07-23T09:00:00Z"),
       activity: {
         create: { userId, label: "Added to board — Interested", date: new Date("2026-07-22") },
       },
@@ -35,7 +37,7 @@ async function seedEverything(tx: TenantClient, userId: string) {
       mimeType: "application/pdf",
     },
   });
-  await tx.generationQuota.create({ data: { userId, weekStart: new Date("2026-07-20"), used: 2 } });
+  await tx.generationQuota.create({ data: { userId, weekStart: new Date("2026-07-20"), used: 2, flagged: 1 } });
   return { job, contact, document };
 }
 
@@ -135,6 +137,9 @@ describe("ticket 04: tenant isolation, proven", () => {
 
     await withTenant(userB, async (tx) => {
       expect(await tx.job.findUnique({ where: { id: job.id } })).toBeNull();
+      // The Draft is a Job column and the Flags a quota column: neither is reachable by a query either.
+      expect(await tx.job.findMany({ where: { draft: { not: "" } } })).toEqual([]);
+      expect(await tx.generationQuota.findMany({ where: { flagged: { gt: 0 } } })).toEqual([]);
       expect(await tx.contact.findUnique({ where: { id: contact.id } })).toBeNull();
       expect(await tx.document.findUnique({ where: { id: document.id } })).toBeNull();
 
