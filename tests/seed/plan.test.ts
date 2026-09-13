@@ -219,6 +219,7 @@ describe("a seeded account is one the app could have produced", () => {
       ["a document the app would not accept", { documents: [{ ...resume, fileName: "resume.docx" }] }, /\.pdf/],
       ["a file name longer than an upload allows", { documents: [{ ...resume, fileName: `${"r".repeat(252)}.pdf` }] }, /fileName/],
       ["more letters than the quota", { lettersUsed: 6 }, /on free holds at most 5 cover letters/],
+      ["more letters than basic's week", { plan: "basic", lettersUsed: 16 }, /on basic holds at most 15 cover letters/],
       ["more letters than pro's week", { plan: "pro", lettersUsed: 26 }, /on pro holds at most 25 cover letters/],
       ["a move to the stage it is in", { jobs: [{ ...job, moves: [{ stage: "interested", daysAgo: 5 }] }] }, /already/],
       ["a move before it was added", { jobs: [{ ...job, moves: [{ stage: "applied", daysAgo: 12 }] }] }, /before/],

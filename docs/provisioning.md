@@ -114,9 +114,10 @@ A Tenant's Plan is a row in `"UserPlan"` that only the migrator may write (ADR-0
 application role reads it and nothing more. With `DIRECT_URL` set for the project in question:
 
 ```sh
-npm run db:plan                          # who is on pro
-npm run db:plan -- you@example.com pro   # put an account on pro
-npm run db:plan -- you@example.com free  # back to free (the row is removed)
+npm run db:plan                            # who is on basic or pro
+npm run db:plan -- you@example.com basic   # put an account on basic
+npm run db:plan -- you@example.com pro     # put an account on pro
+npm run db:plan -- you@example.com free    # back to free (the row is removed)
 ```
 
 The same thing from the SQL editor, should the script not be to hand:
@@ -132,7 +133,6 @@ delete from "UserPlan" where "userId" = (select id from auth.users where lower(e
 
 What each Plan allows is code, not rows: `src/lib/plans.ts`.
 
-## Hosted: Vercel
 ## Lifting a Hold early
 
 A Tenant whose Feedback carried directions to the writer twice in one quota week is on Hold until
@@ -150,6 +150,7 @@ update "GenerationQuota"
 Who is being flagged is in the logs: one JSON line per Flag, operation `generation.flag`, with the
 tenant and the source (`feedback` or `hidden`) and never the text.
 
+## Hosted: Vercel
 
 1. Create the project from this repository. Framework preset: Next.js. Build command is the
    default (`npm run build`, which runs `prisma generate` first).

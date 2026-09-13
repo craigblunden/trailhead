@@ -78,16 +78,16 @@ _Avoid_: Report, Review, Scan
 The aggregate pass across every active Job at once, which is where recurring Gaps become visible
 ("most of these roles want proof of work"). Distinct from an Analysis, which sees exactly one Job.
 
+**Outcome review**:
+The aggregate pass relating the Documents sent with each Job to the Stage that Job reached, which is
+where what is working becomes visible ("jobs sent the research resume reach interviewing more
+often"). Reads Application kits and Stages, never job descriptions — so it finds no Gaps.
+_Avoid_: Insights, Analytics, Report
+
 **Stale**:
 Said of an Analysis whose Document or job description has changed since it ran. A stale Analysis is
 still shown, and never silently recomputed — re-running is always the user's act.
 
-### Boundaries
-
-**Tenant**:
-One user and everything they own. Tenancy here means **isolation**, never collaboration: there is no
-row a second user may read, and no concept of a shared or public Job. Every Tenant is on exactly one
-Plan.
 ### Writing letters
 
 **Feedback**:
@@ -118,13 +118,19 @@ week and lasting until that week ends. Nothing else about the Tenant changes: th
 and Contacts are untouched.
 _Avoid_: Ban, Suspension, Block, Lockout
 
+### Boundaries
+
+**Tenant**:
+One user and everything they own. Tenancy here means **isolation**, never collaboration: there is no
+row a second user may read, and no concept of a shared or public Job. Every Tenant is on exactly one
+Plan.
 _Avoid_: Organization, Workspace, Account (as a synonym — an _account_ is the user's login, which is
 a different idea)
 
 ### Limits
 
 **Plan**:
-Which set of Limits a Tenant lives under: `free` or `pro`. A Tenant with no Plan recorded is on
+Which set of Limits a Tenant lives under: `free`, `basic`, or `pro`, in rising order. A Tenant with no Plan recorded is on
 `free`. A Plan says nothing about how the Tenant came to be on it — granted by hand and paid for are
 the same Plan.
 _Avoid_: Tier, Subscription, Membership, Paid user, Premium

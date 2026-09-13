@@ -133,6 +133,55 @@ const JORDAN_ORBIT_LETTER = [
   "Jordan Reyes",
 ];
 
+const TAYLOR_RESUME = [
+  "Taylor Brooks - Product Designer",
+  "Perth, WA | taylor.brooks@example.com",
+  "Seven years designing field-service and logistics tools, from research to shipped UI.",
+  "EXPERIENCE",
+  "Ironbark Field - Senior Product Designer - 2021 to present",
+  "- Redesigned the technician job app; jobs closed on the first visit up 15 percent.",
+  "- Ran ride-alongs with 30 technicians to rebuild offline scheduling.",
+  "Saltbush Freight - Product Designer - 2018 to 2021",
+  "- Designed the dispatch board used by 120 depots.",
+  "SKILLS",
+  "Interaction design, field research, mobile and offline UX, Figma, prototyping.",
+];
+
+const TAYLOR_RESEARCH_RESUME = [
+  "Taylor Brooks - Product Designer, Research",
+  "Perth, WA | taylor.brooks@example.com",
+  "Seven years of design, the last four leading research for operations software.",
+  "EXPERIENCE",
+  "Ironbark Field - Senior Product Designer - 2021 to present",
+  "- Set up a research repository used by product, support, and sales.",
+  "- Led 80 contextual interviews across mining, utilities, and facilities teams.",
+  "Saltbush Freight - Product Designer - 2018 to 2021",
+  "- Ran the diary study that reshaped how depots plan a day of deliveries.",
+  "SKILLS",
+  "Contextual inquiry, research operations, synthesis, service design, workshops.",
+];
+
+const TAYLOR_WATTLE_LETTER = [
+  "Taylor Brooks | taylor.brooks@example.com",
+  "Dear Wattle Energy team,",
+  "I am applying for the Senior Product Designer, Field Apps role. At Ironbark Field I",
+  "redesigned the technician job app after riding along with 30 technicians, and first-visit",
+  "fixes rose 15 percent. I would love to bring that same close-to-the-work approach to",
+  "the crews who keep your network running.",
+  "Thank you for your time,",
+  "Taylor Brooks",
+];
+
+const TAYLOR_GENERAL_LETTER = [
+  "Taylor Brooks | taylor.brooks@example.com",
+  "Hello,",
+  "I am a product designer with seven years in field-service and logistics software. I like",
+  "designing for people whose work happens away from a desk, and I do my best work when I",
+  "can see that work first-hand.",
+  "Best,",
+  "Taylor Brooks",
+];
+
 export const SEED_ACCOUNTS: readonly SeedAccount[] = [
   {
     key: "new",
@@ -270,6 +319,16 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
         ],
         contacts: ["tom"],
         resume: "resume",
+        draft: {
+          paragraphs: [
+            "Dear Tom,",
+            "I'm applying for the Lead Product Designer role at Harvest & Co. Building out a merchant experience for 4,000 restaurant partners is close to the work I know best: at Parcelwise I designed the merchant onboarding flow and the pricing experiments behind it, and at Lumen Analytics I own the reporting surface end to end.",
+            "The Lumen redesign lifted weekly active use of dashboards by 18 percent, and the onboarding rework, shaped by more than forty customer interviews, halved the time to a first chart. Both started with research in the field and ended with a component library four product teams now share.",
+            "I've mentored designers through that work and partnered with engineering on a design-token pipeline that shipped to web and iOS. Leading two designers while running research with merchants is the shape of role I've been looking for, and I'd welcome a conversation about it.",
+            "Sincerely,\nSam Rivera",
+          ],
+          daysAgo: 12,
+        },
       },
       {
         company: "Northbeam",
@@ -319,16 +378,6 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
           "Cobalt Systems sells infrastructure monitoring to platform teams. The Staff UX Designer leads design " +
           "for incident response.",
         notes: "Only the summary so far — paste the full posting before writing a letter.",
-        draft: {
-          paragraphs: [
-            "Dear Tom,",
-            "I'm applying for the Lead Product Designer role at Harvest & Co. Building out a merchant experience for 4,000 restaurant partners is close to the work I know best: at Parcelwise I designed the merchant onboarding flow and the pricing experiments behind it, and at Lumen Analytics I own the reporting surface end to end.",
-            "The Lumen redesign lifted weekly active use of dashboards by 18 percent, and the onboarding rework, shaped by more than forty customer interviews, halved the time to a first chart. Both started with research in the field and ended with a component library four product teams now share.",
-            "I've mentored designers through that work and partnered with engineering on a design-token pipeline that shipped to web and iOS. Leading two designers while running research with merchants is the shape of role I've been looking for, and I'd welcome a conversation about it.",
-            "Sincerely,\nSam Rivera",
-          ],
-          daysAgo: 12,
-        },
         addedDaysAgo: 18,
         moves: [{ stage: "applied", daysAgo: 15 }],
         contacts: ["dana"],
@@ -429,6 +478,78 @@ export const SEED_ACCOUNTS: readonly SeedAccount[] = [
       },
     ],
     lettersUsed: 5,
+  },
+  {
+    key: "basic",
+    name: "Taylor Brooks",
+    verified: true,
+    plan: "basic",
+    about:
+      "On basic: four documents on file and nine of this week's 15 letters written, both past what free " +
+      "allows. Wattle Energy is ready to write another.",
+    documents: [
+      {
+        key: "resume",
+        kind: "resume",
+        fileName: "taylor-brooks-resume.pdf",
+        lines: TAYLOR_RESUME,
+        uploadedDaysAgo: 25,
+      },
+      {
+        key: "research-resume",
+        kind: "resume",
+        fileName: "taylor-brooks-resume-research.pdf",
+        lines: TAYLOR_RESEARCH_RESUME,
+        uploadedDaysAgo: 16,
+      },
+      {
+        key: "general-letter",
+        kind: "cover_letter",
+        fileName: "taylor-brooks-cover-letter.pdf",
+        lines: TAYLOR_GENERAL_LETTER,
+        uploadedDaysAgo: 16,
+      },
+      {
+        key: "wattle-letter",
+        kind: "cover_letter",
+        fileName: "taylor-brooks-wattle-cover-letter.pdf",
+        lines: TAYLOR_WATTLE_LETTER,
+        uploadedDaysAgo: 3,
+      },
+    ],
+    jobs: [
+      {
+        company: "Wattle Energy",
+        role: "Senior Product Designer, Field Apps",
+        location: "Hybrid · Perth",
+        salaryMin: 150,
+        salaryMax: 175,
+        postingUrl: "https://wattleenergy.example.com/careers/senior-product-designer-field-apps",
+        description:
+          "Wattle Energy maintains the electricity network across regional Western Australia. We are hiring a " +
+          "Senior Product Designer for the apps our field crews use to plan, record, and hand over work, often " +
+          "with no signal. You will spend time in the field with crews, work with two engineering squads, and " +
+          "own the job app end to end. Experience designing offline-first mobile tools for field workers is " +
+          "required.",
+        addedDaysAgo: 8,
+        moves: [{ stage: "applied", daysAgo: 3 }],
+        resume: "resume",
+        coverLetter: "wattle-letter",
+      },
+      {
+        company: "Banksia Logistics",
+        role: "Product Designer, Research",
+        location: "Remote (AU)",
+        salaryMin: 130,
+        description:
+          "Banksia Logistics runs same-day delivery for retailers in five cities. The Product Designer, Research " +
+          "will lead discovery with depot staff and drivers and turn it into the roadmap for our dispatch tools.",
+        addedDaysAgo: 4,
+        resume: "research-resume",
+        coverLetter: "general-letter",
+      },
+    ],
+    lettersUsed: 9,
   },
   {
     key: "pro",

@@ -36,7 +36,7 @@ beforeEach(async () => {
 });
 
 describe("npm run db:plan", () => {
-  it("PLAN-8: puts the user with that email on pro, lists them, and free takes the row away again", async () => {
+  it("PLAN-8: puts the user with that email on pro, lists them, moves them to basic, and free takes the row away again", async () => {
     await setPlanByEmail(migrator, alice.email, "pro");
     actAs(alice);
     expect(await currentPlan()).toBe("pro");
@@ -46,6 +46,11 @@ describe("npm run db:plan", () => {
     expect((await listPlans(migrator)).map(({ email, plan }) => ({ email, plan }))).toEqual([
       { email: alice.email, plan: "pro" },
     ]);
+
+    await setPlanByEmail(migrator, alice.email, "basic");
+    actAs(alice);
+    expect(await currentPlan()).toBe("basic");
+    expect((await listPlans(migrator)).map(({ plan }) => plan)).toEqual(["basic"]);
 
     await setPlanByEmail(migrator, alice.email, "free");
     actAs(alice);

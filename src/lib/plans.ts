@@ -8,7 +8,7 @@
  * (ADR-0001).
  */
 
-export const PLANS = ["free", "pro"] as const;
+export const PLANS = ["free", "basic", "pro"] as const;
 
 export type Plan = (typeof PLANS)[number];
 
@@ -27,6 +27,7 @@ export type Limits = {
 
 export const PLAN_LIMITS = {
   free: { documents: 3, lettersPerWeek: 5 },
+  basic: { documents: 10, lettersPerWeek: 15 },
   // Letters stay finite on every Plan: each one is a paid model call, and "unlimited" would be a
   // bill with no ceiling.
   pro: { documents: "unlimited", lettersPerWeek: 25 },

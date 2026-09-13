@@ -1,5 +1,5 @@
 /**
- * `npm run db:plan -- <email> pro|free` puts one Tenant on a Plan; `npm run db:plan` alone lists
+ * `npm run db:plan -- <email> free|basic|pro` puts one Tenant on a Plan; `npm run db:plan` alone lists
  * every Tenant off the default. Runs as `trailhead_migrator` over `DIRECT_URL` — the only role
  * with a write grant on "UserPlan" (ADR-0001) — so it works against the hosted project as well
  * as the local stack. The SQL it runs is in `docs/provisioning.md` for the dashboard.
@@ -15,6 +15,7 @@ const { listPlans, setPlanByEmail, withMigrator } = await import("./plan/set-pla
 
 const USAGE = `Usage:
   npm run db:plan                     list everyone on a plan other than free
+  npm run db:plan -- <email> basic    put the person with that email on basic
   npm run db:plan -- <email> pro      put the person with that email on pro
   npm run db:plan -- <email> free     put them back on free`;
 

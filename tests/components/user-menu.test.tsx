@@ -20,6 +20,11 @@ describe("UserMenu", () => {
     expect(menu).toHaveTextContent(/sam\.rivera@example\.com\s*Free plan/);
   });
 
+  it("names the basic Plan under the email", async () => {
+    const menu = await openMenu("basic");
+    expect(menu).toHaveTextContent(/sam\.rivera@example\.com\s*Basic plan/);
+  });
+
   it("names the pro Plan under the email", async () => {
     const menu = await openMenu("pro");
     expect(menu).toHaveTextContent(/sam\.rivera@example\.com\s*Pro plan/);

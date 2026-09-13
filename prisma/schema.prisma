@@ -56,6 +56,7 @@ enum DocumentKind {
 /// Members match `PLANS` in `src/lib/plans.ts`; `enum-assertions.ts` fails the typecheck if they drift.
 enum Plan {
   free
+  basic
   pro
 }
 
@@ -93,11 +94,11 @@ model Job {
   /// The cover letter sent with this Job, if any. The tenant policy checks both kinds.
   coverLetterId String?
   coverLetter   Document? @relation("JobCoverLetter", fields: [coverLetterId], references: [id], onDelete: SetNull)
-  contacts    JobContact[]
   /// The last letter written for this Job (ADR-0002): its Draft. Empty when none has been written.
   /// Each write replaces it; it goes with the Job, and it is never a Document.
   draft          String    @default("")
   draftWrittenAt DateTime?
+  contacts    JobContact[]
   activity    ActivityEntry[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -202,8 +203,8 @@ model GenerationQuota {
   userId    String   @db.Uuid
   weekStart DateTime @db.Date
   used      Int      @default(0)
-  updatedAt DateTime @default(now())
   flagged   Int      @default(0)
+  updatedAt DateTime @default(now())
 
   @@id([userId, weekStart])
 }
