@@ -7,7 +7,7 @@ import { UserMenu } from "@/components/user-menu";
 import { signOutAction } from "@/server/auth/actions";
 
 type AppHeaderProps = {
-  /** Replaces the default logo lockup — used by the job detail back-link. */
+  /** What stands at the start of the header: the logo lockup, on every page. */
   leading: React.ReactNode;
   actions?: React.ReactNode;
   /**

@@ -42,8 +42,7 @@ test.describe("the first journey", () => {
     ).toBeVisible();
 
     // The board reflects it on the way back.
-    // The back link; the header nav carries a second "Board" link at this width.
-    await page.getByRole("link", { name: "Board" }).first().click();
+    await page.getByRole("link", { name: "Back to board" }).click();
     await expect(
       page.getByRole("region", { name: "Applied" }).getByText("Alpine Robotics", { exact: true }),
     ).toBeVisible();

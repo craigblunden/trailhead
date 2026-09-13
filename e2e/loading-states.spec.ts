@@ -53,7 +53,7 @@ test.describe("performance ticket 02: loading states", () => {
     // The board already knew the Job, so its name is shown at once — as text, not yet as the heading.
     await expect(page.getByText(job.role, { exact: true })).toBeVisible();
     expect(await page.getByRole("heading", { level: 1 }).count()).toBe(0);
-    await expect(page.getByRole("link", { name: "Board" }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Back to board" })).toBeVisible();
     await expectAccessible(page);
     await expect(page.getByRole("heading", { level: 1, name: job.role })).toBeVisible({ timeout: HOLD_MS + 10_000 });
   });

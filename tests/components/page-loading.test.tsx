@@ -96,9 +96,8 @@ describe("a Job's page", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Loading this job…");
     // As text, not as the page's heading: the heading is the page's to render.
     expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
-    // The way back is live while the page loads. The nav also links to the board; the first link
-    // in the banner is the way back.
-    expect(screen.getAllByRole("link", { name: "Board" })[0]).toHaveAttribute("href", "/board");
+    // The way back is live while the page loads.
+    expect(screen.getByRole("link", { name: "Back to board" })).toHaveAttribute("href", "/board");
   });
 
   it("shows a placeholder for a Job the browser has not seen", () => {
@@ -106,7 +105,7 @@ describe("a Job's page", () => {
     renderLoading(<PageLoading />);
 
     expect(screen.getByRole("status")).toHaveTextContent("Loading this job…");
-    expect(screen.getAllByRole("link", { name: "Board" })[0]).toHaveAttribute("href", "/board");
+    expect(screen.getByRole("link", { name: "Back to board" })).toHaveAttribute("href", "/board");
   });
 
   it("has no structural violations", async () => {

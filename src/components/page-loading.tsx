@@ -8,7 +8,7 @@ import { ArrowLeft } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { BrandLogo } from "@/components/brand-logo";
 import { CompanyAvatar } from "@/components/company-avatar";
-import { JobDetailHeader } from "@/components/job/job-detail-header";
+import { JobBackLink } from "@/components/job/job-back-link";
 import { PageMain } from "@/components/page-main";
 import { PageWait } from "@/components/page-wait";
 import { Button } from "@/components/ui/button";
@@ -233,10 +233,12 @@ export function JobLoading({ id }: { id: string }) {
 
   return (
     <div className="flex flex-1 flex-col bg-background">
-      <JobDetailHeader loading />
+      <AppHeader leading={<BrandLogo href="/board" />} loading />
       <PageWait>Loading this job…</PageWait>
 
       <PageMain>
+        {/* The way back, live, as on the page itself. */}
+        <JobBackLink />
         <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
           <div className="flex min-w-0 items-start gap-4">
             {job ? (

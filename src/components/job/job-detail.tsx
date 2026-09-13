@@ -4,13 +4,15 @@ import Link from "next/link";
 import { useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 
+import { AppHeader } from "@/components/app-header";
+import { BrandLogo } from "@/components/brand-logo";
 import { CompanyAvatar } from "@/components/company-avatar";
 import { useJobs, type JobPatch } from "@/components/jobs-provider";
 import { ActivityCard } from "@/components/job/activity-card";
 import { ApplicationKitCard } from "@/components/job/application-kit";
 import { ContactsCard } from "@/components/job/job-contacts";
 import { CoverLetterCard } from "@/components/job/cover-letter";
-import { JobDetailHeader } from "@/components/job/job-detail-header";
+import { JobBackLink } from "@/components/job/job-back-link";
 import { DetailsCard } from "@/components/job/details-card";
 import { EditJobDialog } from "@/components/job/edit-job-dialog";
 import { JobLoading } from "@/components/page-loading";
@@ -48,7 +50,7 @@ export function JobDetail({ jobId }: { jobId: string }) {
 function DetailMissing() {
   return (
     <div className="flex flex-1 flex-col bg-background">
-      <JobDetailHeader />
+      <AppHeader leading={<BrandLogo href="/board" />} />
       <main className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center px-6 py-20 text-center">
         <h1 className="text-2xl">This job isn&rsquo;t on your trail</h1>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -120,9 +122,11 @@ function JobDetailView({ job, error, dismissError, onPatch, onStage }: JobDetail
 
   return (
     <div className="flex flex-1 flex-col bg-background">
-      <JobDetailHeader />
+      <AppHeader leading={<BrandLogo href="/board" />} />
 
       <PageMain>
+        <JobBackLink />
+
         {error && (
           <div
             role="alert"
