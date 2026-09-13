@@ -177,6 +177,12 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* An open menu, dialog, or select locks the page's scroll and gives the body a right margin the
+     width of the scrollbar it hides. The gutter above already keeps that room, so the margin would
+     count it twice and push the page sideways. */
+  html body[data-scroll-locked] {
+    margin-right: 0 !important;
+  }
   h1,
   h2,
   h3 {

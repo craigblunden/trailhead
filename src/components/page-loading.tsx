@@ -151,16 +151,20 @@ function BoardLoading() {
       <PageWait>Loading your trail…</PageWait>
 
       <PageMain>
-        {/* The title row: the heading, and the count of active jobs when the browser last saw them. */}
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <SectionTitle>Your trail</SectionTitle>
-          {seen ? (
-            <p aria-hidden="true" className="text-sm text-muted-foreground">
-              {pluralize(seen.filter((job) => ACTIVE_STAGES.includes(job.stage)).length, "active application")}
-            </p>
-          ) : (
-            <Bar className="h-3.5 w-32 self-center" />
-          )}
+        {/* The title row: the heading, the count of active jobs when the browser last saw them, and
+            Add job's space at the end. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <SectionTitle>Your trail</SectionTitle>
+            {seen ? (
+              <p aria-hidden="true" className="text-sm text-muted-foreground">
+                {pluralize(seen.filter((job) => ACTIVE_STAGES.includes(job.stage)).length, "active application")}
+              </p>
+            ) : (
+              <Bar className="h-3.5 w-32 self-center" />
+            )}
+          </div>
+          <Bar className="h-9 w-24 rounded-lg" />
         </div>
 
         <div className="mt-6 grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

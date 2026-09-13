@@ -39,7 +39,7 @@ export function BoardView() {
       count: count + 1,
     }));
   }
-  // Either the header button or the empty-state button can open the dialog;
+  // Either the title-row button or the empty-state button can open the dialog;
   // remember which, so focus goes back to it on close.
   const addTrigger = useRef<HTMLElement | null>(null);
 
@@ -62,22 +62,21 @@ export function BoardView() {
 
   return (
     <div className="flex flex-1 flex-col">
-      <AppHeader
-        leading={<BrandLogo href="/board" />}
-        actions={
+      <AppHeader leading={<BrandLogo href="/board" />} />
+
+      <PageMain>
+        {/* The title row: the heading and its count at the start, Add job at the end. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <h1 className="text-3xl tracking-tight">Your trail</h1>
+            <p className="text-sm text-muted-foreground">
+              {pluralize(activeCount, "active application")}
+            </p>
+          </div>
           <Button className="h-9 px-3.5" onClick={openAddJob}>
             <Plus aria-hidden="true" />
             Add job
           </Button>
-        }
-      />
-
-      <PageMain>
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <h1 className="text-3xl tracking-tight">Your trail</h1>
-          <p className="text-sm text-muted-foreground">
-            {pluralize(activeCount, "active application")}
-          </p>
         </div>
 
         {error && (

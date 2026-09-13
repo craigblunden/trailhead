@@ -21,8 +21,8 @@ type AddJobDialogProps = {
   onOpenChange: (open: boolean) => void;
   /**
    * The control that opened the dialog. Focus returns here on close (WCAG
-   * 2.4.3) — Radix cannot infer it, because the trigger lives in the header
-   * rather than wrapping this dialog.
+   * 2.4.3) — Radix cannot infer it, because the trigger lives beside the board’s
+   * title rather than wrapping this dialog.
    */
   returnFocusTo?: React.RefObject<HTMLElement | null>;
 };

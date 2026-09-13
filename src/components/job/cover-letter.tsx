@@ -260,9 +260,16 @@ export function CoverLetterCard({ job }: { job: Job }) {
                 <label htmlFor={feedbackId} className="block text-sm font-medium">
                   What should change?
                 </label>
-                <p id={`${feedbackId}-hint`} className="mt-1 text-xs text-muted-foreground">
-                  A couple of sentences about this letter. A rewrite uses one of your letters.
-                </p>
+                <div id={`${feedbackId}-hint`} className="mt-1 text-xs text-muted-foreground">
+                  <p>The more specific you are, the better the rewrite. Things worth a look:</p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                    <li>Tone: warmer, more direct, or more formal.</li>
+                    <li>Anything on your resume the posting asks for that the letter missed.</li>
+                    <li>Experience from an earlier role that carries over to this one.</li>
+                    <li>Sentences or paragraphs a hiring manager could do without.</li>
+                  </ul>
+                  <p className="mt-1">A rewrite uses one of your letters.</p>
+                </div>
                 <Textarea
                   id={feedbackId}
                   aria-describedby={`${feedbackId}-hint`}
