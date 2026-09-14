@@ -228,6 +228,22 @@
   opacity: 1;
 }
 
+/*
+ * A Job's page draws every Stage's scene in its header and shows the Job's own; changing Stage
+ * crossfades from one to the next. See `SummitScenes` and `SummitHeaderFrame`.
+ */
+[data-summit-part] {
+  opacity: 0;
+  transition: opacity 700ms ease;
+}
+[data-summit="interested"] [data-summit-part="interested"],
+[data-summit="applied"] [data-summit-part="applied"],
+[data-summit="interviewing"] [data-summit-part="interviewing"],
+[data-summit="offer"] [data-summit-part="offer"],
+[data-summit="rejected"] [data-summit-part="rejected"] {
+  opacity: 1;
+}
+
 /* ------------------------------------------------------------------------------------------------
  * Waiting and arriving.
  *
@@ -305,7 +321,8 @@
   .loading-trail-path {
     animation: none;
   }
-  [data-scene-part] {
+  [data-scene-part],
+  [data-summit-part] {
     transition: none;
   }
   ::view-transition-old(*),

@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ActionError } from "@/components/action-client";
 import { JobDetail } from "@/components/job/job-detail";
+import { SummitScenes } from "@/components/job/summit-scenes";
 import { LOCATION_FALLBACK } from "@/lib/job-fields";
-import type { Job } from "@/lib/jobs";
+import { STAGES, type Job, type Stage } from "@/lib/jobs";
 import type { JobPatch } from "@/lib/jobs-client";
 import { createTrail } from "../fakes/trail";
 import { SEED_JOBS } from "../fixtures/jobs";
@@ -446,5 +447,72 @@ describe("panel structure", () => {
         name,
       );
     }
+  });
+});
+
+describe("the summit attempt", () => {
+  const attempt = () => screen.getByRole("list", { name: "Summit attempt" });
+  const currentStep = () => within(attempt()).getByText((_, node) => node?.getAttribute("aria-current") === "step");
+
+  it("SUM-1: tells the Stage as a phase of the climb, and follows a Stage change", async () => {
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />);
+
+    expect(currentStep()).toHaveTextContent("Climb, Interviewing");
+    expect(screen.getByText("On the climb.")).toBeInTheDocument();
+
+    await selectStage(user, "Offer");
+
+    expect(currentStep()).toHaveTextContent("Summit, Offer");
+    expect(screen.getByText("Summit.")).toBeInTheDocument();
+  });
+
+  it("SUM-2: a rejected Job is off the route, regrouping for the next attempt", async () => {
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />);
+
+    await selectStage(user, "Rejected");
+
+    expect(currentStep()).toHaveTextContent("Regroup, Rejected");
+    expect(within(attempt()).getAllByRole("listitem")).toHaveLength(5);
+    expect(screen.getByText("Regroup at camp.")).toBeInTheDocument();
+  });
+
+  it("SUM-3: shows the scene for the Job's Stage, hidden from assistive technology, and moves back with a refused change", async () => {
+    const trail = createTrail({ jobs: SEED_JOBS });
+    let refuse = false;
+    const setStage = (id: string, stage: Stage) =>
+      refuse ? Promise.reject(new ActionError("failed", "Couldn't move the job.")) : trail.jobs.setStage(id, stage);
+    const { user, container } = renderWithJobs(<JobDetail jobId={HARVEST} scenes={<SummitScenes />} />, {
+      trail,
+      client: { ...trail.jobs, setStage },
+    });
+    const shown = () => container.querySelector("[data-summit]")?.getAttribute("data-summit");
+
+    const pictures = container.querySelectorAll("svg[data-summit-part]");
+    expect([...pictures].map((svg) => svg.getAttribute("data-summit-part"))).toEqual([...STAGES]);
+    for (const svg of pictures) expect(svg).toHaveAttribute("aria-hidden", "true");
+    expect(shown()).toBe("interviewing");
+
+    await selectStage(user, "Offer");
+    expect(shown()).toBe("offer");
+
+    refuse = true;
+    await selectStage(user, "Rejected");
+    await screen.findByRole("alert");
+    expect(shown()).toBe("offer");
+  });
+
+  it("SUM-4: draws the scenes it was handed once, however the Job changes", async () => {
+    let renders = 0;
+    function Scenes() {
+      renders += 1;
+      return <svg data-testid="scenes" />;
+    }
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} scenes={<Scenes />} />);
+
+    await selectStage(user, "Offer");
+    await selectStage(user, "Applied");
+
+    expect(screen.getByTestId("scenes")).toBeInTheDocument();
+    expect(renders).toBe(1);
   });
 });

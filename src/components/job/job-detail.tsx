@@ -12,9 +12,9 @@ import { ActivityCard } from "@/components/job/activity-card";
 import { ApplicationKitCard } from "@/components/job/application-kit";
 import { ContactsCard } from "@/components/job/job-contacts";
 import { CoverLetterCard } from "@/components/job/cover-letter";
-import { JobBackLink } from "@/components/job/job-back-link";
 import { DetailsCard } from "@/components/job/details-card";
 import { EditJobDialog } from "@/components/job/edit-job-dialog";
+import { SummitHeaderFrame, SummitProgress } from "@/components/job/summit-header";
 import { JobLoading } from "@/components/page-loading";
 import { PageMain } from "@/components/page-main";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { STAGES, STAGE_META, webLink, type Job, type Stage } from "@/lib/jobs";
 
-export function JobDetail({ jobId }: { jobId: string }) {
+/**
+ * A Job's page. `scenes` is every Stage's picture for its header (`SummitScenes`), rendered by the
+ * page on the server, so the drawing stays out of this component's JavaScript and is never redrawn
+ * when the Job changes.
+ */
+export function JobDetail({ jobId, scenes }: { jobId: string; scenes?: React.ReactNode }) {
   const { getJob, updateJob, setStage, status, error, dismissError } = useJobs();
   const job = getJob(jobId);
 
@@ -39,6 +44,7 @@ export function JobDetail({ jobId }: { jobId: string }) {
   return (
     <JobDetailView
       job={job}
+      scenes={scenes}
       error={error}
       dismissError={dismissError}
       onPatch={(patch) => updateJob(job.id, patch)}
@@ -66,6 +72,7 @@ function DetailMissing() {
 
 type JobDetailViewProps = {
   job: Job;
+  scenes: React.ReactNode;
   error: string | null;
   dismissError: () => void;
   onPatch: (patch: JobPatch) => Promise<boolean>;
@@ -115,7 +122,7 @@ function SaveRow({
 }
 
 /** Each free-text field is saved by its own button, so a long paste is never saved mid-edit. */
-function JobDetailView({ job, error, dismissError, onPatch, onStage }: JobDetailViewProps) {
+function JobDetailView({ job, scenes, error, dismissError, onPatch, onStage }: JobDetailViewProps) {
   const description = useSavedText(job.description, (value) => onPatch({ description: value }));
   const notes = useSavedText(job.notes, (value) => onPatch({ notes: value }));
   const posting = webLink(job.postingUrl);
@@ -124,132 +131,143 @@ function JobDetailView({ job, error, dismissError, onPatch, onStage }: JobDetail
     <div className="flex flex-1 flex-col bg-background">
       <AppHeader leading={<BrandLogo href="/board" />} />
 
-      <PageMain>
-        <JobBackLink />
+      <main className="flex flex-1 flex-col">
+        <SummitHeaderFrame
+          stage={job.stage}
+          scenes={scenes}
+          title={
+            <>
+              <CompanyAvatar
+                company={job.company}
+                accent={job.accent}
+                size="lg"
+                className="lg:size-16 lg:rounded-lg lg:text-3xl"
+              />
+              <div className="min-w-0">
+                <h1 className="text-3xl leading-tight tracking-tight text-balance sm:text-4xl lg:text-5xl 2xl:text-6xl">
+                  {job.role}
+                </h1>
+                <p className="mt-1 sm:text-lg lg:mt-2 lg:text-xl">
+                  {job.company} · {job.location}
+                </p>
+              </div>
+            </>
+          }
+          controls={
+            <>
+              <Select value={job.stage} onValueChange={(next) => onStage(next as Stage)}>
+                <SelectTrigger
+                  className="h-9 w-full min-w-32 bg-card sm:w-40"
+                  aria-label="Application stage"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STAGES.map((stage) => (
+                    <SelectItem key={stage} value={stage}>
+                      {STAGE_META[stage].label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-        {error && (
-          <div
-            role="alert"
-            className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/40 bg-card px-4 py-3 text-sm"
-          >
-            <span>{error}</span>
-            <Button variant="outline" size="sm" onClick={dismissError}>
-              Dismiss
-            </Button>
-          </div>
-        )}
+              <EditJobDialog job={job} onPatch={onPatch} />
 
-        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
-          <div className="flex min-w-0 items-start gap-4">
-            <CompanyAvatar company={job.company} accent={job.accent} size="lg" />
-            <div className="min-w-0">
-              <h1 className="text-3xl leading-tight tracking-tight text-balance">
-                {job.role}
-              </h1>
-              <p className="mt-1 text-muted-foreground">
-                {job.company} · {job.location}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex w-full shrink-0 flex-wrap items-center gap-3 sm:w-auto">
-            <Select value={job.stage} onValueChange={(next) => onStage(next as Stage)}>
-              <SelectTrigger
-                className="h-9 w-full min-w-32 sm:w-40"
-                aria-label="Application stage"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STAGES.map((stage) => (
-                  <SelectItem key={stage} value={stage}>
-                    {STAGE_META[stage].label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <EditJobDialog job={job} onPatch={onPatch} />
-
-            {/* `disabled` does nothing to an anchor, so a job with no usable
-                URL gets a real disabled button instead of a dead link. */}
-            {posting ? (
-              <Button asChild className="h-9 px-3.5">
-                <a href={posting} target="_blank" rel="noopener noreferrer">
-                  Open posting
+              {/* `disabled` does nothing to an anchor, so a job with no usable
+                  URL gets a real disabled button instead of a dead link. */}
+              {posting ? (
+                <Button asChild className="h-9 px-3.5">
+                  <a href={posting} target="_blank" rel="noopener noreferrer">
+                    Open posting
+                    <ArrowUpRight aria-hidden="true" />
+                    <span className="sr-only">, opens in a new tab</span>
+                  </a>
+                </Button>
+              ) : (
+                <Button disabled className="h-9 px-3.5">
+                  No posting link
                   <ArrowUpRight aria-hidden="true" />
-                  <span className="sr-only">, opens in a new tab</span>
-                </a>
-              </Button>
-            ) : (
-              <Button disabled className="h-9 px-3.5">
-                No posting link
-                <ArrowUpRight aria-hidden="true" />
-              </Button>
-            )}
-          </div>
-        </div>
+                </Button>
+              )}
+            </>
+          }
+          progress={<SummitProgress stage={job.stage} />}
+        />
 
-        {/* The side cards in one column beside the writing, and in two from `2xl`, where one column
-            of text boxes would otherwise run the full width of the page. */}
-        <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] 2xl:grid-cols-[minmax(0,1fr)_43.5rem]">
-          <div className="min-w-0 space-y-6">
-            <section
-              aria-labelledby="description-heading"
-              className="rounded-lg bg-card p-5 ring-1 ring-foreground/10"
+        <PageMain as="div">
+          {error && (
+            <div
+              role="alert"
+              className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/40 bg-card px-4 py-3 text-sm"
             >
-              <h2 id="description-heading" className="text-lg">
-                Job description
-              </h2>
-              <p id="description-hint" className="mt-1 text-sm text-muted-foreground">
-                Keep this current — it feeds your cover letter later.
-              </p>
-              <Textarea
+              <span>{error}</span>
+              <Button variant="outline" size="sm" onClick={dismissError}>
+                Dismiss
+              </Button>
+            </div>
+          )}
+
+          {/* The side cards in one column beside the writing, and in two from `2xl`, where one column
+              of text boxes would otherwise run the full width of the page. */}
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] 2xl:grid-cols-[minmax(0,1fr)_43.5rem]">
+            <div className="min-w-0 space-y-6">
+              <section
                 aria-labelledby="description-heading"
-                aria-describedby="description-hint"
-                value={description.value}
-                onChange={(event) => description.set(event.target.value)}
-                className="mt-3 min-h-56 resize-y"
-              />
-              <SaveRow changed={description.changed} onSave={description.save}>
-                Save description
-              </SaveRow>
-            </section>
+                className="rounded-lg bg-card p-5 ring-1 ring-foreground/10"
+              >
+                <h2 id="description-heading" className="text-lg">
+                  Job description
+                </h2>
+                <p id="description-hint" className="mt-1 text-sm text-muted-foreground">
+                  Keep this current — it feeds your cover letter later.
+                </p>
+                <Textarea
+                  aria-labelledby="description-heading"
+                  aria-describedby="description-hint"
+                  value={description.value}
+                  onChange={(event) => description.set(event.target.value)}
+                  className="mt-3 min-h-56 resize-y"
+                />
+                <SaveRow changed={description.changed} onSave={description.save}>
+                  Save description
+                </SaveRow>
+              </section>
 
-            <section
-              aria-labelledby="notes-heading"
-              className="rounded-lg bg-card p-5 ring-1 ring-foreground/10"
-            >
-              <h2 id="notes-heading" className="text-lg">
-                Notes
-              </h2>
-              <Textarea
+              <section
                 aria-labelledby="notes-heading"
-                placeholder="Interview prep, follow-ups, anything worth remembering."
-                value={notes.value}
-                onChange={(event) => notes.set(event.target.value)}
-                className="mt-3 min-h-32 resize-y"
-              />
-              <SaveRow changed={notes.changed} onSave={notes.save}>
-                Save notes
-              </SaveRow>
-            </section>
+                className="rounded-lg bg-card p-5 ring-1 ring-foreground/10"
+              >
+                <h2 id="notes-heading" className="text-lg">
+                  Notes
+                </h2>
+                <Textarea
+                  aria-labelledby="notes-heading"
+                  placeholder="Interview prep, follow-ups, anything worth remembering."
+                  value={notes.value}
+                  onChange={(event) => notes.set(event.target.value)}
+                  className="mt-3 min-h-32 resize-y"
+                />
+                <SaveRow changed={notes.changed} onSave={notes.save}>
+                  Save notes
+                </SaveRow>
+              </section>
 
-            <CoverLetterCard job={job} />
+              <CoverLetterCard job={job} />
+            </div>
+
+            <aside className="grid min-w-0 grid-cols-1 items-start gap-6 2xl:grid-cols-2">
+              <div className="min-w-0 space-y-6">
+                <DetailsCard job={job} onChange={onPatch} />
+                <ApplicationKitCard job={job} />
+              </div>
+              <div className="min-w-0 space-y-6">
+                <ContactsCard job={job} />
+                <ActivityCard entries={job.activity} />
+              </div>
+            </aside>
           </div>
-
-          <aside className="grid min-w-0 grid-cols-1 items-start gap-6 2xl:grid-cols-2">
-            <div className="min-w-0 space-y-6">
-              <DetailsCard job={job} onChange={onPatch} />
-              <ApplicationKitCard job={job} />
-            </div>
-            <div className="min-w-0 space-y-6">
-              <ContactsCard job={job} />
-              <ActivityCard entries={job.activity} />
-            </div>
-          </aside>
-        </div>
-      </PageMain>
+        </PageMain>
+      </main>
     </div>
   );
 }

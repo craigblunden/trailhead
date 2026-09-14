@@ -29,7 +29,7 @@ type MountainProps = {
  * A peak whose snow cap is derived from the slope, so its outer edges sit
  * exactly on the mountain and its notches mirror about the apex.
  */
-function Mountain({ apexX, apexY, baseY, halfWidth, fill }: MountainProps) {
+export function Mountain({ apexX, apexY, baseY, halfWidth, fill }: MountainProps) {
   const run = halfWidth / (baseY - apexY);
   const capDepth = (baseY - apexY) * 0.24;
   const capY = apexY + capDepth;
@@ -60,7 +60,7 @@ function Mountain({ apexX, apexY, baseY, halfWidth, fill }: MountainProps) {
   );
 }
 
-function Pine({ x, baseY, height, fill }: PineProps) {
+export function Pine({ x, baseY, height, fill }: PineProps) {
   const halfWidth = height * 0.32;
   const canopyBottom = baseY - height * 0.16;
 
@@ -111,7 +111,7 @@ function Tent({ x, baseY }: { x: number; baseY: number }) {
   );
 }
 
-function Campfire({ x, baseY }: { x: number; baseY: number }) {
+export function Campfire({ x, baseY }: { x: number; baseY: number }) {
   return (
     <g>
       <path

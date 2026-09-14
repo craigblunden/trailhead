@@ -9,7 +9,7 @@ import { AppHeader } from "@/components/app-header";
 import { StageMarker } from "@/components/board/trail-marker";
 import { BrandLogo } from "@/components/brand-logo";
 import { CompanyAvatar } from "@/components/company-avatar";
-import { JobBackLink } from "@/components/job/job-back-link";
+import { SummitHeaderFrame } from "@/components/job/summit-header";
 import { PageMain } from "@/components/page-main";
 import { PageWait } from "@/components/page-wait";
 import { Button } from "@/components/ui/button";
@@ -229,7 +229,8 @@ function GhostJobCard() {
 }
 
 /* ------------------------------------------------------------------------------------------------
- * A Job's page: its name and company from the board the user just left, and the cards in outline.
+ * A Job's page: its name, company, and Stage's sky from the board the user just left, and the
+ * header's strip and the cards in outline. The scene itself arrives with the page.
  * ---------------------------------------------------------------------------------------------- */
 
 /** Also the job page's own wait, for the rare load where the browser holds no jobs at all. */
@@ -242,82 +243,105 @@ export function JobLoading({ id }: { id: string }) {
       <AppHeader leading={<BrandLogo href="/board" />} loading />
       <PageWait>Loading this job…</PageWait>
 
-      <PageMain>
-        {/* The way back, live, as on the page itself. */}
-        <JobBackLink />
-        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
-          <div className="flex min-w-0 items-start gap-4">
-            {job ? (
-              <CompanyAvatar company={job.company} accent={job.accent} size="lg" />
-            ) : (
-              <Bar className="size-12 shrink-0 rounded-md" />
-            )}
-            <div className="min-w-0">
-              <GhostTitle width="w-64">{job?.role}</GhostTitle>
+      <main className="flex flex-1 flex-col">
+        {/* The way back is live inside it, as on the page itself. */}
+        <SummitHeaderFrame
+          stage={job?.stage ?? null}
+          title={
+            <>
               {job ? (
-                <p className="mt-1 text-muted-foreground">
-                  {job.company} · {job.location}
-                </p>
+                <CompanyAvatar
+                  company={job.company}
+                  accent={job.accent}
+                  size="lg"
+                  className="lg:size-16 lg:rounded-lg lg:text-3xl"
+                />
               ) : (
-                <Bar className="mt-3 h-4 w-44" />
+                <Bar className="size-12 shrink-0 rounded-md lg:size-16 lg:rounded-lg" />
               )}
-            </div>
-          </div>
-
-          <div className="flex w-full shrink-0 flex-wrap items-center gap-3 sm:w-auto">
-            <Bar className="h-9 w-full rounded-lg sm:w-40" />
-            <Bar className="h-9 w-32 rounded-lg" />
-            <Bar className="h-9 w-32 rounded-lg" />
-          </div>
-        </div>
-
-        {/* The side cards in one column beside the writing, and in two from `2xl`, where one column
-            of text boxes would otherwise run the full width of the page. */}
-        <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] 2xl:grid-cols-[minmax(0,1fr)_43.5rem]">
-          {/* min-w-0: a grid track is never made wider than the screen by what it holds. */}
-          <div className="min-w-0 space-y-6">
-            {/* The description card is where the wait is shown: the largest space on the page. */}
-            <GhostCard>
-              <Bar className="h-5 w-36" />
-              <Bar className="mt-2.5 h-3.5 w-72 max-w-full" />
-              <div className="mt-3 min-h-56 rounded-md border border-dashed border-input" />
-              <div className="mt-3 flex justify-end">
-                <Bar className="h-9 w-36 rounded-lg" />
+              <div className="min-w-0">
+                {job ? (
+                  <>
+                    <p className="font-heading text-3xl leading-tight tracking-tight text-balance sm:text-4xl lg:text-5xl 2xl:text-6xl">
+                      {job.role}
+                    </p>
+                    <p className="mt-1 sm:text-lg lg:mt-2 lg:text-xl">
+                      {job.company} · {job.location}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Bar className="mt-1 h-7 w-64 max-w-full sm:h-9 lg:h-12" />
+                    <Bar className="mt-3 h-4 w-44 lg:h-5" />
+                  </>
+                )}
               </div>
-            </GhostCard>
-            <GhostCard>
-              <Bar className="h-5 w-16" />
-              <Bar className="mt-3 h-32 w-full rounded-md" />
-              <div className="mt-3 flex justify-end">
-                <Bar className="h-9 w-28 rounded-lg" />
-              </div>
-            </GhostCard>
-            {/* The cover letter: its line, the letter block, and the Feedback box and buttons beneath it. */}
-            <GhostCard>
-              <Bar className="h-5 w-28" />
-              <Bar className="mt-2.5 h-3.5 w-full max-w-md" />
-              <Bar className="mt-4 h-32 w-full rounded-md" />
-              <Bar className="mt-4 h-3.5 w-36" />
-              <Bar className="mt-2 h-20 w-full rounded-md" />
-              <div className="mt-3 flex gap-3">
-                <Bar className="h-9 w-24 rounded-lg" />
-                <Bar className="h-9 w-28 rounded-lg" />
-              </div>
-            </GhostCard>
-          </div>
+            </>
+          }
+          progress={
+            <>
+              <Bar className="h-5 w-72 max-w-full rounded-full" />
+              <Bar className="h-4 w-96 max-w-full" />
+            </>
+          }
+          controls={
+            <>
+              <Bar className="h-9 w-full rounded-lg sm:w-40" />
+              <Bar className="h-9 w-32 rounded-lg" />
+              <Bar className="h-9 w-32 rounded-lg" />
+            </>
+          }
+        />
 
-          <div className="grid min-w-0 grid-cols-1 items-start gap-6 2xl:grid-cols-2">
+        <PageMain as="div">
+          {/* The side cards in one column beside the writing, and in two from `2xl`, where one column
+              of text boxes would otherwise run the full width of the page. */}
+          <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] 2xl:grid-cols-[minmax(0,1fr)_43.5rem]">
+            {/* min-w-0: a grid track is never made wider than the screen by what it holds. */}
             <div className="min-w-0 space-y-6">
-              <GhostCardBody lines={4} />
-              <GhostCardBody lines={2} />
+              {/* The description card is where the wait is shown: the largest space on the page. */}
+              <GhostCard>
+                <Bar className="h-5 w-36" />
+                <Bar className="mt-2.5 h-3.5 w-72 max-w-full" />
+                <div className="mt-3 min-h-56 rounded-md border border-dashed border-input" />
+                <div className="mt-3 flex justify-end">
+                  <Bar className="h-9 w-36 rounded-lg" />
+                </div>
+              </GhostCard>
+              <GhostCard>
+                <Bar className="h-5 w-16" />
+                <Bar className="mt-3 h-32 w-full rounded-md" />
+                <div className="mt-3 flex justify-end">
+                  <Bar className="h-9 w-28 rounded-lg" />
+                </div>
+              </GhostCard>
+              {/* The cover letter: its line, the letter block, and the Feedback box and buttons beneath it. */}
+              <GhostCard>
+                <Bar className="h-5 w-28" />
+                <Bar className="mt-2.5 h-3.5 w-full max-w-md" />
+                <Bar className="mt-4 h-32 w-full rounded-md" />
+                <Bar className="mt-4 h-3.5 w-36" />
+                <Bar className="mt-2 h-20 w-full rounded-md" />
+                <div className="mt-3 flex gap-3">
+                  <Bar className="h-9 w-24 rounded-lg" />
+                  <Bar className="h-9 w-28 rounded-lg" />
+                </div>
+              </GhostCard>
             </div>
-            <div className="min-w-0 space-y-6">
-              <GhostCardBody lines={2} />
-              <GhostCardBody lines={3} />
+
+            <div className="grid min-w-0 grid-cols-1 items-start gap-6 2xl:grid-cols-2">
+              <div className="min-w-0 space-y-6">
+                <GhostCardBody lines={4} />
+                <GhostCardBody lines={2} />
+              </div>
+              <div className="min-w-0 space-y-6">
+                <GhostCardBody lines={2} />
+                <GhostCardBody lines={3} />
+              </div>
             </div>
           </div>
-        </div>
-      </PageMain>
+        </PageMain>
+      </main>
     </div>
   );
 }

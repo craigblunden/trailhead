@@ -9,7 +9,7 @@ export function sceneSectionFor(pathname: string): SceneSection | null {
   if (pathname === "/board") return "board";
   if (pathname === "/contacts" || pathname.startsWith("/contacts/")) return "contacts";
   if (pathname === "/documents") return "documents";
-  // A Job's page is for reading and writing at length, and runs on a plain background.
+  // A Job's page draws its own scene, for its Stage, in its header (see `SummitHeaderFrame`).
   return null;
 }
 
