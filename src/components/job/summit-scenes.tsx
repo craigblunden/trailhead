@@ -444,7 +444,7 @@ function RejectedScene() {
       <Star x={140} y={54} />
       <Star x={330} y={96} r={4} />
       <Star x={1080} y={62} r={4} />
-      <circle cx={1010} cy={318} r={64} fill="#f0a868" />
+      <circle cx={1010} cy={318 - GROUND_LIFT} r={64} fill="#f0a868" />
 
       <Mountain apexX={-640} apexY={150} baseY={320} halfWidth={260} fill="#a9a3c3" />
       <Mountain apexX={1900} apexY={180} baseY={320} halfWidth={240} fill="#a9a3c3" />
@@ -458,33 +458,36 @@ function RejectedScene() {
       <path d="M682 164 l16 16 M698 164 l-16 16" stroke="#d1603f" strokeWidth={4} strokeLinecap="round" />
       <path d="M690 172 L740 124 L700 70" fill="none" stroke="#ffffff" strokeWidth={4} strokeDasharray="2 10" strokeLinecap="round" />
 
-      <path d="M-1000 312 C -800 298 -600 320 -400 312 C -260 294 -130 310 0 306 C 220 290 420 300 640 296 C 860 292 1020 298 1200 306 C 1340 314 1470 296 1600 306 C 1800 316 2000 298 2200 306 L2200 400 L-1000 400 Z" fill="#94ac80" />
-      <path d="M-1000 356 C -800 342 -600 364 -400 356 C -260 338 -130 354 0 350 C 260 334 480 344 720 338 C 940 332 1080 338 1200 344 C 1340 352 1470 334 1600 344 C 1800 354 2000 336 2200 344 L2200 400 L-1000 400 Z" fill="#7f9b6f" />
+      {/* The ground and everything on it, lifted clear of the strip beneath the picture. */}
+      <g transform={`translate(0 ${-GROUND_LIFT})`}>
+        <path d="M-1000 312 C -800 298 -600 320 -400 312 C -260 294 -130 310 0 306 C 220 290 420 300 640 296 C 860 292 1020 298 1200 306 C 1340 314 1470 296 1600 306 C 1800 316 2000 298 2200 306 L2200 440 L-1000 440 Z" fill="#94ac80" />
+        <path d="M-1000 356 C -800 342 -600 364 -400 356 C -260 338 -130 354 0 350 C 260 334 480 344 720 338 C 940 332 1080 338 1200 344 C 1340 352 1470 334 1600 344 C 1800 354 2000 336 2200 344 L2200 440 L-1000 440 Z" fill="#7f9b6f" />
 
-      <Pine x={-780} baseY={334} height={90} fill="var(--pine-dark)" />
-      <Pine x={-560} baseY={350} height={56} fill="var(--pine)" />
-      <Pine x={1760} baseY={348} height={58} fill="var(--pine)" />
-      <Pine x={1960} baseY={336} height={88} fill="var(--pine-dark)" />
-      <Pine x={-250} baseY={336} height={88} fill="var(--pine-dark)" />
-      <Pine x={-160} baseY={350} height={56} fill="var(--pine)" />
-      <Pine x={1400} baseY={334} height={90} fill="var(--pine-dark)" />
-      <Pine x={70} baseY={334} height={92} fill="var(--pine-dark)" />
-      <Pine x={1130} baseY={336} height={88} fill="var(--pine-dark)" />
-      <Pine x={1070} baseY={350} height={56} fill="var(--pine)" />
+        <Pine x={-780} baseY={334} height={90} fill="var(--pine-dark)" />
+        <Pine x={-560} baseY={350} height={56} fill="var(--pine)" />
+        <Pine x={1760} baseY={348} height={58} fill="var(--pine)" />
+        <Pine x={1960} baseY={336} height={88} fill="var(--pine-dark)" />
+        <Pine x={-250} baseY={336} height={88} fill="var(--pine-dark)" />
+        <Pine x={-160} baseY={350} height={56} fill="var(--pine)" />
+        <Pine x={1400} baseY={334} height={90} fill="var(--pine-dark)" />
+        <Pine x={70} baseY={334} height={92} fill="var(--pine-dark)" />
+        <Pine x={1130} baseY={336} height={88} fill="var(--pine-dark)" />
+        <Pine x={1070} baseY={350} height={56} fill="var(--pine)" />
 
-      <ellipse cx={600} cy={366} rx={110} ry={40} fill="#ffd28a" opacity={0.35} />
-      <CampTent x={320} baseY={368} s={1.8} />
-      <Campfire x={600} baseY={376} />
-      <rect x={456} y={362} width={80} height={16} rx={8} fill="var(--trunk)" />
-      <circle cx={464} cy={370} r={6} fill="#b08658" />
-      <SittingReader x={494} seatY={362} />
+        <ellipse cx={600} cy={366} rx={110} ry={40} fill="#ffd28a" opacity={0.35} />
+        <CampTent x={320} baseY={368} s={1.8} />
+        <Campfire x={600} baseY={376} />
+        <rect x={456} y={362} width={80} height={16} rx={8} fill="var(--trunk)" />
+        <circle cx={464} cy={370} r={6} fill="#b08658" />
+        <SittingReader x={494} seatY={362} />
 
-      {/* Kit laid out and repacked for next time. */}
-      <Backpack x={740} baseY={382} />
-      <RopeCoil x={782} y={378} />
-      <g>
-        <rect x={866} y={326} width={6} height={56} fill="var(--trunk)" />
-        <path d="M846 330 H900 L910 340 L900 350 H846 Z" fill="#b08658" stroke="var(--trunk)" strokeWidth={2.5} strokeLinejoin="round" transform="rotate(-18 869 340)" />
+        {/* Kit laid out and repacked for next time. */}
+        <Backpack x={740} baseY={382} />
+        <RopeCoil x={782} y={378} />
+        <g>
+          <rect x={866} y={326} width={6} height={56} fill="var(--trunk)" />
+          <path d="M846 330 H900 L910 340 L900 350 H846 Z" fill="#b08658" stroke="var(--trunk)" strokeWidth={2.5} strokeLinejoin="round" transform="rotate(-18 869 340)" />
+        </g>
       </g>
     </>
   );
