@@ -27,17 +27,19 @@ describe("authRedirect", () => {
     }
   });
 
-  it("PROXY-2: sends a signed-in visit to sign-in or sign-up to the board", () => {
+  it("PROXY-2: sends a signed-in visit to the landing page or sign-in/up to the board", () => {
+    expect(authRedirect("/", true)).toBe("/board");
     expect(authRedirect("/login", true)).toBe("/board");
     expect(authRedirect("/signup", true)).toBe("/board");
   });
 
   it("PROXY-3: leaves everything else alone in both states", () => {
-    for (const path of ["/", "/auth/confirm", "/boardroom", "/forgot-password"]) {
+    for (const path of ["/auth/confirm", "/boardroom", "/forgot-password"]) {
       expect(authRedirect(path, false), path).toBeNull();
       expect(authRedirect(path, true), path).toBeNull();
     }
     expect(authRedirect("/board", true)).toBeNull();
+    expect(authRedirect("/", false)).toBeNull();
     expect(authRedirect("/login", false)).toBeNull();
   });
 

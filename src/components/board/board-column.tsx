@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 
 import { JobCard } from "@/components/board/job-card";
+import { StageMarker } from "@/components/board/trail-marker";
 import { carriesJob, readJobTransfer } from "@/lib/board-dnd";
 import { STAGE_META, pluralize, type Job, type Stage } from "@/lib/jobs";
 
@@ -61,8 +62,9 @@ export function BoardColumn({ stage, jobs, onMove }: BoardColumnProps) {
       onDragLeave={onDragLeave}
       onDragOver={onDragOver}
       onDrop={onDrop}
-      className="flex h-fit flex-col rounded-lg bg-card/55 ring-1 ring-foreground/10 transition-[box-shadow,background-color] data-[drop-target=true]:bg-accent/70 data-[drop-target=true]:ring-2 data-[drop-target=true]:ring-primary/60"
+      className="relative flex h-fit flex-col rounded-lg bg-card/55 ring-1 ring-foreground/10 transition-[box-shadow,background-color] data-[drop-target=true]:bg-accent/70 data-[drop-target=true]:ring-2 data-[drop-target=true]:ring-primary/60"
     >
+      <StageMarker stage={stage} />
       <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
         <span
           aria-hidden="true"

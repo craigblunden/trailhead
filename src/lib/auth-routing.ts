@@ -10,8 +10,8 @@
 /** Routes that only make sense signed in. */
 const PROTECTED_PREFIXES = ["/board", "/contacts", "/documents"];
 
-/** Routes that only make sense signed out. */
-const SIGNED_OUT_ONLY = ["/login", "/signup"];
+/** Routes that only make sense signed out. Signed in, the landing page is the board. */
+const SIGNED_OUT_ONLY = ["/", "/login", "/signup"];
 
 /**
  * Where a page sends a visitor whose cookie did not hold up (expired, revoked, forged). The proxy

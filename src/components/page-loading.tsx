@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { AppHeader } from "@/components/app-header";
+import { StageMarker } from "@/components/board/trail-marker";
 import { BrandLogo } from "@/components/brand-logo";
 import { CompanyAvatar } from "@/components/company-avatar";
 import { JobBackLink } from "@/components/job/job-back-link";
@@ -169,7 +170,8 @@ function BoardLoading() {
 
         <div className="mt-6 grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {STAGES.map((stage) => (
-            <div key={stage} className="flex h-fit flex-col rounded-lg bg-card/55 ring-1 ring-foreground/10">
+            <div key={stage} className="relative flex h-fit flex-col rounded-lg bg-card/55 ring-1 ring-foreground/10">
+              <StageMarker stage={stage} />
               <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
                 <span
                   aria-hidden="true"

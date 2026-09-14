@@ -16,7 +16,8 @@ const REFRESH_WITHIN_SECONDS = 5 * 60;
 /**
  * Optimistic redirects, and nothing that counts as authorization.
  *
- * Signed-out visitors to the board go to sign-in; signed-in visitors to sign-in go to the board.
+ * Signed-out visitors to the board go to sign-in; signed-in visitors to the landing page or sign-in
+ * go to the board.
  * "Signed in" here means the session COOKIE says so — parsed locally, no signature check, no
  * network — because this runs on every prefetch. Pages call `requirePageSession()` and the data
  * layer `requireSession()`, both of which validate with Auth, whatever happens here. Delete this
@@ -77,7 +78,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Only the routes with a signed-in / signed-out opinion. Auth callbacks, `_next` assets, and
+  // Only the routes with a signed-in / signed-out opinion. The landing page is still prerendered;
+  // matching it costs a cookie parse per visit, not a render. Auth callbacks, `_next` assets, and
   // static files never match, so a bad cookie can never block a stylesheet or a verification link.
-  matcher: ["/board/:path*", "/contacts/:path*", "/documents/:path*", "/login", "/signup"],
+  matcher: ["/", "/board/:path*", "/contacts/:path*", "/documents/:path*", "/login", "/signup"],
 };
