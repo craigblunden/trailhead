@@ -23,6 +23,13 @@ const ROCK = "#8f99a4";
 const ROCK_LIGHT = "#aab3bc";
 const BLUE_JACKET = "#4c7a9c";
 
+/**
+ * How far the ground-level scenes raise their foreground above the bottom of the picture. Their
+ * people stand almost on its bottom edge, right against the strip beneath; the mountains and sky stay
+ * where they are, so nothing at the top is cropped.
+ */
+const GROUND_LIFT = 32;
+
 type FigureProps = {
   x: number;
   baseY: number;
@@ -210,7 +217,7 @@ function InterestedScene() {
 
       {/* The route the map shows, traced faintly on the real mountain. */}
       <path
-        d="M690 322 L830 262 L700 202 L800 142 L748 96 L760 58"
+        d="M690 294 L830 262 L700 202 L800 142 L748 96 L760 58"
         fill="none"
         stroke="#d1603f"
         strokeOpacity={0.75}
@@ -220,45 +227,48 @@ function InterestedScene() {
       />
       <Pennant x={760} y={52} h={30} />
 
-      <path d="M-1000 318 C -800 304 -600 326 -400 318 C -260 300 -130 316 0 312 C 200 290 380 306 600 298 C 820 290 1000 296 1200 306 C 1340 314 1470 296 1600 306 C 1800 316 2000 298 2200 306 L2200 400 L-1000 400 Z" fill="var(--hill-far)" />
-      <path d="M-1000 356 C -800 342 -600 364 -400 356 C -260 338 -130 354 0 350 C 240 330 460 344 700 336 C 900 330 1060 332 1200 342 C 1340 350 1470 332 1600 342 C 1800 352 2000 334 2200 342 L2200 400 L-1000 400 Z" fill="var(--hill-near)" />
+      {/* The ground and everything on it, lifted clear of the strip beneath the picture. */}
+      <g transform={`translate(0 ${-GROUND_LIFT})`}>
+        <path d="M-1000 318 C -800 304 -600 326 -400 318 C -260 300 -130 316 0 312 C 200 290 380 306 600 298 C 820 290 1000 296 1200 306 C 1340 314 1470 296 1600 306 C 1800 316 2000 298 2200 306 L2200 440 L-1000 440 Z" fill="var(--hill-far)" />
+        <path d="M-1000 356 C -800 342 -600 364 -400 356 C -260 338 -130 354 0 350 C 240 330 460 344 700 336 C 900 330 1060 332 1200 342 C 1340 350 1470 332 1600 342 C 1800 352 2000 334 2200 342 L2200 440 L-1000 440 Z" fill="var(--hill-near)" />
 
-      <path
-        d="M300 386 C 460 366 560 350 690 326"
-        fill="none"
-        stroke="var(--trail-path)"
-        strokeWidth={7}
-        strokeLinecap="round"
-        strokeDasharray="22 16"
-      />
+        <path
+          d="M300 386 C 460 366 560 350 690 326"
+          fill="none"
+          stroke="var(--trail-path)"
+          strokeWidth={7}
+          strokeLinecap="round"
+          strokeDasharray="22 16"
+        />
 
-      <Pine x={-760} baseY={336} height={86} fill="var(--pine-dark)" />
-      <Pine x={-520} baseY={350} height={58} fill="var(--pine)" />
-      <Pine x={1700} baseY={346} height={60} fill="var(--pine)" />
-      <Pine x={1960} baseY={334} height={92} fill="var(--pine-dark)" />
-      <Pine x={-260} baseY={332} height={90} fill="var(--pine-dark)" />
-      <Pine x={-150} baseY={350} height={60} fill="var(--pine)" />
-      <Pine x={1330} baseY={344} height={58} fill="var(--pine)" />
-      <Pine x={1450} baseY={330} height={94} fill="var(--pine-dark)" />
-      <Pine x={70} baseY={336} height={96} fill="var(--pine-dark)" />
-      <Pine x={140} baseY={352} height={62} fill="var(--pine)" />
-      <Pine x={1110} baseY={330} height={92} fill="var(--pine-dark)" />
-      <Pine x={1165} baseY={350} height={60} fill="var(--pine)" />
-      <Pine x={990} baseY={340} height={54} fill="var(--pine)" />
+        <Pine x={-760} baseY={336} height={86} fill="var(--pine-dark)" />
+        <Pine x={-520} baseY={350} height={58} fill="var(--pine)" />
+        <Pine x={1700} baseY={346} height={60} fill="var(--pine)" />
+        <Pine x={1960} baseY={334} height={92} fill="var(--pine-dark)" />
+        <Pine x={-260} baseY={332} height={90} fill="var(--pine-dark)" />
+        <Pine x={-150} baseY={350} height={60} fill="var(--pine)" />
+        <Pine x={1330} baseY={344} height={58} fill="var(--pine)" />
+        <Pine x={1450} baseY={330} height={94} fill="var(--pine-dark)" />
+        <Pine x={70} baseY={336} height={96} fill="var(--pine-dark)" />
+        <Pine x={140} baseY={352} height={62} fill="var(--pine)" />
+        <Pine x={1110} baseY={330} height={92} fill="var(--pine-dark)" />
+        <Pine x={1165} baseY={350} height={60} fill="var(--pine)" />
+        <Pine x={990} baseY={340} height={54} fill="var(--pine)" />
 
-      {/* Trailhead sign, pointing up the route. */}
-      <g>
-        <rect x={462} y={318} width={6} height={50} fill="var(--trunk)" />
-        <path d="M440 322 H500 L510 332 L500 342 H440 Z" fill="#b08658" stroke="var(--trunk)" strokeWidth={2.5} strokeLinejoin="round" />
-        <path d="M448 339 L456 327 L464 339 Z" fill="var(--peak-near)" />
-        <rect x={470} y={329} width={22} height={2.4} fill="#6b4a2e" />
-        <rect x={470} y={334} width={14} height={2.4} fill="#6b4a2e" />
+        {/* Trailhead sign, pointing up the route. */}
+        <g>
+          <rect x={462} y={318} width={6} height={50} fill="var(--trunk)" />
+          <path d="M440 322 H500 L510 332 L500 342 H440 Z" fill="#b08658" stroke="var(--trunk)" strokeWidth={2.5} strokeLinejoin="round" />
+          <path d="M448 339 L456 327 L464 339 Z" fill="var(--peak-near)" />
+          <rect x={470} y={329} width={22} height={2.4} fill="#6b4a2e" />
+          <rect x={470} y={334} width={14} height={2.4} fill="#6b4a2e" />
+        </g>
+
+        <Rocks at={[[380, 382, 14], [560, 376, 9]]} />
+        <Figure x={250} baseY={384} scale={2.5}>
+          <HeldMap />
+        </Figure>
       </g>
-
-      <Rocks at={[[380, 382, 14], [560, 376, 9]]} />
-      <Figure x={250} baseY={384} scale={2.5}>
-        <HeldMap />
-      </Figure>
     </>
   );
 }
@@ -275,37 +285,40 @@ function AppliedScene() {
       <Cloud x={1000} y={170} s={0.9} />
       <Cloud x={180} y={210} s={0.7} />
 
-      <path d="M-1000 306 C -800 292 -600 314 -400 306 C -260 288 -130 304 0 300 C 220 284 420 296 640 290 C 860 284 1020 292 1200 300 C 1340 308 1470 290 1600 300 C 1800 310 2000 292 2200 300 L2200 400 L-1000 400 Z" fill="var(--hill-far)" />
-      <path d="M-1000 352 C -800 338 -600 360 -400 352 C -260 334 -130 350 0 346 C 260 330 480 342 720 336 C 940 330 1080 334 1200 340 C 1340 348 1470 330 1600 340 C 1800 350 2000 332 2200 340 L2200 400 L-1000 400 Z" fill="var(--hill-near)" />
+      {/* The ground and everything on it, lifted clear of the strip beneath the picture. */}
+      <g transform={`translate(0 ${-GROUND_LIFT})`}>
+        <path d="M-1000 306 C -800 292 -600 314 -400 306 C -260 288 -130 304 0 300 C 220 284 420 296 640 290 C 860 284 1020 292 1200 300 C 1340 308 1470 290 1600 300 C 1800 310 2000 292 2200 300 L2200 440 L-1000 440 Z" fill="var(--hill-far)" />
+        <path d="M-1000 352 C -800 338 -600 360 -400 352 C -260 334 -130 350 0 346 C 260 330 480 342 720 336 C 940 330 1080 334 1200 340 C 1340 348 1470 330 1600 340 C 1800 350 2000 332 2200 340 L2200 440 L-1000 440 Z" fill="var(--hill-near)" />
 
-      <Pine x={-820} baseY={334} height={86} fill="var(--pine-dark)" />
-      <Pine x={-640} baseY={348} height={56} fill="var(--pine)" />
-      <Pine x={1760} baseY={346} height={58} fill="var(--pine)" />
-      <Pine x={1980} baseY={332} height={90} fill="var(--pine-dark)" />
-      <Pine x={-300} baseY={332} height={88} fill="var(--pine-dark)" />
-      <Pine x={-200} baseY={348} height={56} fill="var(--pine)" />
-      <Pine x={1300} baseY={346} height={58} fill="var(--pine)" />
-      <Pine x={1420} baseY={330} height={92} fill="var(--pine-dark)" />
-      <Pine x={60} baseY={330} height={90} fill="var(--pine-dark)" />
-      <Pine x={128} baseY={346} height={58} fill="var(--pine)" />
-      <Pine x={1120} baseY={328} height={86} fill="var(--pine-dark)" />
-      <Pine x={1060} baseY={346} height={54} fill="var(--pine)" />
+        <Pine x={-820} baseY={334} height={86} fill="var(--pine-dark)" />
+        <Pine x={-640} baseY={348} height={56} fill="var(--pine)" />
+        <Pine x={1760} baseY={346} height={58} fill="var(--pine)" />
+        <Pine x={1980} baseY={332} height={90} fill="var(--pine-dark)" />
+        <Pine x={-300} baseY={332} height={88} fill="var(--pine-dark)" />
+        <Pine x={-200} baseY={348} height={56} fill="var(--pine)" />
+        <Pine x={1300} baseY={346} height={58} fill="var(--pine)" />
+        <Pine x={1420} baseY={330} height={92} fill="var(--pine-dark)" />
+        <Pine x={60} baseY={330} height={90} fill="var(--pine-dark)" />
+        <Pine x={128} baseY={346} height={58} fill="var(--pine)" />
+        <Pine x={1120} baseY={328} height={86} fill="var(--pine-dark)" />
+        <Pine x={1060} baseY={346} height={54} fill="var(--pine)" />
 
-      {/* A tent going up: pole standing, fly still slack, a guy line in the hiker's hand. */}
-      <g>
-        <path d="M232 370 L300 306 L318 330 Q340 352 368 370 Z" fill="#6f9cc0" />
-        <path d="M300 306 L318 330 Q340 352 368 370 L300 370 Z" fill={BLUE_JACKET} />
-        <rect x={298} y={304} width={4} height={66} fill="#3b4652" />
-        <path d="M300 306 L394 330" stroke="#3b3b3b" strokeWidth={1.6} />
+        {/* A tent going up: pole standing, fly still slack, a guy line in the hiker's hand. */}
+        <g>
+          <path d="M232 370 L300 306 L318 330 Q340 352 368 370 Z" fill="#6f9cc0" />
+          <path d="M300 306 L318 330 Q340 352 368 370 L300 370 Z" fill={BLUE_JACKET} />
+          <rect x={298} y={304} width={4} height={66} fill="#3b4652" />
+          <path d="M300 306 L394 330" stroke="#3b3b3b" strokeWidth={1.6} />
+        </g>
+        <Figure x={430} baseY={372} scale={2.3} facing="left" />
+
+        <CampTent x={600} baseY={364} s={1.9} />
+        <Pennant x={700} y={362} h={120} />
+        <Campfire x={820} baseY={372} />
+        <Backpack x={500} baseY={372} s={0.9} />
+        <RopeCoil x={536} y={368} />
+        <Rocks at={[[940, 380, 16], [980, 386, 10], [180, 384, 12]]} />
       </g>
-      <Figure x={430} baseY={372} scale={2.3} facing="left" />
-
-      <CampTent x={600} baseY={364} s={1.9} />
-      <Pennant x={700} y={362} h={120} />
-      <Campfire x={820} baseY={372} />
-      <Backpack x={500} baseY={372} s={0.9} />
-      <RopeCoil x={536} y={368} />
-      <Rocks at={[[940, 380, 16], [980, 386, 10], [180, 384, 12]]} />
     </>
   );
 }
