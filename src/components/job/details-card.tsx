@@ -47,8 +47,8 @@ function AppliedDateField({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" className="mt-1 h-9 px-3 font-normal">
-          <CalendarIcon aria-hidden="true" />
+        <Button type="button" variant="outline" className="mt-1 h-9 gap-2 px-3 font-normal">
+          <CalendarIcon aria-hidden="true" className="text-muted-foreground" />
           {formatLongDate(appliedOn)}
         </Button>
       </PopoverTrigger>
