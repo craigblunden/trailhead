@@ -132,8 +132,19 @@ _Avoid_: Feedback (which is about a letter), Report, Ticket, Review
 One user and everything they own. Tenancy here means **isolation**, never collaboration: there is no
 row a second user may read, and no concept of a shared or public Job. Every Tenant is on exactly one
 Plan.
-_Avoid_: Organization, Workspace, Account (as a synonym — an _account_ is the user's login, which is
+_Avoid_: Organization, Workspace, Account (as a synonym — an Account is the user's login, which is
 a different idea)
+
+**Account**:
+The user's login — an email and password, or a social sign-in — and the one thing a Tenant belongs
+to. The Account is who signs in; the Tenant is what they own.
+_Avoid_: Profile, User (as an entity), Tenant (as a synonym)
+
+**Account deletion**:
+Ending an Account and erasing its Tenant with it, at once and for good: every Job, Contact,
+Document and its file, Draft, quota week, and Plan. There is no grace period and nothing to restore.
+App feedback already sent is not recalled — it was never stored.
+_Avoid_: Deactivation, Closing, Cancellation (which will one day mean something about paying)
 
 ### Limits
 
