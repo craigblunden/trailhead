@@ -1,7 +1,7 @@
 import "server-only";
 
 import { UnauthenticatedError, getOptionalSession } from "@/server/auth/session";
-import { NotFoundError, RuleError } from "@/server/data/errors";
+import { AccountDeletionError, NotFoundError, RuleError, type AccountDeletionStep } from "@/server/data/errors";
 import { logError } from "@/server/log";
 import { idSchema, parseInput, type FieldErrors } from "@/server/validation";
 
@@ -19,7 +19,7 @@ export type ActionFailure = {
   /** Safe to show the user as-is. */
   message: string;
   fields?: FieldErrors;
-  /** For `rejected`: which rule said no, so the UI can render its designed state. */
+  /** For `rejected`: which rule said no, so the UI can render its designed state. For a failed Account deletion: the step. */
   code?: string;
 };
 
@@ -31,6 +31,15 @@ export const ACTION_MESSAGES = {
   invalid: "Check the highlighted fields.",
   failed: "Something went wrong on our side. Your changes weren't saved — please try again.",
 } as const;
+
+/**
+ * What Account deletion says when a step fails, by what it left behind: after a Storage failure
+ * nothing was erased; after an erase failure the files may be gone but every row remains.
+ */
+export const ACCOUNT_DELETION_FAILURES: Record<AccountDeletionStep, string> = {
+  storage: "We couldn't delete your files, so nothing was deleted. Please try again.",
+  erase: "Your files may already be gone, but your board is still here. Please try again to finish.",
+};
 
 export function invalid(fields: FieldErrors): ActionFailure {
   return { ok: false, error: "invalid", message: ACTION_MESSAGES.invalid, fields };
@@ -67,6 +76,10 @@ export async function runAction<T>(
     }
     if (error instanceof RuleError) {
       return { ok: false, error: "rejected", code: error.code, message: error.message };
+    }
+    if (error instanceof AccountDeletionError) {
+      // Logged with its step where it was thrown.
+      return { ok: false, error: "failed", code: error.step, message: ACCOUNT_DELETION_FAILURES[error.step] };
     }
     const session = await getOptionalSession().catch(() => null);
     logError({ operation, tenant: session?.userId ?? null }, error);

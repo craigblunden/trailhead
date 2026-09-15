@@ -20,6 +20,20 @@ export class NotFoundError extends Error {
   }
 }
 
+/** The steps of Account deletion that can fail, in the order they run (`src/server/data/account.ts`). */
+export type AccountDeletionStep = "storage" | "erase";
+
+/**
+ * Account deletion stopped at `step`. The cause has already been logged; what the user is told
+ * depends only on the step, because what is left behind does (`ACCOUNT_DELETION_FAILURES`).
+ */
+export class AccountDeletionError extends Error {
+  constructor(readonly step: AccountDeletionStep) {
+    super(`Account deletion failed at ${step}`);
+    this.name = "AccountDeletionError";
+  }
+}
+
 /**
  * A domain rule said no — the document cap, a quota, a document of the wrong kind. The message is
  * written for the user and names what to do; the code lets the UI render the designed state.

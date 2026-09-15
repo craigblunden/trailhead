@@ -35,7 +35,7 @@ export function logEvent(context: LogContext & Record<string, unknown>): void {
   console.info(JSON.stringify({ level: "info", at: new Date().toISOString(), ...redact(context) }));
 }
 
-export function logError(context: LogContext, error: unknown): void {
+export function logError(context: LogContext & Record<string, unknown>, error: unknown): void {
   const line = {
     level: "error",
     at: new Date().toISOString(),

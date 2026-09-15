@@ -20,6 +20,8 @@ export type Session = {
   email: string;
   /** Display name from sign-up, falling back to the local part of the email. */
   name: string;
+  /** Every way the Account signs in, as Auth's provider ids (`email`, `google`, …). */
+  providers: string[];
 };
 
 /**
@@ -49,8 +51,21 @@ export const getOptionalSession = cache(async (): Promise<Session | null> => {
     userId: claims.sub,
     email,
     name: fullName || email.split("@")[0] || "You",
+    providers: providersOf(claims.app_metadata),
   };
 });
+
+/**
+ * Auth lists every identity linked to the Account in `app_metadata.providers`, and the first in
+ * `provider`. The token's `amr` is only how this session signed in, so it is not used.
+ */
+function providersOf(appMetadata: unknown): string[] {
+  const metadata = (appMetadata ?? {}) as { provider?: unknown; providers?: unknown };
+  if (Array.isArray(metadata.providers)) {
+    return metadata.providers.filter((id): id is string => typeof id === "string");
+  }
+  return typeof metadata.provider === "string" ? [metadata.provider] : [];
+}
 
 /**
  * The session, or an `UnauthenticatedError`. Every data-layer function calls this first, and no

@@ -1,15 +1,66 @@
 import { randomUUID } from "node:crypto";
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { signOut } from "./session-mock";
 
+import { ACCOUNT_DELETION_FAILURES } from "@/server/action-result";
+import { deleteAccountAction } from "@/server/actions/account";
+import { accountSummary, deleteAccount } from "@/server/data/account";
+import { deleteDocument, finishUpload, startUpload } from "@/server/data/documents";
+import { AccountDeletionError } from "@/server/data/errors";
 import { prisma } from "@/server/db/prisma";
 import { withTenant, type TenantClient } from "@/server/db/tenant";
 
 import { resetTables, setPlan } from "./helpers";
 import { passwordAccount } from "./social-helpers";
-import { asJanitor, bucketOf, fixture, realUser } from "./storage-helpers";
+import {
+  actAs,
+  asJanitor,
+  bucketOf,
+  fixture,
+  objectExists,
+  putObject,
+  realUser,
+  type RealUser,
+} from "./storage-helpers";
+
+/** A pass-through over the real bucket that can fail its next listing or removal, or list nothing. */
+const hooks = vi.hoisted(() => ({ failNextList: false, failNextRemove: false, listNothing: false }));
+
+vi.mock("@/server/storage/documents-bucket", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/server/storage/documents-bucket")>();
+  return {
+    ...actual,
+    documentsBucket: async () => {
+      const bucket = await actual.documentsBucket();
+      return new Proxy(bucket, {
+        get(target, property) {
+          if (property === "list" && hooks.failNextList) {
+            hooks.failNextList = false;
+            return async () => ({ data: null, error: new Error("Storage is unreachable") });
+          }
+          if (property === "list" && hooks.listNothing) {
+            return async () => ({ data: [], error: null });
+          }
+          if (property === "remove" && hooks.failNextRemove) {
+            hooks.failNextRemove = false;
+            return async () => ({ data: null, error: new Error("Storage is unreachable") });
+          }
+          const value = Reflect.get(target, property) as unknown;
+          return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+        },
+      });
+    },
+  };
+});
+
+vi.mock("next/navigation", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/navigation")>()),
+  redirect: (path: string) => {
+    throw new Error(`NEXT_REDIRECT:${path}`);
+  },
+}));
 
 /**
  * Account deletion (ADR-0004): one definer function erases the Tenant in scope — every tenant row,
@@ -81,6 +132,7 @@ const erase = (userId: string) =>
 beforeEach(async () => {
   await resetTables();
   signOut();
+  Object.assign(hooks, { failNextList: false, failNextRemove: false, listNothing: false });
 });
 
 describe("account issue 02: erase_my_account()", () => {
@@ -270,3 +322,204 @@ describe("account issue 03: the janitor sweeps rows with no Account", () => {
     expect(job.rows[0].command).toContain("public.sweep_accountless()");
   });
 });
+
+describe("account issue 04: deleting an Account in the data layer", () => {
+  let logged: { info: ReturnType<typeof vi.spyOn>; error: ReturnType<typeof vi.spyOn> };
+
+  beforeEach(() => {
+    logged = {
+      info: vi.spyOn(console, "info").mockImplementation(() => {}),
+      error: vi.spyOn(console, "error").mockImplementation(() => {}),
+    };
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** The full upload as the browser drives it: start, PUT to Storage, finish. */
+  async function upload(user: RealUser, kind: "resume" | "cover_letter" = "resume") {
+    actAs(user);
+    const bytes = fixture("resume.pdf");
+    const ticket = await startUpload({ kind, fileName: "resume.pdf", sizeBytes: bytes.length });
+    expect((await putObject(user, ticket, bytes)).error).toBeNull();
+    await finishUpload(ticket.documentId);
+    return ticket;
+  }
+
+  /** Objects under the user's prefix, as `postgres` reads `storage.objects`. */
+  const objectsOf = (userId: string) =>
+    asJanitor(
+      async (client) =>
+        (
+          await client.query<{ n: number }>(
+            "select count(*)::int as n from storage.objects where bucket_id = 'documents' and name like $1",
+            [`${userId}/%`],
+          )
+        ).rows[0].n,
+    );
+
+  /** A Tenant with two uploaded Documents, a tombstone, a Job, and a Contact. Leaves `user` signed in. */
+  async function populated(user: RealUser) {
+    await upload(user);
+    await upload(user, "cover_letter");
+    const third = await upload(user);
+    await deleteDocument(third.documentId);
+    await withTenant(user.userId, async (tx) => {
+      await tx.job.create({
+        data: {
+          userId: user.userId,
+          company: "Meridian Labs",
+          role: "Designer",
+          location: "Remote",
+          addedOn: new Date("2026-07-22"),
+          accent: "moss",
+        },
+      });
+      await tx.contact.create({ data: { userId: user.userId, name: "Dana Whitfield" } });
+    });
+  }
+
+  const jsonLines = (spy: ReturnType<typeof vi.spyOn>): Record<string, unknown>[] =>
+    spy.mock.calls.map((call: unknown[]) => JSON.parse(call[0] as string) as Record<string, unknown>);
+
+  it("ACCT-4: the summary counts Jobs, held Documents, and Contacts, and names the Plan and sign-in", async () => {
+    const alex = await realUser();
+    await populated(alex);
+    await setPlan(alex.userId, "basic");
+
+    expect(await accountSummary()).toEqual({
+      name: "Tester",
+      email: alex.email,
+      providers: ["email"],
+      plan: "basic",
+      jobs: 1,
+      documents: 2,
+      contacts: 1,
+    });
+  });
+
+  it("DEL-1: removes every object under the prefix, every row, and the Auth user; another Tenant keeps everything", async () => {
+    const [alex, blair] = await Promise.all([realUser(), realUser()]);
+    await populated(blair);
+    await populated(alex);
+    // An object no row knows about still goes: the listing finds it.
+    const stray = await bucketOf(alex).upload(`${alex.userId}/stray.pdf`, fixture("resume.pdf"), {
+      contentType: "application/pdf",
+    });
+    expect(stray.error).toBeNull();
+    expect(await objectsOf(alex.userId)).toBe(3);
+
+    await deleteAccount();
+
+    expect(await objectsOf(alex.userId)).toBe(0);
+    expect(await footprint(alex.userId)).toEqual({ counts: NOTHING, users: 0, identities: 0 });
+    expect((await alex.client.auth.getSession()).data.session).toBeNull();
+
+    expect(await objectsOf(blair.userId)).toBe(2);
+    expect(await footprint(blair.userId)).toMatchObject({ users: 1, counts: { Job: 1, Contact: 1, Document: 3 } });
+
+    const events = jsonLines(logged.info).filter((line) => line.operation === "account.delete");
+    expect(events).toEqual([expect.objectContaining({ level: "info", tenant: alex.userId })]);
+    expect(JSON.stringify([logged.info.mock.calls, logged.error.mock.calls])).not.toContain(alex.email);
+  });
+
+  it("DEL-2: an object the listing misses is still removed, by its Document row's key", async () => {
+    const alex = await realUser();
+    const ticket = await upload(alex);
+    hooks.listNothing = true;
+
+    await deleteAccount();
+
+    expect(await objectExists(alex, ticket.path)).toBe(false);
+    expect(await objectsOf(alex.userId)).toBe(0);
+  });
+
+  it("DEL-3: a Storage failure stops before Postgres — nothing is erased, and the step is named", async () => {
+    const alex = await realUser();
+    await populated(alex);
+    const before = await footprint(alex.userId);
+
+    hooks.failNextRemove = true;
+    const removal = await deleteAccount().catch((error: unknown) => error);
+    expect(removal).toBeInstanceOf(AccountDeletionError);
+    expect((removal as AccountDeletionError).step).toBe("storage");
+
+    hooks.failNextList = true;
+    await expect(deleteAccount()).rejects.toMatchObject({ step: "storage" });
+
+    expect(await footprint(alex.userId)).toEqual(before);
+    expect(await objectsOf(alex.userId)).toBe(2);
+    expect(jsonLines(logged.error)).toEqual([
+      expect.objectContaining({ operation: "account.delete", tenant: alex.userId, step: "storage" }),
+      expect.objectContaining({ operation: "account.delete", tenant: alex.userId, step: "storage" }),
+    ]);
+  });
+
+  it("DEL-4: an erase failure after Storage leaves the board intact, and calling again finishes", async () => {
+    const alex = await realUser();
+    await populated(alex);
+    const before = await footprint(alex.userId);
+
+    await withEraseRevoked(async () => {
+      await expect(deleteAccount()).rejects.toMatchObject({ step: "erase" });
+    });
+    expect(await objectsOf(alex.userId)).toBe(0);
+    expect(await footprint(alex.userId)).toEqual(before);
+
+    await deleteAccount();
+    expect(await footprint(alex.userId)).toEqual({ counts: NOTHING, users: 0, identities: 0 });
+  });
+
+  it("ACCT-5: the action refuses an email that is not the Account's, touching nothing", async () => {
+    const alex = await realUser();
+    await populated(alex);
+
+    const result = await deleteAccountAction("someone-else@example.com");
+
+    expect(result).toMatchObject({ ok: false, error: "rejected", code: "email-mismatch" });
+    expect(await objectsOf(alex.userId)).toBe(2);
+    expect((await footprint(alex.userId)).users).toBe(1);
+  });
+
+  it("ACCT-6: the action accepts the email with other casing and spaces, erases, and lands on the notice", async () => {
+    const alex = await realUser();
+    await populated(alex);
+
+    await expect(deleteAccountAction(`  ${alex.email.toUpperCase()} `)).rejects.toThrow("NEXT_REDIRECT:/?deleted=1");
+
+    expect(await footprint(alex.userId)).toEqual({ counts: NOTHING, users: 0, identities: 0 });
+  });
+
+  it("ACCT-7: each failed step comes back as its written message", async () => {
+    const alex = await realUser();
+    await populated(alex);
+
+    hooks.failNextRemove = true;
+    expect(await deleteAccountAction(alex.email)).toEqual({
+      ok: false,
+      error: "failed",
+      code: "storage",
+      message: ACCOUNT_DELETION_FAILURES.storage,
+    });
+
+    await withEraseRevoked(async () => {
+      expect(await deleteAccountAction(alex.email)).toEqual({
+        ok: false,
+        error: "failed",
+        code: "erase",
+        message: ACCOUNT_DELETION_FAILURES.erase,
+      });
+    });
+  });
+});
+
+/** Makes the erase step fail for real: the app role loses EXECUTE on the function until `run` settles. */
+async function withEraseRevoked(run: () => Promise<void>) {
+  await asJanitor((client) => client.query("revoke execute on function public.erase_my_account() from trailhead_app"));
+  try {
+    await run();
+  } finally {
+    await asJanitor((client) => client.query("grant execute on function public.erase_my_account() to trailhead_app"));
+  }
+}

@@ -26,7 +26,7 @@ export async function realUser(): Promise<RealUser> {
 
 /** Makes `user` the signed-in user for both the data layer and Storage. */
 export function actAs(user: RealUser) {
-  signInAs(user.userId);
+  signInAs(user.userId, user.email);
   setSupabaseClient(user.client);
 }
 

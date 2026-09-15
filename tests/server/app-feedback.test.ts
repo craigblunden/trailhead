@@ -25,7 +25,7 @@ vi.mock("@/server/auth/session", async (importOriginal) => {
   };
 });
 
-const SIGNED_IN: Session = { userId: "6a0c2e20-0000-4000-8000-000000000001", email: "sam@example.com", name: "Sam Rivera" };
+const SIGNED_IN: Session = { userId: "6a0c2e20-0000-4000-8000-000000000001", email: "sam@example.com", name: "Sam Rivera", providers: ["email"] };
 
 let fetchMock: ReturnType<typeof vi.fn>;
 

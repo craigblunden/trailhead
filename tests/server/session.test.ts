@@ -6,7 +6,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * valid session is pinned here: a render redirects, an action's caller gets an error to map.
  */
 const auth = vi.hoisted(() => ({
-  claims: null as null | { sub: string; email: string; user_metadata: Record<string, unknown> },
+  claims: null as null | {
+    sub: string;
+    email: string;
+    user_metadata: Record<string, unknown>;
+    app_metadata?: Record<string, unknown>;
+  },
 }));
 
 vi.mock("@/server/auth/supabase", () => ({
@@ -46,12 +51,14 @@ describe("session (tickets 05, 12)", () => {
       sub: "6a0c2e20-0000-4000-8000-000000000001",
       email: "sam@example.com",
       user_metadata: { full_name: "  Sam Rivera " },
+      app_metadata: { provider: "email", providers: ["email", "google"] },
     };
     const { requireSession } = await import("@/server/auth/session");
     expect(await requireSession()).toEqual({
       userId: "6a0c2e20-0000-4000-8000-000000000001",
       email: "sam@example.com",
       name: "Sam Rivera",
+      providers: ["email", "google"],
     });
   });
 
@@ -59,5 +66,22 @@ describe("session (tickets 05, 12)", () => {
     auth.claims = { sub: "6a0c2e20-0000-4000-8000-000000000002", email: "dana@example.com", user_metadata: {} };
     const { requireSession } = await import("@/server/auth/session");
     expect((await requireSession()).name).toBe("dana");
+  });
+
+  it("SES-4: the ways the Account signs in come from the token, falling back to its one provider", async () => {
+    auth.claims = {
+      sub: "6a0c2e20-0000-4000-8000-000000000003",
+      email: "lee@example.com",
+      user_metadata: {},
+      app_metadata: { provider: "github" },
+    };
+    const { requireSession } = await import("@/server/auth/session");
+    expect((await requireSession()).providers).toEqual(["github"]);
+  });
+
+  it("SES-4: a token with no provider at all yields none, not a guess", async () => {
+    auth.claims = { sub: "6a0c2e20-0000-4000-8000-000000000004", email: "kim@example.com", user_metadata: {} };
+    const { requireSession } = await import("@/server/auth/session");
+    expect((await requireSession()).providers).toEqual([]);
   });
 });

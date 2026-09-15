@@ -6,12 +6,14 @@ import { vi } from "vitest";
  * has no way to take a userId from a caller. Import this module before anything that reaches
  * `@/server/auth/session`, then call `signInAs()` — it is what the cookie would have said.
  */
-const current = vi.hoisted(() => ({ userId: "" }));
+const current = vi.hoisted(() => ({ userId: "", email: "tester@example.com" }));
 
 vi.mock("@/server/auth/session", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/server/auth/session")>();
   const session = async () =>
-    current.userId ? { userId: current.userId, email: "tester@example.com", name: "Tester" } : null;
+    current.userId
+      ? { userId: current.userId, email: current.email, name: "Tester", providers: ["email"] }
+      : null;
   return {
     ...actual,
     getOptionalSession: session,
@@ -36,8 +38,10 @@ vi.mock("@/server/auth/supabase", () => ({
   },
 }));
 
-export function signInAs(userId: string) {
+/** `email` is what the token would carry; only Account deletion's confirmation reads it. */
+export function signInAs(userId: string, email = "tester@example.com") {
   current.userId = userId;
+  current.email = email;
 }
 
 export function setSupabaseClient(client: unknown) {

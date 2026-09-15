@@ -61,12 +61,18 @@ export type Defer = (work: () => Promise<unknown>) => unknown;
 
 const inline: Defer = (work) => work();
 
+/**
+ * The Documents a Tenant holds, as the Documents Limit counts them: not deleted, and not an upload that
+ * failed. A pending upload holds its slot.
+ */
+export const heldBy = (userId: string) => ({ userId, deletedAt: null, ingestion: { not: "failed" as const } });
+
 /** Newest first; tombstoned rows are gone from the user's point of view. */
 export async function listDocuments(): Promise<DocumentSummary[]> {
   const { userId } = await requireSession();
   const rows = await withTenant(userId, (tx) =>
     tx.document.findMany({
-      where: { userId, deletedAt: null, ingestion: { not: "failed" } },
+      where: heldBy(userId),
       include: DOCUMENT_SUMMARY_INCLUDE,
       orderBy: [{ createdAt: "desc" }, { id: "asc" }],
     }),
@@ -98,7 +104,7 @@ export async function startUpload(input: StartUploadInput, defer: Defer = inline
     const limit = limitsOf(await planOf(tenant)).documents;
     if (limit !== "unlimited") {
       const held = await tx.document.count({
-        where: { userId, deletedAt: null, ingestion: { not: "failed" } },
+        where: heldBy(userId),
       });
       if (!withinLimit(held, limit)) throw new RuleError("cap-reached", limitReachedRefusal(limit));
     }
