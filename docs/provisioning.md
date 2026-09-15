@@ -127,13 +127,22 @@ select conrelid::regclass::text as tbl, conname, confdeltype
  where confrelid = 'auth.users'::regclass;
 ```
 
-Expected: `can_delete = true`, and every row's table is in `auth` with `confdeltype = 'c'`. Record
+Also read _Authentication → Sessions_ (or _JWT settings_): the access token expiry. The janitor's
+`sweep_accountless()` leaves rows written in the last two hours on the assumption that a token lives
+no longer than that; the local stack's is 3600 s.
+
+Expected: `can_delete = true`, every row's table is in `auth` with `confdeltype = 'c'`, and a token
+expiry of two hours or less. Record
 the result here and in `.scratch/trailhead-account/issues/01-hosted-probe-auth-users-delete.md`.
 If either fails, stop: ADR-0004 reopens.
 
 **Result:** not yet run.
 
-Then push what the effort added — `npx supabase db push` for the three `20260915…` Supabase
+**`20260915000000_close_email_lookups.sql` does not wait for the probe.** It revokes the two email
+lookups from the Data API roles, which could otherwise be called with the publishable key; push it as
+soon as the Plans migration it amends is on hosted.
+
+Then push what the effort added — `npx supabase db push` for the other two `20260915…` Supabase
 migrations, and `npm run db:deploy` for `20260915000000_account_deletion_grants` — and delete a
 throwaway Account on the deployment as the smoke test. Both commands also apply any earlier migration
 not yet on hosted; `npx supabase migration list` shows which.

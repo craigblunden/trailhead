@@ -24,7 +24,7 @@ const account = vi.hoisted(() => ({
   remove: vi.fn(),
 }));
 
-vi.mock("@/components/account/account-client", () => ({ accountClient: account }));
+vi.mock("@/components/account/account-actions-client", () => ({ accountClient: account }));
 
 const AXE_OPTIONS = { rules: { "color-contrast": { enabled: false } } } as const;
 

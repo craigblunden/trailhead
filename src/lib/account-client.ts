@@ -9,13 +9,15 @@ import type { QuotaStatus } from "@/lib/generation";
  */
 export const accountCache = {
   key: ["account"] as const,
+  staleTime: 60_000,
   options: (fetchSummary: () => Promise<AccountSummary>) =>
-    queryOptions({ queryKey: accountCache.key, queryFn: () => fetchSummary(), staleTime: 60_000 }),
+    queryOptions({ queryKey: accountCache.key, queryFn: () => fetchSummary(), staleTime: accountCache.staleTime }),
 };
 
 /** Letters left this quota week, as the cover-letter card counts them. */
 export const lettersCache = {
   key: ["account", "letters"] as const,
+  staleTime: 60_000,
   options: (fetchLetters: () => Promise<QuotaStatus>) =>
-    queryOptions({ queryKey: lettersCache.key, queryFn: () => fetchLetters(), staleTime: 60_000 }),
+    queryOptions({ queryKey: lettersCache.key, queryFn: () => fetchLetters(), staleTime: lettersCache.staleTime }),
 };

@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useId, useState, useTransition } from "react";
 
-import { accountClient } from "@/components/account/account-client";
-import { PLAN_LABEL } from "@/components/plan-mark";
+import { accountClient } from "@/components/account/account-actions-client";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { deletionContents, emailsMatch, type AccountSummary } from "@/lib/account";
+import { PLAN_LABEL } from "@/lib/plans";
 
 const DELETE_FAILED = "Your account wasn’t deleted. Check your connection and try again.";
 

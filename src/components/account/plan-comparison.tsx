@@ -1,7 +1,7 @@
 import { useId } from "react";
 
-import { PLAN_LABEL, PlanBlaze } from "@/components/plan-mark";
-import { PLANS, PLAN_LIMITS, type Limit, type Plan } from "@/lib/plans";
+import { PlanBlaze } from "@/components/plan-mark";
+import { PLANS, PLAN_LABEL, PLAN_LIMITS, type Limit, type Plan } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 const limitText = (limit: Limit) => (limit === "unlimited" ? "Unlimited" : String(limit));

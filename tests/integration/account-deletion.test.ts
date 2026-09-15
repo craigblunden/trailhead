@@ -410,7 +410,7 @@ describe("account issue 04: deleting an Account in the data layer", () => {
     expect(stray.error).toBeNull();
     expect(await objectsOf(alex.userId)).toBe(3);
 
-    await deleteAccount();
+    await deleteAccount(alex.email);
 
     expect(await objectsOf(alex.userId)).toBe(0);
     expect(await footprint(alex.userId)).toEqual({ counts: NOTHING, users: 0, identities: 0 });
@@ -421,6 +421,7 @@ describe("account issue 04: deleting an Account in the data layer", () => {
 
     const events = jsonLines(logged.info).filter((line) => line.operation === "account.delete");
     expect(events).toEqual([expect.objectContaining({ level: "info", tenant: alex.userId })]);
+    expect(jsonLines(logged.error)).toEqual([]);
     expect(JSON.stringify([logged.info.mock.calls, logged.error.mock.calls])).not.toContain(alex.email);
   });
 
@@ -429,7 +430,7 @@ describe("account issue 04: deleting an Account in the data layer", () => {
     const ticket = await upload(alex);
     hooks.listNothing = true;
 
-    await deleteAccount();
+    await deleteAccount(alex.email);
 
     expect(await objectExists(alex, ticket.path)).toBe(false);
     expect(await objectsOf(alex.userId)).toBe(0);
@@ -441,12 +442,12 @@ describe("account issue 04: deleting an Account in the data layer", () => {
     const before = await footprint(alex.userId);
 
     hooks.failNextRemove = true;
-    const removal = await deleteAccount().catch((error: unknown) => error);
+    const removal = await deleteAccount(alex.email).catch((error: unknown) => error);
     expect(removal).toBeInstanceOf(AccountDeletionError);
     expect((removal as AccountDeletionError).step).toBe("storage");
 
     hooks.failNextList = true;
-    await expect(deleteAccount()).rejects.toMatchObject({ step: "storage" });
+    await expect(deleteAccount(alex.email)).rejects.toMatchObject({ step: "storage" });
 
     expect(await footprint(alex.userId)).toEqual(before);
     expect(await objectsOf(alex.userId)).toBe(2);
@@ -462,12 +463,12 @@ describe("account issue 04: deleting an Account in the data layer", () => {
     const before = await footprint(alex.userId);
 
     await withEraseRevoked(async () => {
-      await expect(deleteAccount()).rejects.toMatchObject({ step: "erase" });
+      await expect(deleteAccount(alex.email)).rejects.toMatchObject({ step: "erase" });
     });
     expect(await objectsOf(alex.userId)).toBe(0);
     expect(await footprint(alex.userId)).toEqual(before);
 
-    await deleteAccount();
+    await deleteAccount(alex.email);
     expect(await footprint(alex.userId)).toEqual({ counts: NOTHING, users: 0, identities: 0 });
   });
 

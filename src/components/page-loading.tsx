@@ -95,6 +95,15 @@ function SectionLede({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** A card's own title, written, for the eye only like the section's. */
+function CardTitle({ children }: { children: string }) {
+  return (
+    <p aria-hidden="true" className="font-heading text-lg">
+      {children}
+    </p>
+  );
+}
+
 /**
  * A page's title when the browser already knows it: the heading's type, but not a heading, since
  * that is the page's to render. `font-heading` is spelled out because only real headings inherit it.
@@ -380,9 +389,7 @@ function ContactsLoading({ selectedId }: { selectedId: string | null }) {
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[19rem_minmax(0,1fr)] xl:grid-cols-[19rem_minmax(0,1fr)_21rem]">
           <div className={cn("space-y-6 xl:contents xl:space-y-0", selectedId && "hidden lg:block")}>
             <GhostCard className="xl:col-start-3 xl:row-start-1">
-              <p aria-hidden="true" className="font-heading text-lg">
-                Add a contact
-              </p>
+              <CardTitle>Add a contact</CardTitle>
               <p aria-hidden="true" className="mt-1 text-sm text-muted-foreground">
                 Just a name and what they are to you. Add the rest on their page.
               </p>
@@ -512,17 +519,13 @@ function DocumentsLoading() {
 
         <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
           <GhostCard className="lg:col-start-2 lg:row-start-1">
-            <p aria-hidden="true" className="font-heading text-lg">
-              Upload
-            </p>
+            <CardTitle>Upload</CardTitle>
             <Bar className="mt-3 h-28 w-full rounded-md" />
           </GhostCard>
 
           <div className="min-w-0 lg:col-start-1 lg:row-start-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <p aria-hidden="true" className="font-heading text-lg">
-                On file
-              </p>
+              <CardTitle>On file</CardTitle>
               <Bar className="h-3.5 w-12" />
             </div>
             <div className="mt-3 flex flex-col gap-3">
@@ -547,14 +550,6 @@ function DocumentsLoading() {
 /* ------------------------------------------------------------------------------------------------
  * The account page: four cards in one narrow column, the last set apart, as the page lays them out.
  * ---------------------------------------------------------------------------------------------- */
-
-function CardTitle({ children }: { children: string }) {
-  return (
-    <p aria-hidden="true" className="font-heading text-lg">
-      {children}
-    </p>
-  );
-}
 
 /** A card's written title over a short list of label-and-value rows. */
 function GhostRows({ title, rows }: { title: string; rows: number }) {

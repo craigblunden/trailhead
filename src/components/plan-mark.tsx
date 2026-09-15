@@ -1,7 +1,5 @@
-import type { Plan } from "@/lib/plans";
+import { PLAN_LABEL, type Plan } from "@/lib/plans";
 import { cn } from "@/lib/utils";
-
-export const PLAN_LABEL: Record<Plan, string> = { free: "Free plan", basic: "Basic plan", pro: "Pro plan" };
 
 /** The trail blaze alone: hollow on free, outlined in the trail colour on basic, painted on pro. */
 export function PlanBlaze({ plan, className }: { plan: Plan; className?: string }) {

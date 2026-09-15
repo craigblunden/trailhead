@@ -1,14 +1,14 @@
 import "server-only";
 
-import type { AccountSummary } from "@/lib/account";
+import { EMAIL_MISMATCH, emailsMatch, type AccountSummary } from "@/lib/account";
 import { requireSession } from "@/server/auth/session";
 import { createServerSupabase } from "@/server/auth/supabase";
 import { withTenant } from "@/server/db/tenant";
-import { logError, logEvent } from "@/server/log";
+import { describeError, logError, logEvent } from "@/server/log";
 import { documentsBucket } from "@/server/storage/documents-bucket";
 
 import { heldBy } from "./documents";
-import { AccountDeletionError } from "./errors";
+import { AccountDeletionError, RuleError } from "./errors";
 import { planOf } from "./plans";
 
 /**
@@ -22,7 +22,7 @@ import { planOf } from "./plans";
  * 2. **Postgres, one transaction.** `public.erase_my_account()` erases every tenant row and then the
  *    Auth user. A failure here leaves the board intact and the files possibly gone; a retry finishes,
  *    because removing a missing object is a no-op.
- * 3. **Sign-out.** The Account is already gone, so a failure is logged and nothing more.
+ * 3. **Sign-out.** The Account is already gone, so a failure is noted and nothing more.
  *
  * Storage is never called inside `withTenant()`: it holds a pooled connection under a timeout.
  */
@@ -43,11 +43,13 @@ export async function accountSummary(): Promise<AccountSummary> {
 }
 
 /**
- * Ends the signed-in Account and erases its Tenant, at once and for good. Throws an
- * `AccountDeletionError` naming the step that failed; the email is never logged.
+ * Ends the signed-in Account and erases its Tenant, at once and for good — refused unless
+ * `confirmEmail` is the Account's own email (the dialog checks the same; this is the check that
+ * counts). Throws an `AccountDeletionError` naming the step that failed; the email is never logged.
  */
-export async function deleteAccount(): Promise<void> {
-  const { userId } = await requireSession();
+export async function deleteAccount(confirmEmail: string): Promise<void> {
+  const { userId, email } = await requireSession();
+  if (!emailsMatch(confirmEmail, email)) throw new RuleError("email-mismatch", EMAIL_MISMATCH);
   const operation = "account.delete";
 
   try {
@@ -64,16 +66,19 @@ export async function deleteAccount(): Promise<void> {
     throw new AccountDeletionError("erase");
   }
 
+  // The Account is gone whatever happens here, so a failure is noted on the one success line rather
+  // than logged as a failed deletion. Auth's client clears the session cookie even when Auth refuses
+  // the sign-out; only a throw before that could leave the cookie behind.
+  let signOutError: unknown = null;
   try {
     const supabase = await createServerSupabase();
     const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    signOutError = error;
   } catch (error) {
-    // The Account is gone; at worst the cookie outlives it until the redirect's session check drops it.
-    logError({ operation, tenant: userId, step: "sign-out" }, error);
+    signOutError = error;
   }
 
-  logEvent({ operation, tenant: userId });
+  logEvent({ operation, tenant: userId, ...(signOutError ? { signOut: describeError(signOutError) } : {}) });
 }
 
 /**

@@ -92,7 +92,8 @@ flowchart TB
   row's `userId` to it, and a query outside a tenant transaction sees nothing. Write checks also
   refuse references to another tenant's rows (a Job's resume, a Contact link).
 - **Nothing internal reaches a browser.** Actions and the Route Handler translate typed domain errors
-  (`NotFoundError`, `RuleError`) into written messages; everything else is logged as one JSON line
+  (`NotFoundError`, `RuleError`, and `AccountDeletionError`, whose message depends on the step that
+  failed) into written messages; everything else is logged as one JSON line
   (operation, tenant, error name and message) and the user gets a generic failure.
 
 ## Uploading a document

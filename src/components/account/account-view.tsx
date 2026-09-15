@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
 
-import { accountClient } from "@/components/account/account-client";
+import { accountClient } from "@/components/account/account-actions-client";
 import { DeleteAccount } from "@/components/account/delete-account";
 import { PlanComparison } from "@/components/account/plan-comparison";
 import { AppHeader } from "@/components/app-header";

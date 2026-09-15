@@ -12,6 +12,9 @@ export const PLANS = ["free", "basic", "pro"] as const;
 
 export type Plan = (typeof PLANS)[number];
 
+/** How a Plan is named wherever it is shown. */
+export const PLAN_LABEL: Record<Plan, string> = { free: "Free plan", basic: "Basic plan", pro: "Pro plan" };
+
 /** A Tenant with no Plan recorded is on this one. */
 export const DEFAULT_PLAN: Plan = "free";
 
