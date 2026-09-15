@@ -226,6 +226,14 @@ describe("jobPatchSchema", () => {
     expect(tooLong.ok).toBe(false);
   });
 
+  it("VAL-8: allows the Rejection letter, bounded", () => {
+    expect(parseInput(jobPatchSchema, { rejectionLetter: "Thank you for your time." })).toEqual({
+      ok: true,
+      data: { rejectionLetter: "Thank you for your time." },
+    });
+    expect(parseInput(jobPatchSchema, { rejectionLetter: "r".repeat(20_001) }).ok).toBe(false);
+  });
+
   it("VAL-8: allows the details typed when adding, read by the same rules as adding", () => {
     const result = parseInput(jobPatchSchema, {
       company: "  Renamed Co ",

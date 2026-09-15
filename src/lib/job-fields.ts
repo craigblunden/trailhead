@@ -13,6 +13,7 @@ export const JOB_LIMITS = {
   postingUrl: 2048,
   description: 20_000,
   notes: 20_000,
+  rejectionLetter: 20_000,
 } as const;
 
 export const LOCATION_FALLBACK = "Location TBD";

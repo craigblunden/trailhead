@@ -22,6 +22,13 @@ _Avoid_: Status, State, Column, Step
 **Active stage**:
 A Stage whose outcome is still open — every stage but rejected.
 
+**Rejection letter**:
+The message a company sent turning the user down, pasted onto one rejected Job and kept for
+reference. It belongs to the Job, never to the user's Documents, and it outlasts the Job leaving
+rejected — it is simply not shown until the Job is rejected again. "Letter" alone still means a
+cover letter.
+_Avoid_: Rejection email, Rejection Document, Feedback (which is about a cover letter)
+
 **Activity entry**:
 A dated line in a Job's history ("Moved to Interviewing"). Written by the system as a side effect of
 change, never composed by the user.

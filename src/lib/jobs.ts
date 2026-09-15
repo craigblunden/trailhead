@@ -86,6 +86,8 @@ export type Job = {
   draftWrittenAt: string | null;
   description: string;
   notes: string;
+  /** The Rejection letter pasted onto this Job. Kept whatever the Stage; shown only while rejected. */
+  rejectionLetter: string;
   contacts: Contact[];
   activity: ActivityEntry[];
   accent: Accent;

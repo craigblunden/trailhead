@@ -67,6 +67,7 @@ export type NewJobFacts = {
   addedOn: string;
   appliedOn: null;
   notes: string;
+  rejectionLetter: "";
   resume: null;
   coverLetter: null;
   draft: "";
@@ -88,6 +89,7 @@ export function newJobFacts(today: string, existingCount: number): NewJobFacts {
     addedOn: today,
     appliedOn: null,
     notes: "",
+    rejectionLetter: "",
     resume: null,
     coverLetter: null,
     draft: "",

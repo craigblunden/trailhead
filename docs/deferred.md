@@ -61,6 +61,7 @@ query rather than an inference call. The glossary terms (`Requirement`, `Evidenc
 | ~~Storing generated letters~~ | Reversed by ADR-0002: a Job keeps its last **Draft** so a Rewrite has a trusted starting point | — |
 | Data export | Not in this phase; Documents already download one at a time. Account deletion shipped without it (`.scratch/trailhead-account`) | One read of every tenant table and a signed link per file, as the user, bundled for download |
 | Charts | Nothing needs one | Recharts via shadcn/ui is the standing choice |
+| **Reading Rejection letters** against the cover letter and job description sent | A Rejection letter is kept for reference only, for now. Undecided whether this becomes a per-Job pass, like an Analysis, or an input to the Outcome review, which today reads Application kits and Stages and never text | A glossary decision first: which of the two it is, and whether a Rejection letter can go stale the way an Analysis does |
 
 ## Verified only locally — for the first hosted deployment
 

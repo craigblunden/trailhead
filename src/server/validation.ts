@@ -115,9 +115,9 @@ const jobFields = {
 
 /**
  * Editing is an allowlist, not a filter. What the user typed when adding the Job — company, role,
- * location, salary, posting link, description — and the notes are writable, read by the same rules
- * as when the Job was added: a blank company or role is refused, a blank location reads as the
- * default. The applied date is also writable directly, so a stage-change backfill that guessed
+ * location, salary, posting link, description — is writable, read by the same rules as when the Job
+ * was added: a blank company or role is refused, a blank location reads as the default. So are the
+ * notes and the Rejection letter. The applied date is also writable directly, so a stage-change backfill that guessed
  * wrong can be corrected without moving the Job's stage; it is the same real-day-or-blank rule
  * `lastSpokenOn` uses. Any other field in the patch is REJECTED rather than dropped — so a field
  * added later cannot become writable by accident. Stage changes go through their own action
@@ -130,6 +130,7 @@ export const jobPatchSchema = z.strictObject({
   postingUrl: jobFields.postingUrl.optional(),
   description: boundedText(JOB_LIMITS.description).optional(),
   notes: boundedText(JOB_LIMITS.notes).optional(),
+  rejectionLetter: boundedText(JOB_LIMITS.rejectionLetter).optional(),
   salaryMin: salaryBound.optional(),
   salaryMax: salaryBound.optional(),
   appliedOn: pastCalendarDate().optional(),

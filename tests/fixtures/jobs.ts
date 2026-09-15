@@ -25,6 +25,7 @@ export const SEED_JOBS: Job[] = [
       "Meridian Labs is building measurement tooling for climate teams. We're looking for a Senior Product Designer to own the analytics surface end to end.",
     notes:
       "Referral from Priya — she can intro to the hiring manager once I've tailored the resume.",
+    rejectionLetter: "",
     contacts: [],
     activity: [{ id: "a1", label: "Added to board — Interested", date: "2026-07-22" }],
     accent: "moss",
@@ -47,6 +48,7 @@ export const SEED_JOBS: Job[] = [
     description:
       "Fernwood is a subscription plant company. The Growth design team owns onboarding, pricing, and the referral loop.",
     notes: "Recruiter said they move fast — expect a screen within a week.",
+    rejectionLetter: "",
     contacts: [
       {
         id: "c3",
@@ -87,6 +89,7 @@ export const SEED_JOBS: Job[] = [
       "Cobalt Systems sells infrastructure monitoring to platform teams. The Staff UX role leads design for the incident response product.",
     notes:
       "Heavy systems work — pull the design-system case study to the front of the portfolio.",
+    rejectionLetter: "",
     contacts: [],
     activity: [
       { id: "a1", label: "Applied with resume_staff_v1.pdf", date: "2026-07-09" },
@@ -113,6 +116,7 @@ export const SEED_JOBS: Job[] = [
       "Harvest & Co is a food-tech company hiring a Lead Product Designer to build out our merchant experience.",
     notes:
       "Panel is 3 rounds: portfolio, cross-functional, exec. Prep case study on marketplace redesign.",
+    rejectionLetter: "",
     contacts: [
       {
         id: "c1",
@@ -159,6 +163,7 @@ export const SEED_JOBS: Job[] = [
     description:
       "Northbeam builds route planning for regional freight. This role sits on the dispatcher tools team.",
     notes: "No band posted. Ask the recruiter before the second round.",
+    rejectionLetter: "",
     contacts: [
       {
         id: "c4",
@@ -199,6 +204,7 @@ export const SEED_JOBS: Job[] = [
     description:
       "Bramble is a family scheduling app. The Senior UX role owns the shared-calendar experience across web and mobile.",
     notes: "Offer verbal on Jul 21. Written offer expected this week — compare against Harvest.",
+    rejectionLetter: "",
     contacts: [
       {
         id: "c5",
@@ -236,6 +242,7 @@ export const SEED_JOBS: Job[] = [
     description:
       "Quill Health builds intake software for small clinics. The role covers patient-facing forms and scheduling.",
     notes: "Passed after the screen — they wanted more healthcare domain depth.",
+    rejectionLetter: "",
     contacts: [],
     activity: [
       { id: "a1", label: "Moved to Rejected", date: "2026-07-06" },

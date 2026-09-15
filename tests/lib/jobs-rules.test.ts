@@ -37,7 +37,7 @@ const fields = {
 const lead: Job = { ...SEED_JOBS[0], stage: "interested", appliedOn: null };
 
 describe("a new Job", () => {
-  it("RULE-1: starts interested, dated today, with no applied date, notes, kit, or contacts, and one opening entry", () => {
+  it("RULE-1: starts interested, dated today, with no applied date, notes, Rejection letter, kit, or contacts, and one opening entry", () => {
     expect(newJob(fields, { today: TODAY, existingCount: 0, newId: sequence() })).toEqual({
       ...fields,
       id: "id-1",
@@ -45,6 +45,7 @@ describe("a new Job", () => {
       addedOn: TODAY,
       appliedOn: null,
       notes: "",
+      rejectionLetter: "",
       resume: null,
       coverLetter: null,
       draft: "",

@@ -165,6 +165,7 @@ export function toJobDto(row: JobRow): Job {
     draftWrittenAt: row.draftWrittenAt ? row.draftWrittenAt.toISOString() : null,
     description: row.description,
     notes: row.notes,
+    rejectionLetter: row.rejectionLetter,
     contacts: sortContacts(row.contacts.map((link) => link.contact)).map(toContactDto),
     activity: sortActivity(row.activity).map(toActivityDto),
     accent: row.accent,

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, ChevronDown } from "lucide-react";
 
 import { AppHeader } from "@/components/app-header";
 import { BrandLogo } from "@/components/brand-logo";
@@ -184,7 +184,21 @@ function JobDetailView({
     onPatch({ description: value }),
   );
   const notes = useSavedText(job.notes, (value) => onPatch({ notes: value }));
+  const rejectionLetter = useSavedText(job.rejectionLetter, (value) =>
+    onPatch({ rejectionLetter: value }),
+  );
   const posting = webLink(job.postingUrl);
+
+  // A rejected Job leads with its Rejection letter, so its description starts folded away, and
+  // folds again whenever the Stage changes.
+  const rejected = job.stage === "rejected";
+  const [descriptionShown, setDescriptionShown] = useState(false);
+  const [shownAtStage, setShownAtStage] = useState(job.stage);
+  if (shownAtStage !== job.stage) {
+    setShownAtStage(job.stage);
+    setDescriptionShown(false);
+  }
+  const descriptionFolded = rejected && !descriptionShown;
 
   return (
     <div className="flex flex-1 flex-col bg-background">
@@ -277,30 +291,92 @@ function JobDetailView({
                 aria-labelledby="description-heading"
                 className="rounded-lg bg-card p-5 ring-1 ring-foreground/10"
               >
-                <h2 id="description-heading" className="text-lg">
-                  Job description
-                </h2>
-                <p
-                  id="description-hint"
-                  className="mt-1 text-sm text-muted-foreground"
-                >
-                  Copy and paste this from the job post website — it feeds your
-                  cover letter later.
-                </p>
-                <Textarea
-                  aria-labelledby="description-heading"
-                  aria-describedby="description-hint"
-                  value={description.value}
-                  onChange={(event) => description.set(event.target.value)}
-                  className="mt-3 min-h-56 resize-y"
-                />
-                <SaveRow
-                  changed={description.changed}
-                  onSave={description.save}
-                >
-                  Save description
-                </SaveRow>
+                <div className="flex items-center justify-between gap-3">
+                  <h2 id="description-heading" className="text-lg">
+                    Job description
+                  </h2>
+                  {rejected && (
+                    <div className="flex items-center gap-3">
+                      {/* The Save row goes with the fold, so an edit left unsaved still says so. */}
+                      {descriptionFolded && description.changed && (
+                        <span className="text-sm text-muted-foreground">
+                          Unsaved changes
+                        </span>
+                      )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        aria-expanded={!descriptionFolded}
+                        aria-controls={descriptionFolded ? undefined : "description-body"}
+                        onClick={() => setDescriptionShown((shown) => !shown)}
+                      >
+                        {descriptionFolded ? "Show description" : "Hide description"}
+                        <ChevronDown
+                          aria-hidden="true"
+                          className={descriptionFolded ? undefined : "rotate-180"}
+                        />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                {/* Unmounted rather than hidden while folded: the unsaved text lives in `description`,
+                    so it is still there when the description is shown again. */}
+                {!descriptionFolded && (
+                  <div id="description-body">
+                    <p
+                      id="description-hint"
+                      className="mt-1 text-sm text-muted-foreground"
+                    >
+                      Copy and paste this from the job post website — it feeds your
+                      cover letter later.
+                    </p>
+                    <Textarea
+                      aria-labelledby="description-heading"
+                      aria-describedby="description-hint"
+                      value={description.value}
+                      onChange={(event) => description.set(event.target.value)}
+                      className="mt-3 min-h-56 resize-y"
+                    />
+                    <SaveRow
+                      changed={description.changed}
+                      onSave={description.save}
+                    >
+                      Save description
+                    </SaveRow>
+                  </div>
+                )}
               </section>
+
+              {rejected && (
+                <section
+                  aria-labelledby="rejection-letter-heading"
+                  className="rounded-lg bg-card p-5 ring-1 ring-foreground/10"
+                >
+                  <h2 id="rejection-letter-heading" className="text-lg">
+                    Rejection letter
+                  </h2>
+                  <p
+                    id="rejection-letter-hint"
+                    className="mt-1 text-sm text-muted-foreground"
+                  >
+                    Paste the message you received — kept for reference.
+                  </p>
+                  <Textarea
+                    aria-labelledby="rejection-letter-heading"
+                    aria-describedby="rejection-letter-hint"
+                    value={rejectionLetter.value}
+                    onChange={(event) => rejectionLetter.set(event.target.value)}
+                    className="mt-3 min-h-40 resize-y"
+                  />
+                  <SaveRow
+                    changed={rejectionLetter.changed}
+                    onSave={rejectionLetter.save}
+                  >
+                    Save rejection letter
+                  </SaveRow>
+                </section>
+              )}
 
               <section
                 aria-labelledby="notes-heading"

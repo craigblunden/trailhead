@@ -88,6 +88,9 @@ model Job {
   appliedOn   DateTime? @db.Date
   description String    @default("")
   notes       String    @default("")
+  /// The message the company sent turning the user down, pasted for reference. Kept when the Job
+  /// leaves rejected; the page shows it only while the Job is rejected.
+  rejectionLetter String @default("")
   accent      Accent
   /// The resume sent with this Job, if any. Deleting the Document leaves the Job intact.
   /// Renamed from `documentId` when cover letters got their own reference (ticket 17).
