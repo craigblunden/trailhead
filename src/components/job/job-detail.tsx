@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 
 import { AppHeader } from "@/components/app-header";
@@ -18,6 +19,7 @@ import {
   SummitHeaderFrame,
   SummitProgress,
 } from "@/components/job/summit-header";
+import { LoadErrorHint } from "@/components/load-error";
 import { JobLoading } from "@/components/page-loading";
 import { PageMain } from "@/components/page-main";
 import { Button } from "@/components/ui/button";
@@ -43,12 +45,23 @@ export function JobDetail({
   jobId: string;
   scenes?: React.ReactNode;
 }) {
-  const { getJob, updateJob, setStage, status, error, dismissError } =
+  const { getJob, updateJob, setStage, status, error, dismissError, reload, redirectFor } =
     useJobs();
   const job = getJob(jobId);
+  const router = useRouter();
+  // Set only for a job opened at the optimistic id it was added under: the id a `useEffect` below
+  // follows to where the add actually saved, the moment the server answers.
+  const redirectTo = !job ? redirectFor(jobId) : undefined;
 
-  // The same outline the navigation showed; here it stays until the client's own fetch answers.
-  if (!job && status === "pending") return <JobLoading id={jobId} />;
+  useEffect(() => {
+    if (redirectTo) router.replace(`/board/${redirectTo}`);
+  }, [redirectTo, router]);
+
+  // The same outline the navigation showed; here it stays until the client's own fetch answers, or
+  // — for a job clicked open before its add settled — until the redirect above lands.
+  if (!job && (status === "pending" || redirectTo)) return <JobLoading id={jobId} />;
+  // The list failed to load, not this one job: say so, with a way to retry, same as the board.
+  if (!job && status === "error") return <JobDetailError onRetry={reload} />;
   // An unknown id and another user's id are the same thing here, on purpose.
   if (!job) return <DetailMissing />;
   return (
@@ -60,6 +73,21 @@ export function JobDetail({
       onPatch={(patch) => updateJob(job.id, patch)}
       onStage={(stage) => setStage(job.id, stage)}
     />
+  );
+}
+
+function JobDetailError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex flex-1 flex-col bg-background">
+      <AppHeader leading={<BrandLogo href="/board" />} />
+      <main
+        role="alert"
+        className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center px-6 py-20 text-center"
+      >
+        <h1 className="text-2xl">We couldn&rsquo;t load this job</h1>
+        <LoadErrorHint onRetry={onRetry} />
+      </main>
+    </div>
   );
 }
 

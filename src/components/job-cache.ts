@@ -48,6 +48,12 @@ export type JobCache = {
    * nothing to resync: the server's answer is in hand, and a list fetch landing later carries it too.
    */
   record(jobId: string, next: (job: Job) => Job): void;
+  /**
+   * Where `jobId` now lives, if an `add` gave it the server's own id in place of the optimistic one
+   * it was shown under. Lets a page opened at the optimistic id — a card clicked before its write
+   * settled — follow the Job to where it actually saved, rather than finding nothing there forever.
+   */
+  redirectFor(jobId: string): string | undefined;
 };
 
 type Field = keyof Job;
@@ -64,6 +70,18 @@ function inFlightFor(queryClient: QueryClient): InFlight {
     inFlightByClient.set(queryClient, inFlight);
   }
   return inFlight;
+}
+
+/** Optimistic id -> the server's own, once an `add` swaps one in. See `redirectFor`. */
+const redirectsByClient = new WeakMap<QueryClient, Map<string, string>>();
+
+function redirectsFor(queryClient: QueryClient): Map<string, string> {
+  let redirects = redirectsByClient.get(queryClient);
+  if (!redirects) {
+    redirects = new Map();
+    redirectsByClient.set(queryClient, redirects);
+  }
+  return redirects;
 }
 
 function hold(inFlight: InFlight, jobId: string, fields: readonly Field[]) {
@@ -98,6 +116,7 @@ function withFields(target: Job, source: Job, fields: Iterable<Field>): Job {
 
 export function jobCache(queryClient: QueryClient): JobCache {
   const inFlight = inFlightFor(queryClient);
+  const redirects = redirectsFor(queryClient);
 
   // Writing during a read also moves the state that read would revert to, so the change can be
   // shown in the same tick as the cancel — a radio or a select that waits even a microtask looks,
@@ -160,6 +179,7 @@ export function jobCache(queryClient: QueryClient): JobCache {
         const saved = await send();
         cancelReads();
         change(optimistic.id, () => saved);
+        if (saved.id !== optimistic.id) redirects.set(optimistic.id, saved.id);
         return { ok: true, job: saved };
       } catch (error) {
         cancelReads();
@@ -177,6 +197,10 @@ export function jobCache(queryClient: QueryClient): JobCache {
 
     record(jobId, next) {
       change(jobId, next);
+    },
+
+    redirectFor(jobId) {
+      return redirects.get(jobId);
     },
   };
 }

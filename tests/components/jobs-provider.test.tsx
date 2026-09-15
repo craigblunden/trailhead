@@ -9,6 +9,12 @@ import { createTrail } from "../fakes/trail";
 import { SEED_JOBS } from "../fixtures/jobs";
 import { freezeClock, renderWithJobs, screen, waitFor, within } from "../test-utils";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
+  usePathname: () => "/board",
+  useSelectedLayoutSegment: () => null,
+}));
+
 const HARVEST = "harvest-lead-product-designer";
 
 /**

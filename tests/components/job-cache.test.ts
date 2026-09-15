@@ -217,6 +217,29 @@ describe("a write the server accepts", () => {
     expect(await accepted).toMatchObject({ ok: true });
     expect(ids()).toEqual([HARVEST, FERNWOOD, MERIDIAN, "server-assigned-id"]);
   });
+
+  it("CACHE-10: redirectFor follows an optimistic id to the server's own, once the add settles — and not before, or when refused", async () => {
+    const { cache } = setup();
+    expect(cache.redirectFor("optimistic-new")).toBeUndefined();
+
+    const add = deferred<Job>();
+    const adding = cache.add(() => ({ ...harvest, id: "optimistic-new" }), {
+      send: () => add.promise,
+      fallback: "That job wasn't saved.",
+    });
+    expect(cache.redirectFor("optimistic-new")).toBeUndefined();
+
+    add.resolve({ ...harvest, id: "server-assigned-id" });
+    await adding;
+    expect(cache.redirectFor("optimistic-new")).toBe("server-assigned-id");
+
+    const refusing = cache.add(() => ({ ...harvest, id: "optimistic-refused" }), {
+      send: () => Promise.reject(new Error("503 from the server")),
+      fallback: "That job wasn't saved.",
+    });
+    await refusing;
+    expect(cache.redirectFor("optimistic-refused")).toBeUndefined();
+  });
 });
 
 describe("resyncing the list", () => {

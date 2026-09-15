@@ -8,6 +8,7 @@ import { BoardColumn } from "@/components/board/board-column";
 import { AppHeader } from "@/components/app-header";
 import { useJobs } from "@/components/jobs-provider";
 import { BrandLogo } from "@/components/brand-logo";
+import { LoadErrorHint } from "@/components/load-error";
 import { LoadingTrail } from "@/components/loading-trail";
 import { PageMain } from "@/components/page-main";
 import { Button } from "@/components/ui/button";
@@ -99,12 +100,7 @@ export function BoardView() {
             className="mt-8 rounded-lg border border-dashed border-border px-6 py-16 text-center"
           >
             <h2 className="text-lg">We couldn&rsquo;t load your trail</h2>
-            <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-              Something went wrong on our side. Your jobs are safe — try again in a moment.
-            </p>
-            <Button className="mt-5 h-10 px-4" onClick={reload}>
-              Try again
-            </Button>
+            <LoadErrorHint onRetry={reload} />
           </div>
         ) : jobs.length === 0 ? (
           <div className="mt-8 rounded-lg border border-dashed border-border px-6 py-16 text-center">

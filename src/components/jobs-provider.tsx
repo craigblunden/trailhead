@@ -36,6 +36,8 @@ type JobsContextValue = {
   dismissError: () => void;
   /** Refetches the list — the recovery from a failed load. */
   reload: () => void;
+  /** Where a Job opened at an optimistic id now lives, once its add has taken the server's own. */
+  redirectFor: (id: string) => string | undefined;
 };
 
 const JobsContext = createContext<JobsContextValue | null>(null);
@@ -132,6 +134,7 @@ export function JobsProvider({
       error,
       dismissError: () => setError(null),
       reload: () => void refetch(),
+      redirectFor: cache.redirectFor,
     }),
     [jobs, status, cache, client, report, error, refetch, queryClient],
   );
