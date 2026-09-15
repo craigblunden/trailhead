@@ -34,3 +34,9 @@ In `tests/integration/account-deletion.test.ts` (called directly as `postgres`, 
    goes.
 
 ## Comments
+
+**2026-09-15 (implementation):** A second schedule, `trailhead-sweep-accountless`, hourly. One
+addition beyond the ticket: a row last written within the past two hours is left for a later run.
+That is longer than an access token lives (`jwt_expiry`, 3600 s), so a stale token cannot still be
+writing to it, and the integration suites, which write rows under made-up tenant ids with no Auth
+user, are never swept mid-test by the local stack's cron. SWEEP-2 covers it.

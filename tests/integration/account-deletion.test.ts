@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { signOut } from "./session-mock";
@@ -7,7 +9,7 @@ import { withTenant, type TenantClient } from "@/server/db/tenant";
 
 import { resetTables, setPlan } from "./helpers";
 import { passwordAccount } from "./social-helpers";
-import { asJanitor } from "./storage-helpers";
+import { asJanitor, bucketOf, fixture, realUser } from "./storage-helpers";
 
 /**
  * Account deletion (ADR-0004): one definer function erases the Tenant in scope — every tenant row,
@@ -165,5 +167,106 @@ describe("account issue 02: erase_my_account()", () => {
       return rows.map((row) => row.role);
     });
     expect(callers).toEqual(["trailhead_app"]);
+  });
+});
+
+describe("account issue 03: the janitor sweeps rows with no Account", () => {
+  /** Longer ago than an access token lives, so no stale token can still be writing. */
+  const longAgo = () => new Date(Date.now() - 3 * 60 * 60 * 1000);
+
+  const sweep = () =>
+    asJanitor(async (client) => (await client.query<{ n: number }>("select public.sweep_accountless() as n")).rows[0].n);
+
+  /** What a second tab with a still-valid token writes after the Account is gone, dated `at`. */
+  async function staleWrites(userId: string, at: Date, keys: string[]) {
+    await withTenant(userId, async (tx) => {
+      await tx.job.create({
+        data: {
+          userId,
+          company: "Harbor & Co",
+          role: "Design Lead",
+          location: "Hybrid",
+          addedOn: new Date("2026-07-22"),
+          accent: "teal",
+          createdAt: at,
+          updatedAt: at,
+        },
+      });
+      await tx.contact.create({ data: { userId, name: "Lee Park", createdAt: at, updatedAt: at } });
+      for (const storageKey of keys) {
+        await tx.document.create({
+          data: {
+            userId,
+            kind: "resume",
+            fileName: "late.pdf",
+            storageKey,
+            mimeType: "application/pdf",
+            createdAt: at,
+            updatedAt: at,
+          },
+        });
+      }
+    });
+  }
+
+  it("SWEEP-1: rows written for an erased Account by a stale token are swept; another Tenant's are not", async () => {
+    const a = await passwordAccount({ verify: false });
+    const b = await passwordAccount({ verify: false });
+    await seedTenant(b.userId);
+    await erase(a.userId);
+
+    await staleWrites(a.userId, longAgo(), []);
+    expect(await footprint(a.userId)).toMatchObject({ counts: { Job: 1, Contact: 1 } });
+
+    expect(await sweep()).toBe(2);
+    expect(await footprint(a.userId)).toEqual({ counts: NOTHING, users: 0, identities: 0 });
+    expect(await footprint(b.userId)).toEqual({ counts: EVERYTHING, users: 1, identities: 1 });
+    expect(await sweep()).toBe(0);
+  });
+
+  it("SWEEP-2: a row written within an access token's life is left for a later sweep", async () => {
+    const a = await passwordAccount({ verify: false });
+    await erase(a.userId);
+
+    await staleWrites(a.userId, new Date(), []);
+
+    expect(await sweep()).toBe(0);
+    expect(await footprint(a.userId)).toMatchObject({ counts: { Job: 1, Contact: 1 } });
+  });
+
+  it("SWEEP-3: a Document row with no Account survives while its object exists, and goes once it is gone", async () => {
+    const a = await realUser();
+    const kept = `${a.userId}/${randomUUID()}.pdf`;
+    const missing = `${a.userId}/${randomUUID()}.pdf`;
+    const put = await bucketOf(a).upload(kept, fixture("resume.pdf"), { contentType: "application/pdf" });
+    expect(put.error).toBeNull();
+
+    await erase(a.userId);
+    await staleWrites(a.userId, longAgo(), [kept, missing]);
+
+    // The Job, the Contact, and the Document whose object never arrived.
+    expect(await sweep()).toBe(3);
+    const remaining = await asJanitor(
+      async (client) =>
+        (await client.query<{ storageKey: string }>(`select "storageKey" from public."Document" where "userId" = $1`, [a.userId]))
+          .rows,
+    );
+    expect(remaining).toEqual([{ storageKey: kept }]);
+
+    // The stale token still satisfies Storage's policies, so the object can go the ordinary way.
+    const removed = await bucketOf(a).remove([kept]);
+    expect(removed.error).toBeNull();
+    expect(await sweep()).toBe(1);
+    expect(await footprint(a.userId)).toEqual({ counts: NOTHING, users: 0, identities: 0 });
+  });
+
+  it("SWEEP-4: pg_cron runs it on a schedule of its own", async () => {
+    const job = await asJanitor((client) =>
+      client.query<{ schedule: string; command: string }>(
+        "select schedule, command from cron.job where jobname = 'trailhead-sweep-accountless'",
+      ),
+    );
+    expect(job.rows).toHaveLength(1);
+    expect(job.rows[0].command).toContain("public.sweep_accountless()");
   });
 });
