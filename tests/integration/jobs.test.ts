@@ -263,6 +263,33 @@ describe("ticket 11: the detail page is real, and stage and notes persist", () =
     expect(addedOn).toMatchObject({ ok: false, error: "invalid" });
   });
 
+  it("the applied date can be corrected directly, without writing history or touching the stage", async () => {
+    signInAs(newUserId());
+    const job = await createJob(input, FROZEN);
+    await setJobStage(job.id, "applied", FROZEN);
+    expect((await getJob(job.id))?.appliedOn).toBe("2026-07-25");
+
+    const corrected = await updateJobAction(job.id, { appliedOn: "2026-07-20" });
+    expect(corrected).toMatchObject({ ok: true });
+    const reread = await getJob(job.id);
+    expect(reread).toMatchObject({ appliedOn: "2026-07-20", stage: "applied" });
+    expect(reread?.activity).toHaveLength(2);
+
+    const cleared = await updateJobAction(job.id, { appliedOn: null });
+    expect(cleared).toMatchObject({ ok: true });
+    expect((await getJob(job.id))?.appliedOn).toBeNull();
+
+    // Validation refuses an applied date after today, so today is pinned for this one check.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(FROZEN);
+    try {
+      const future = await updateJobAction(job.id, { appliedOn: "2026-08-01" });
+      expect(future).toMatchObject({ ok: false, error: "invalid" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("edits to company, role, location and posting link persist, without writing history", async () => {
     signInAs(newUserId());
     const job = await createJob(input, FROZEN);

@@ -3,7 +3,7 @@ import "server-only";
 import type { ContactDetail, ContactListItem } from "@/lib/contacts";
 import type { Job } from "@/lib/jobs";
 import { requireSession } from "@/server/auth/session";
-import { toContactDetail, toContactListItem, toDateColumn } from "@/server/db/mappers";
+import { dateColumnPatch, toContactDetail, toContactListItem } from "@/server/db/mappers";
 import { withTenant } from "@/server/db/tenant";
 import type { ContactPatchInput, NewContactInput } from "@/server/validation";
 
@@ -28,12 +28,7 @@ const COUNT_INCLUDE = { _count: { select: { jobs: true } } } as const;
 
 function toColumns<T extends Partial<NewContactInput>>(input: T) {
   const { lastSpokenOn, ...rest } = input;
-  return {
-    ...rest,
-    ...(lastSpokenOn === undefined
-      ? {}
-      : { lastSpokenOn: lastSpokenOn === null ? null : toDateColumn(lastSpokenOn) }),
-  };
+  return { ...rest, ...dateColumnPatch("lastSpokenOn", lastSpokenOn) };
 }
 
 /** By name, then id, so the list never reshuffles. */

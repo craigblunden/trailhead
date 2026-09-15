@@ -143,6 +143,40 @@ describe("changing the stage", () => {
   });
 });
 
+describe("editing the applied date", () => {
+  it("DET-16: corrects a backfilled applied date by picking a day, saving and closing at once", async () => {
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />);
+
+    await user.click(within(detailsPanel()).getByRole("button", { name: "June 30, 2026" }));
+    await user.click(screen.getByRole("button", { name: /June 20th, 2026/ }));
+
+    expect(
+      within(detailsPanel()).getByRole("button", { name: "June 20, 2026" }),
+    ).toBeInTheDocument();
+    // The popover is gone, not just visually replaced: its own controls no longer exist.
+    expect(screen.queryByRole("button", { name: "Go to the Next Month" })).toBeNull();
+  });
+
+  it("DET-16: never offers a day after today", async () => {
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />);
+
+    await user.click(within(detailsPanel()).getByRole("button", { name: "June 30, 2026" }));
+    await user.click(screen.getByRole("button", { name: "Go to the Next Month" }));
+
+    expect(screen.getByRole("button", { name: /July 26th, 2026/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /July 24th, 2026/ })).toBeEnabled();
+  });
+
+  it("DET-16: a job never applied to has no calendar to open — only the read-only added date", () => {
+    renderWithJobs(<JobDetail jobId="meridian-senior-product-designer" />);
+
+    expect(within(detailsPanel()).getByText("Added")).toBeInTheDocument();
+    expect(
+      within(detailsPanel()).queryByRole("button", { name: /2026/ }),
+    ).toBeNull();
+  });
+});
+
 describe("editing free text", () => {
   const saveButton = () => screen.getByRole("button", { name: "Save description" });
 

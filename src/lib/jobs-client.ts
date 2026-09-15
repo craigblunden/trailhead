@@ -4,8 +4,9 @@ import type { JobPatchInput, NewJobInput } from "@/server/validation";
 /**
  * What adding a Job sends, and what editing one may change: the validation schemas' own types, so a
  * new editable field is one schema edit (architecture ticket 07). The editable fields are the Job's
- * details — company, role, location, posting link, salary expectation — and the two free-text panels;
- * anything else on a Job changes only through a dedicated action (stage) or not at all (ticket 11).
+ * details — company, role, location, posting link, salary expectation, applied date — and the two
+ * free-text panels; anything else on a Job changes only through a dedicated action (stage) or not
+ * at all.
  */
 export type { NewJobInput };
 export type JobPatch = JobPatchInput;

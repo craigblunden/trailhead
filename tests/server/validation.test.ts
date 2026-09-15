@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CONTACT_LIMITS } from "@/lib/contacts";
 import { FEEDBACK_MAX_CHARS } from "@/lib/generation";
@@ -12,6 +12,7 @@ import {
   parseInput,
   stageSchema,
 } from "@/server/validation";
+import { FROZEN_NOW } from "../test-utils";
 
 const valid = {
   company: "Alpine Robotics",
@@ -22,6 +23,15 @@ const valid = {
   postingUrl: "https://alpine.example.com/jobs/1",
   description: "Robots, mostly.",
 };
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+function freeze() {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(FROZEN_NOW); // 2026-07-25
+}
 
 describe("newJobSchema", () => {
   it("VAL-1: accepts a complete, well-formed job and trims its text", () => {
@@ -250,7 +260,7 @@ describe("jobPatchSchema", () => {
       { stage: "offer" },
       { accent: "teal" },
       { userId: "someone-else" },
-      { notes: "fine", appliedOn: "2026-01-01" },
+      { notes: "fine", addedOn: "2026-01-01" },
     ]) {
       const result = parseInput(jobPatchSchema, patch);
       expect(result.ok, JSON.stringify(patch)).toBe(false);
@@ -259,6 +269,25 @@ describe("jobPatchSchema", () => {
 
   it("VAL-8: an empty patch is valid and changes nothing", () => {
     expect(parseInput(jobPatchSchema, {})).toEqual({ ok: true, data: {} });
+  });
+
+  it("VAL-9: the applied date is a real calendar date, today at the latest, or blank", () => {
+    freeze();
+    const today = parseInput(jobPatchSchema, { appliedOn: "2026-07-25" });
+    expect(today).toEqual({ ok: true, data: { appliedOn: "2026-07-25" } });
+
+    for (const appliedOn of ["", null]) {
+      const blank = parseInput(jobPatchSchema, { appliedOn });
+      expect(blank).toEqual({ ok: true, data: { appliedOn: null } });
+    }
+
+    const tomorrow = parseInput(jobPatchSchema, { appliedOn: "2026-07-26" });
+    expect(tomorrow.ok).toBe(false);
+    if (!tomorrow.ok) expect(tomorrow.errors.appliedOn).toMatch(/future/);
+
+    for (const appliedOn of ["2026-02-30", "25/07/2026", "yesterday"]) {
+      expect(parseInput(jobPatchSchema, { appliedOn }).ok, appliedOn).toBe(false);
+    }
   });
 });
 

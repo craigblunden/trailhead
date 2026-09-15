@@ -5,7 +5,7 @@ import type { Job, Stage } from "@/lib/jobs";
 import { newJobFacts, stageChange } from "@/lib/jobs-rules";
 import { requireSession } from "@/server/auth/session";
 import { todayUtc } from "@/lib/dates";
-import { toDateColumn, toIsoDate, toJobDto, type JobRow } from "@/server/db/mappers";
+import { dateColumnPatch, toDateColumn, toIsoDate, toJobDto, type JobRow } from "@/server/db/mappers";
 import { withTenant, type Tenant, type TenantClient } from "@/server/db/tenant";
 import { isChosenContact, type JobPatchInput, type NewJobInput } from "@/server/validation";
 
@@ -142,11 +142,16 @@ async function newJobContactLink(
   return { userId, contact: { connect: { id: own.id } } };
 }
 
+/** The applied date is the one patch field that isn't a column-ready scalar. */
+function toColumns({ appliedOn, ...rest }: JobPatchInput) {
+  return { ...rest, ...dateColumnPatch("appliedOn", appliedOn) };
+}
+
 /** The patch has already been through the allowlist; only its fields are written. */
 export async function updateJob(id: string, patch: JobPatchInput): Promise<Job> {
   const { userId } = await requireSession();
   return withTenant(userId, async (tx, tenant) => {
-    const { count } = await tx.job.updateMany({ where: { id, userId }, data: patch });
+    const { count } = await tx.job.updateMany({ where: { id, userId }, data: toColumns(patch) });
     if (count === 0) throw new NotFoundError();
     return readJob(tenant, id);
   });

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { todayUtc } from "@/lib/dates";
 import type { Job } from "@/lib/jobs";
 import {
+  dateColumnPatch,
   toDateColumn,
   toIsoDate,
   toJobDto,
@@ -138,6 +139,14 @@ describe("toJobDto", () => {
     expect(toIsoDate(new Date("2026-01-01T00:00:00.000Z"))).toBe("2026-01-01");
     expect(toDateColumn("2026-01-01").toISOString()).toBe("2026-01-01T00:00:00.000Z");
     expect(toIsoDate(toDateColumn("2026-07-25"))).toBe("2026-07-25");
+  });
+
+  it("MAP-4: dateColumnPatch omits the key when absent, and writes null or a date column otherwise", () => {
+    expect(dateColumnPatch("appliedOn", undefined)).toEqual({});
+    expect(dateColumnPatch("appliedOn", null)).toEqual({ appliedOn: null });
+    expect(dateColumnPatch("appliedOn", "2026-07-25")).toEqual({
+      appliedOn: toDateColumn("2026-07-25"),
+    });
   });
 
   it("MAP-3: orders activity newest first by date, then by creation time for a shared date", () => {

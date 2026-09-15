@@ -46,6 +46,20 @@ export function toDateColumn(iso: string): Date {
   return new Date(`${iso}T00:00:00.000Z`);
 }
 
+/**
+ * One field of a patch — an optional, nullable `YYYY-MM-DD` — as the columns to spread into a
+ * Prisma `data` object: absent from the patch means the key is absent here too, so the column is
+ * left untouched; `null` clears it. Every optional date column a patch can carry (`appliedOn`,
+ * `lastSpokenOn`) reads this way.
+ */
+export function dateColumnPatch<K extends string>(
+  key: K,
+  iso: string | null | undefined,
+): Partial<Record<K, Date | null>> {
+  if (iso === undefined) return {};
+  return { [key]: iso === null ? null : toDateColumn(iso) } as Record<K, Date | null>;
+}
+
 
 /** The last tiebreak in every order: ids are unique, so an order that ends here is total. */
 const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);

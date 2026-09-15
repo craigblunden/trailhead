@@ -81,6 +81,22 @@ const webAddress = (max: number) =>
 
 const postingUrl = webAddress(JOB_LIMITS.postingUrl);
 
+/** A `YYYY-MM-DD` that names a real day, today (UTC) at the latest. Blank means unset. */
+function pastCalendarDate() {
+  return z.preprocess(
+    (value) => (value === null || value === undefined || value === "" ? null : value),
+    z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a date")
+      .refine((iso) => {
+        const parsed = new Date(`${iso}T00:00:00.000Z`);
+        return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === iso;
+      }, "Enter a real date")
+      .refine((iso) => iso <= todayUtc(), "That date is in the future")
+      .nullable(),
+  );
+}
+
 const jobFields = {
   company: requiredText(JOB_LIMITS.company),
   role: requiredText(JOB_LIMITS.role),
@@ -101,9 +117,11 @@ const jobFields = {
  * Editing is an allowlist, not a filter. What the user typed when adding the Job — company, role,
  * location, salary, posting link, description — and the notes are writable, read by the same rules
  * as when the Job was added: a blank company or role is refused, a blank location reads as the
- * default. Any other field in the patch is REJECTED rather than dropped — so a field added later
- * cannot become writable by accident. Stage changes go through their own action because they write
- * history.
+ * default. The applied date is also writable directly, so a stage-change backfill that guessed
+ * wrong can be corrected without moving the Job's stage; it is the same real-day-or-blank rule
+ * `lastSpokenOn` uses. Any other field in the patch is REJECTED rather than dropped — so a field
+ * added later cannot become writable by accident. Stage changes go through their own action
+ * because they write history.
  */
 export const jobPatchSchema = z.strictObject({
   company: jobFields.company.optional(),
@@ -114,6 +132,7 @@ export const jobPatchSchema = z.strictObject({
   notes: boundedText(JOB_LIMITS.notes).optional(),
   salaryMin: salaryBound.optional(),
   salaryMax: salaryBound.optional(),
+  appliedOn: pastCalendarDate().optional(),
 });
 
 export type JobPatchInput = z.infer<typeof jobPatchSchema>;
@@ -134,19 +153,8 @@ const contactPhone = z.preprocess(
   boundedText(CONTACT_LIMITS.phone).regex(/^[0-9 +().-]*$/, "Use digits, spaces, and + ( ) . - only"),
 );
 
-/** A `YYYY-MM-DD` that names a real day, today (UTC) at the latest. Blank means never recorded. */
-const lastSpokenOn = z.preprocess(
-  (value) => (value === null || value === undefined || value === "" ? null : value),
-  z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Enter a date")
-    .refine((iso) => {
-      const parsed = new Date(`${iso}T00:00:00.000Z`);
-      return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === iso;
-    }, "Enter a real date")
-    .refine((iso) => iso <= todayUtc(), "That date is in the future")
-    .nullable(),
-);
+/** Blank means never recorded. */
+const lastSpokenOn = pastCalendarDate();
 
 export const contactKindSchema = z.enum(CONTACT_KINDS, "Choose what kind of contact this is");
 
