@@ -171,15 +171,22 @@ export function toJobDto(row: JobRow): Job {
   };
 }
 
-/** The relations a document summary is built from: the Jobs it is attached to, as either kind. */
-export const DOCUMENT_SUMMARY_INCLUDE = {
-  resumeFor: { select: { id: true, company: true, role: true } },
-  coverLetterFor: { select: { id: true, company: true, role: true } },
+/**
+ * What a document summary is read with, spread into the query: the Jobs it is attached to, as either
+ * kind, and every column but `text`. The extracted text can run to the size of a whole file, and a
+ * summary never shows it.
+ */
+export const DOCUMENT_SUMMARY_QUERY = {
+  include: {
+    resumeFor: { select: { id: true, company: true, role: true } },
+    coverLetterFor: { select: { id: true, company: true, role: true } },
+  },
+  omit: { text: true },
 } as const;
 
 type JobLabel = Pick<JobModel, "id" | "company" | "role">;
 
-export type DocumentSummaryRow = DocumentRow & { resumeFor: JobLabel[]; coverLetterFor: JobLabel[] };
+export type DocumentSummaryRow = Omit<DocumentRow, "text"> & { resumeFor: JobLabel[]; coverLetterFor: JobLabel[] };
 
 /** Only ready and pending Documents reach the user; a failed upload is removed where it failed. */
 export function toDocumentSummary(row: DocumentSummaryRow): DocumentSummary {

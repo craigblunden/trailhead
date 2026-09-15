@@ -5,7 +5,7 @@ import type { Job, Stage } from "@/lib/jobs";
 import { newJobFacts, stageChange } from "@/lib/jobs-rules";
 import { requireSession } from "@/server/auth/session";
 import { todayUtc } from "@/lib/dates";
-import { dateColumnPatch, toDateColumn, toIsoDate, toJobDto, type JobRow } from "@/server/db/mappers";
+import { dateColumnPatch, toDateColumn, toIsoDate, toJobDto } from "@/server/db/mappers";
 import { withTenant, type Tenant, type TenantClient } from "@/server/db/tenant";
 import { isChosenContact, type JobPatchInput, type NewJobInput } from "@/server/validation";
 
@@ -162,23 +162,24 @@ export async function updateJob(id: string, patch: JobPatchInput): Promise<Job> 
  * `stageChange`'s decision: re-selecting the current stage writes nothing; a move adds "Moved to …"
  * dated today; leaving `interested` with no applied date backfills one; moving to `interested`
  * never sets one.
+ *
+ * The decision reads only the two columns it needs; the Job's relations are read once, after the write.
  */
 export async function setJobStage(id: string, stage: Stage, now: Date = new Date()): Promise<Job> {
   const { userId } = await requireSession();
   const today = todayUtc(now);
 
-  const row = await withTenant(userId, async (tx): Promise<JobRow> => {
-    const current = await tx.job.findFirst({ where: { id, userId }, include: JOB_INCLUDE });
-    if (!current) throw new NotFoundError();
+  return withTenant(userId, async (tx, tenant) => {
+    const current = await ownJob(tenant, id, { id: true, stage: true, appliedOn: true });
 
     const change = stageChange(
       { stage: current.stage, appliedOn: current.appliedOn ? toIsoDate(current.appliedOn) : null },
       stage,
       today,
     );
-    if (!change.entry) return current;
+    if (!change.entry) return readJob(tenant, current.id);
 
-    return tx.job.update({
+    const row = await tx.job.update({
       where: { id: current.id, userId },
       data: {
         stage: change.stage,
@@ -189,6 +190,6 @@ export async function setJobStage(id: string, stage: Stage, now: Date = new Date
       },
       include: JOB_INCLUDE,
     });
+    return toJobDto(row);
   });
-  return toJobDto(row);
 }

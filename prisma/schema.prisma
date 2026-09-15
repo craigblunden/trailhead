@@ -12,8 +12,10 @@
 //   job-state table: that work left the phase deliberately.
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  // The sweep's partial indexes on Document. Migrate reads them from here, so it never drops them.
+  previewFeatures = ["partialIndexes"]
 }
 
 datasource db {
@@ -190,9 +192,12 @@ model Document {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  /// The documents route lists a user's documents newest-first; the sweep scans tombstones.
+  /// The documents route lists a user's documents newest-first.
   @@index([userId, createdAt])
-  @@index([deletedAt])
+  /// The sweep (`public.sweep_documents()`) looks across every user for uploads left unfinished and for
+  /// tombstones old enough to finish, both by age. Few rows are ever either, so each index holds only those.
+  @@index([createdAt], map: "Document_unfinished_createdAt_idx", where: raw("\"deletedAt\" IS NULL AND ingestion <> 'ready'"))
+  @@index([createdAt], map: "Document_tombstoned_createdAt_idx", where: raw("\"deletedAt\" IS NOT NULL"))
 }
 
 /// Cover letters taken from one user's weekly quota (ticket 18). Weeks start Monday, UTC. Reserved

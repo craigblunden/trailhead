@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { DEFAULT_PLAN, limitsOf, type Limits, type Plan } from "@/lib/plans";
 import { requireSession } from "@/server/auth/session";
 import { withTenant, type Tenant } from "@/server/db/tenant";
@@ -19,10 +21,15 @@ export async function planOf(tenant: Tenant): Promise<Plan> {
   return row?.plan ?? DEFAULT_PLAN;
 }
 
-export async function currentPlan(): Promise<Plan> {
+/**
+ * The signed-in Tenant's Plan, for display. Memoised per render pass with React's `cache`, like the
+ * session, so a layout and its page read it once between them. A site that enforces a Limit reads
+ * `planOf` inside the transaction that counts against it instead.
+ */
+export const currentPlan = cache(async (): Promise<Plan> => {
   const { userId } = await requireSession();
   return withTenant(userId, (_tx, tenant) => planOf(tenant));
-}
+});
 
 /** The Tenant's Limits, by way of its Plan. */
 export async function limits(): Promise<Limits> {

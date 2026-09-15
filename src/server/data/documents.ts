@@ -18,7 +18,7 @@ import {
 import type { Job } from "@/lib/jobs";
 import { limitsOf, withinLimit } from "@/lib/plans";
 import { requireSession } from "@/server/auth/session";
-import { DOCUMENT_SUMMARY_INCLUDE, toDocumentSummary } from "@/server/db/mappers";
+import { DOCUMENT_SUMMARY_QUERY, toDocumentSummary } from "@/server/db/mappers";
 import { withTenant } from "@/server/db/tenant";
 import { extractDocumentText } from "@/server/ingest/extract";
 import { logError } from "@/server/log";
@@ -73,7 +73,7 @@ export async function listDocuments(): Promise<DocumentSummary[]> {
   const rows = await withTenant(userId, (tx) =>
     tx.document.findMany({
       where: heldBy(userId),
-      include: DOCUMENT_SUMMARY_INCLUDE,
+      ...DOCUMENT_SUMMARY_QUERY,
       orderBy: [{ createdAt: "desc" }, { id: "asc" }],
     }),
   );
@@ -144,7 +144,7 @@ export async function startUpload(input: StartUploadInput, defer: Defer = inline
 export async function finishUpload(id: string): Promise<DocumentSummary> {
   const { userId } = await requireSession();
   const row = await withTenant(userId, (tx) =>
-    tx.document.findFirst({ where: { id, userId, deletedAt: null }, include: DOCUMENT_SUMMARY_INCLUDE }),
+    tx.document.findFirst({ where: { id, userId, deletedAt: null }, ...DOCUMENT_SUMMARY_QUERY }),
   );
   if (!row) throw new NotFoundError("document");
   if (row.ingestion === "ready") return toDocumentSummary(row);
@@ -170,7 +170,7 @@ export async function finishUpload(id: string): Promise<DocumentSummary> {
     });
     // Deleted while it was being read: it stays deleted.
     if (count === 0) throw new NotFoundError("document");
-    return tx.document.findFirstOrThrow({ where: { id, userId }, include: DOCUMENT_SUMMARY_INCLUDE });
+    return tx.document.findFirstOrThrow({ where: { id, userId }, ...DOCUMENT_SUMMARY_QUERY });
   });
   return toDocumentSummary(saved);
 }
