@@ -8,7 +8,7 @@
  */
 
 /** Routes that only make sense signed in. */
-const PROTECTED_PREFIXES = ["/board", "/contacts", "/documents"];
+const PROTECTED_PREFIXES = ["/board", "/contacts", "/documents", "/account"];
 
 /** Routes that only make sense signed out. Signed in, the landing page is the board. */
 const SIGNED_OUT_ONLY = ["/", "/login", "/signup"];

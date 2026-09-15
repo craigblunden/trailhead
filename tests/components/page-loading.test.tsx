@@ -62,6 +62,19 @@ describe("where the wait stands", () => {
   });
 });
 
+describe("the account page", () => {
+  it("outlines its four sections under their written titles", async () => {
+    pathname = "/account";
+    const { container } = renderLoading(<PageLoading />);
+
+    for (const title of ["Account", "Your account", "Your plan", "Plans — coming soon", "Delete account"]) {
+      expect(screen.getByText(title)).toBeInTheDocument();
+    }
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+    expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
+  });
+});
+
 describe("the board", () => {
   it("lays out the five stage columns and says what is loading", () => {
     pathname = "/board";

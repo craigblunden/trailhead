@@ -1,4 +1,6 @@
-import type { Plan } from "@/lib/plans";
+import { formatResetDay, type QuotaStatus } from "@/lib/generation";
+import { pluralize } from "@/lib/jobs";
+import type { Limit, Plan } from "@/lib/plans";
 
 /**
  * The account page and Account deletion (CONTEXT.md), the parts both sides of the boundary share.
@@ -45,4 +47,16 @@ export function signInMethodLabels(providers: readonly string[]): string[] {
   return [...new Set(providers)].map(
     (id) => METHOD_LABEL[id] ?? `${id.charAt(0).toUpperCase()}${id.slice(1)}`,
   );
+}
+
+/** Documents held against the Documents Limit: "2 of 3 documents", or a plain count when unlimited. */
+export function documentsHeldLine(held: number, limit: Limit): string {
+  return limit === "unlimited" ? pluralize(held, "document") : `${held} of ${limit} documents`;
+}
+
+/** Letters left this quota week, in the cover-letter card's terms; a Hold outranks the count. */
+export function lettersLeftLine(quota: QuotaStatus): string {
+  if (quota.held) return `Cover letters are paused until ${formatResetDay(quota.resetsOn)}`;
+  if (quota.limit === "unlimited") return `${pluralize(quota.used, "cover letter")} written this week`;
+  return `${quota.remaining} of ${quota.limit} cover letters left this week`;
 }

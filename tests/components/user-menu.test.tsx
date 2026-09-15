@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { UserMenu } from "@/components/user-menu";
@@ -28,5 +28,12 @@ describe("UserMenu", () => {
   it("names the pro Plan under the email", async () => {
     const menu = await openMenu("pro");
     expect(menu).toHaveTextContent(/sam\.rivera@example\.com\s*Pro plan/);
+  });
+
+  it("offers the account page after the sections and before Sign out", async () => {
+    const menu = await openMenu("free");
+    const items = within(menu).getAllByRole("menuitem").map((item) => item.textContent);
+    expect(items).toEqual(["Your trail", "Contacts", "Documents", "Account", "Sign out"]);
+    expect(within(menu).getByRole("menuitem", { name: "Account" })).toHaveAttribute("href", "/account");
   });
 });

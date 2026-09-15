@@ -22,7 +22,7 @@ describe("hasSessionCookie", () => {
 
 describe("authRedirect", () => {
   it("PROXY-2: sends a signed-out visit to any board URL to sign-in", () => {
-    for (const path of ["/board", "/board/abc", "/board/abc/anything", "/contacts", "/documents/x"]) {
+    for (const path of ["/board", "/board/abc", "/board/abc/anything", "/contacts", "/documents/x", "/account"]) {
       expect(authRedirect(path, false), path).toBe("/login");
     }
   });

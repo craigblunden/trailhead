@@ -44,6 +44,7 @@ export function PageLoading() {
   if (pathname.startsWith("/board/")) return <JobLoading id={pathname.slice("/board/".length)} />;
   if (pathname.startsWith("/contacts")) return <ContactsLoading selectedId={contactIdIn(pathname)} />;
   if (pathname.startsWith("/documents")) return <DocumentsLoading />;
+  if (pathname.startsWith("/account")) return <AccountLoading />;
   // A section this file does not know yet: say so plainly rather than draw another page's outline.
   return <SectionLoading />;
 }
@@ -537,6 +538,72 @@ function DocumentsLoading() {
               ))}
             </div>
           </div>
+        </div>
+      </PageMain>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * The account page: four cards in one narrow column, the last set apart, as the page lays them out.
+ * ---------------------------------------------------------------------------------------------- */
+
+function CardTitle({ children }: { children: string }) {
+  return (
+    <p aria-hidden="true" className="font-heading text-lg">
+      {children}
+    </p>
+  );
+}
+
+/** A card's written title over a short list of label-and-value rows. */
+function GhostRows({ title, rows }: { title: string; rows: number }) {
+  return (
+    <GhostCard>
+      <CardTitle>{title}</CardTitle>
+      <div className="mt-3 space-y-2.5">
+        {Array.from({ length: rows }, (_, i) => (
+          <div key={i} className="flex gap-6">
+            <Bar className="h-3.5 w-20" />
+            <Bar className={cn("h-3.5", i % 2 === 0 ? "w-48" : "w-36")} />
+          </div>
+        ))}
+      </div>
+    </GhostCard>
+  );
+}
+
+function AccountLoading() {
+  return (
+    <div className="flex flex-1 flex-col">
+      <AppHeader leading={<BrandLogo href="/board" />} loading />
+      <PageWait>Loading your account…</PageWait>
+
+      <PageMain>
+        <SectionTitle>Account</SectionTitle>
+        <SectionLede>Who you’re signed in as, and your plan.</SectionLede>
+
+        <div className="mt-6 max-w-3xl space-y-6">
+          <GhostRows title="Your account" rows={3} />
+          <GhostRows title="Your plan" rows={3} />
+          <GhostCard>
+            <CardTitle>Plans — coming soon</CardTitle>
+            <Bar className="mt-2.5 h-3.5 w-56" />
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="rounded-md p-4 ring-1 ring-foreground/10">
+                  <Bar className="h-4 w-24" />
+                  <Bar className="mt-4 h-3.5 w-full" />
+                  <Bar className="mt-2.5 h-3.5 w-full" />
+                </div>
+              ))}
+            </div>
+          </GhostCard>
+          <GhostCard className="mt-10 ring-destructive/30">
+            <CardTitle>Delete account</CardTitle>
+            <Bar className="mt-2.5 h-3.5 w-full max-w-md" />
+            <Bar className="mt-4 h-9 w-36 rounded-lg" />
+          </GhostCard>
         </div>
       </PageMain>
     </div>

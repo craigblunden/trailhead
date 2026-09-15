@@ -15,6 +15,7 @@ export const PRIVATE_ROUTES = [
   { name: "board", path: "/board", heading: "Your trail" },
   { name: "contacts", path: "/contacts", heading: "Contacts" },
   { name: "documents", path: "/documents", heading: "Documents" },
+  { name: "account", path: "/account", heading: "Account" },
 ] as const;
 
 /** Spec RESP-1 names these four widths explicitly. */
