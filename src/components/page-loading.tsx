@@ -514,7 +514,7 @@ function DocumentsLoading() {
               </p>
               <Bar className="h-3.5 w-12" />
             </div>
-            <div className="mt-3 grid grid-cols-1 gap-3 2xl:grid-cols-2">
+            <div className="mt-3 flex flex-col gap-3">
               {[0, 1].map((i) => (
                 <div key={i} className="flex items-start gap-3 rounded-lg bg-card p-4 ring-1 ring-foreground/10">
                   <Bar className="mt-0.5 size-5 shrink-0" />

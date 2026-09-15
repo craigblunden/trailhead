@@ -8,7 +8,7 @@ import { WRONG_KIND_REFUSALS, type DocumentKind, type DocumentSummary } from "@/
 import type { DocumentsClient, UploadStage } from "@/lib/documents-client";
 import { STAGES, withKitSlot, type Contact, type Job, type Stage } from "@/lib/jobs";
 import type { JobPatch, JobsClient, NewJobInput } from "@/lib/jobs-client";
-import { movedJob, newJob } from "@/lib/jobs-rules";
+import { isChosenContact, movedJob, newJob } from "@/lib/jobs-rules";
 import { DEFAULT_PLAN, limitsOf, type Plan } from "@/lib/plans";
 import { NotFoundError, RuleError } from "@/server/data/errors";
 import { sortContacts } from "@/server/db/mappers";
@@ -154,7 +154,7 @@ export function createTrail({
     storedContacts = storedContacts.map((contact) => (contact.id === next.id ? next : contact));
     return contactDetail(next);
   };
-  const addContact = (input: Pick<ContactFields, "name" | "kind">) => {
+  const addContact = (input: Pick<ContactFields, "name" | "kind"> & Partial<ContactFields>) => {
     const contact: StoredContact = { ...BLANK_CONTACT, ...input, id: nextId("contact") };
     storedContacts = [...storedContacts, contact];
     return contact;
@@ -162,9 +162,14 @@ export function createTrail({
 
   const jobsClient = {
     list: vi.fn(async () => storedJobs.map(jobView)),
-    add: vi.fn(async (input: NewJobInput) => {
-      const job = newJob(input, { today: todayUtc(), existingCount: storedJobs.length, newId: () => nextId("job") });
+    add: vi.fn(async ({ contact, ...fields }: NewJobInput) => {
+      const job = newJob(fields, { today: todayUtc(), existingCount: storedJobs.length, newId: () => nextId("job") });
       storedJobs = [...storedJobs, job];
+      // A Contact typed with the Job becomes a Contact of the user's; a chosen one already is one.
+      if (contact) {
+        const id = isChosenContact(contact) ? findContact(contact.contactId).id : addContact(contact).id;
+        links.add(linkOf(job.id, id));
+      }
       return jobView(job);
     }),
     update: vi.fn(async (id: string, patch: JobPatch) => saveJob({ ...findJob(id), ...patch })),

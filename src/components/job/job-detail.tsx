@@ -14,7 +14,10 @@ import { ContactsCard } from "@/components/job/job-contacts";
 import { CoverLetterCard } from "@/components/job/cover-letter";
 import { DetailsCard } from "@/components/job/details-card";
 import { EditJobDialog } from "@/components/job/edit-job-dialog";
-import { SummitHeaderFrame, SummitProgress } from "@/components/job/summit-header";
+import {
+  SummitHeaderFrame,
+  SummitProgress,
+} from "@/components/job/summit-header";
 import { JobLoading } from "@/components/page-loading";
 import { PageMain } from "@/components/page-main";
 import { Button } from "@/components/ui/button";
@@ -33,8 +36,15 @@ import { STAGES, STAGE_META, webLink, type Job, type Stage } from "@/lib/jobs";
  * page on the server, so the drawing stays out of this component's JavaScript and is never redrawn
  * when the Job changes.
  */
-export function JobDetail({ jobId, scenes }: { jobId: string; scenes?: React.ReactNode }) {
-  const { getJob, updateJob, setStage, status, error, dismissError } = useJobs();
+export function JobDetail({
+  jobId,
+  scenes,
+}: {
+  jobId: string;
+  scenes?: React.ReactNode;
+}) {
+  const { getJob, updateJob, setStage, status, error, dismissError } =
+    useJobs();
   const job = getJob(jobId);
 
   // The same outline the navigation showed; here it stays until the client's own fetch answers.
@@ -85,7 +95,10 @@ type JobDetailViewProps = {
  * accepted. A refused save leaves the text in the field, with the button live again, so there is
  * something to fix rather than retype.
  */
-function useSavedText(saved: string, save: (value: string) => Promise<boolean>) {
+function useSavedText(
+  saved: string,
+  save: (value: string) => Promise<boolean>,
+) {
   const [draft, setDraft] = useState<string | null>(null);
   const value = draft ?? saved;
   return {
@@ -95,7 +108,8 @@ function useSavedText(saved: string, save: (value: string) => Promise<boolean>) 
     set: setDraft,
     save: async () => {
       const sent = value;
-      if (await save(sent)) setDraft((current) => (current === sent ? null : current));
+      if (await save(sent))
+        setDraft((current) => (current === sent ? null : current));
     },
   };
 }
@@ -114,7 +128,12 @@ function SaveRow({
       <span aria-live="polite" className="text-sm text-muted-foreground">
         {changed ? "Unsaved changes" : null}
       </span>
-      <Button type="button" className="h-9 px-3.5" disabled={!changed} onClick={() => void onSave()}>
+      <Button
+        type="button"
+        className="h-9 px-3.5"
+        disabled={!changed}
+        onClick={() => void onSave()}
+      >
         {children}
       </Button>
     </div>
@@ -122,8 +141,17 @@ function SaveRow({
 }
 
 /** Each free-text field is saved by its own button, so a long paste is never saved mid-edit. */
-function JobDetailView({ job, scenes, error, dismissError, onPatch, onStage }: JobDetailViewProps) {
-  const description = useSavedText(job.description, (value) => onPatch({ description: value }));
+function JobDetailView({
+  job,
+  scenes,
+  error,
+  dismissError,
+  onPatch,
+  onStage,
+}: JobDetailViewProps) {
+  const description = useSavedText(job.description, (value) =>
+    onPatch({ description: value }),
+  );
   const notes = useSavedText(job.notes, (value) => onPatch({ notes: value }));
   const posting = webLink(job.postingUrl);
 
@@ -155,7 +183,10 @@ function JobDetailView({ job, scenes, error, dismissError, onPatch, onStage }: J
           }
           controls={
             <>
-              <Select value={job.stage} onValueChange={(next) => onStage(next as Stage)}>
+              <Select
+                value={job.stage}
+                onValueChange={(next) => onStage(next as Stage)}
+              >
                 <SelectTrigger
                   className="h-9 w-full min-w-32 bg-card sm:w-40"
                   aria-label="Application stage"
@@ -218,8 +249,12 @@ function JobDetailView({ job, scenes, error, dismissError, onPatch, onStage }: J
                 <h2 id="description-heading" className="text-lg">
                   Job description
                 </h2>
-                <p id="description-hint" className="mt-1 text-sm text-muted-foreground">
-                  Keep this current — it feeds your cover letter later.
+                <p
+                  id="description-hint"
+                  className="mt-1 text-sm text-muted-foreground"
+                >
+                  Copy and paste this from the job post website — it feeds your
+                  cover letter later.
                 </p>
                 <Textarea
                   aria-labelledby="description-heading"
@@ -228,7 +263,10 @@ function JobDetailView({ job, scenes, error, dismissError, onPatch, onStage }: J
                   onChange={(event) => description.set(event.target.value)}
                   className="mt-3 min-h-56 resize-y"
                 />
-                <SaveRow changed={description.changed} onSave={description.save}>
+                <SaveRow
+                  changed={description.changed}
+                  onSave={description.save}
+                >
                   Save description
                 </SaveRow>
               </section>

@@ -117,6 +117,25 @@ async function jobWithResume(userId: string, description = "A long and specific 
   return job;
 }
 
+/** A ready cover-letter Document for one user, uploaded when `createdAt` says. */
+async function uploadCoverLetter(userId: string, text: string, createdAt = new Date()) {
+  signInAs(userId);
+  return withTenant(userId, (tx) =>
+    tx.document.create({
+      data: {
+        userId,
+        kind: "cover_letter",
+        fileName: "letter.pdf",
+        storageKey: `${userId}/${crypto.randomUUID()}.pdf`,
+        mimeType: "application/pdf",
+        text,
+        ingestion: "ready",
+        createdAt,
+      },
+    }),
+  );
+}
+
 async function tableCounts(userId: string) {
   return withTenant(userId, async (tx) => ({
     jobs: await tx.job.count(),
@@ -382,6 +401,28 @@ describe("writing a cover letter (tickets 18, 19; architecture ticket 04)", () =
   it("GEN-10: without a session it throws, and nothing is attempted", async () => {
     await expect(write("any-job")).rejects.toBeInstanceOf(UnauthenticatedError);
     expect(requests).toBe(0);
+  });
+
+  it("GEN-11: the user's latest uploaded cover letter goes to the writer as a voice guide — theirs only, and none is no refusal", async () => {
+    const user = newUserId();
+    const job = await jobWithResume(user);
+
+    // Another Tenant's cover letter, and this user's own, older one: neither is the guide.
+    await uploadCoverLetter(newUserId(), "A stranger's letter.");
+    signInAs(user);
+    await uploadCoverLetter(user, "My first letter.", new Date("2026-07-01T09:00:00Z"));
+    await uploadCoverLetter(user, "My newest letter.", new Date("2026-07-10T09:00:00Z"));
+
+    signInAs(user);
+    expect((await write(job.id)).ok).toBe(true);
+    expect(prompts[0]).toContain("<sample_letter>\nMy newest letter.\n</sample_letter>");
+    expect(prompts[0]).not.toMatch(/stranger|My first letter/);
+
+    // A user with none is written for all the same.
+    const other = newUserId();
+    const theirJob = await jobWithResume(other);
+    expect((await write(theirJob.id)).ok).toBe(true);
+    expect(prompts[1]).not.toContain("<sample_letter>");
   });
 });
 

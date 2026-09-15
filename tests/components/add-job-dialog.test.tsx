@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BoardView } from "@/components/board/board-view";
 import { STAGE_META } from "@/lib/jobs";
+import { createTrail } from "../fakes/trail";
 import { SEED_JOBS } from "../fixtures/jobs";
 import { freezeClock, renderWithJobs, screen, within } from "../test-utils";
 
@@ -39,6 +40,13 @@ describe("opening the dialog", () => {
     expect(within(dialog).getByLabelText("Company")).toBeRequired();
     expect(within(dialog).getByLabelText("Role title")).toBeRequired();
     expect(within(dialog).getByLabelText("Location")).not.toBeRequired();
+  });
+
+  it("ADD-2: says what the asterisk beside a field means", async () => {
+    const { user } = renderWithJobs(<BoardView />);
+    const dialog = await openDialog(user);
+
+    expect(within(dialog).getByText(/are required/i)).toBeInTheDocument();
   });
 
   it("ADD-1: hides the board behind it while open, as a modal should", async () => {
@@ -140,6 +148,179 @@ describe("adding a job", () => {
       .getByRole("link", { name: "Principal Designer" })
       .closest("li")!;
     expect(within(card).getByText("Salary TBD")).toBeInTheDocument();
+  });
+});
+
+describe("the optional contact", () => {
+  async function addJobWithFields(
+    user: ReturnType<typeof renderWithJobs>["user"],
+    fill: (dialog: HTMLElement) => Promise<void>,
+  ) {
+    const dialog = await openDialog(user);
+    await user.type(within(dialog).getByLabelText("Company"), "Alpine Robotics");
+    await user.type(within(dialog).getByLabelText("Role title"), "Principal Designer");
+    await fill(dialog);
+    await user.click(within(dialog).getByRole("button", { name: "Add to board" }));
+    return dialog;
+  }
+
+  const detailsToggle = (dialog: HTMLElement) =>
+    within(dialog).getByRole("button", { name: "Add their details" });
+
+  it("ADD-8: leaves the contact section blank when nobody was entered", async () => {
+    const { user, trail } = renderWithJobs(<BoardView />);
+    const before = (await trail.contacts.list()).length;
+
+    await addJobWithFields(user, async () => {});
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(trail.jobs.add).toHaveBeenCalledWith(expect.objectContaining({ contact: null }));
+    await expect(trail.contacts.list()).resolves.toHaveLength(before);
+  });
+
+  it("ADD-8: saves the person entered with the job and links them to it", async () => {
+    const { user, trail } = renderWithJobs(<BoardView />);
+
+    await addJobWithFields(user, async (dialog) => {
+      await user.type(within(dialog).getByLabelText("Name"), "Dana Pike");
+      await user.click(detailsToggle(dialog));
+      await user.type(within(dialog).getByLabelText("Title"), "Talent Partner");
+      await user.type(within(dialog).getByLabelText("Agency"), "Northstar Talent");
+      await user.type(within(dialog).getByLabelText("Email"), "dana@northstar.example");
+      await user.type(within(dialog).getByLabelText("Phone"), "0400 000 000");
+    });
+
+    expect(trail.jobs.add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contact: {
+          name: "Dana Pike",
+          kind: "recruiter",
+          title: "Talent Partner",
+          agency: "Northstar Talent",
+          email: "dana@northstar.example",
+          phone: "0400 000 000",
+          linkedinUrl: "",
+        },
+      }),
+    );
+    // One Contact of the user's, on this Job and no other.
+    const dana = (await trail.contacts.list()).filter((contact) => contact.name === "Dana Pike");
+    expect(dana).toEqual([
+      expect.objectContaining({ agency: "Northstar Talent", kind: "recruiter", jobCount: 1 }),
+    ]);
+  });
+
+  it("ADD-8: asks for a name as soon as any other contact field is used", async () => {
+    const { user } = renderWithJobs(<BoardView />);
+    const dialog = await openDialog(user);
+    await user.click(detailsToggle(dialog));
+
+    expect(within(dialog).getByLabelText("Name")).not.toBeRequired();
+
+    await user.type(within(dialog).getByLabelText("Email"), "dana@northstar.example");
+
+    expect(within(dialog).getByLabelText("Name")).toBeRequired();
+  });
+
+  it("ADD-8: keeps the details out of the way until they are asked for", async () => {
+    const { user } = renderWithJobs(<BoardView />);
+    const dialog = await openDialog(user);
+
+    // The section is closed, so its fields are not in the accessibility tree at all.
+    expect(within(dialog).queryByRole("textbox", { name: "Email" })).toBeNull();
+    expect(detailsToggle(dialog)).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(detailsToggle(dialog));
+
+    expect(within(dialog).getByRole("textbox", { name: "Email" })).toBeInTheDocument();
+    expect(detailsToggle(dialog)).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("ADD-8: closing the details section hides the fields without discarding them", async () => {
+    const { user, trail } = renderWithJobs(<BoardView />);
+
+    await addJobWithFields(user, async (dialog) => {
+      await user.type(within(dialog).getByLabelText("Name"), "Dana Pike");
+      await user.click(detailsToggle(dialog));
+      await user.type(within(dialog).getByLabelText("Phone"), "0400 000 000");
+      await user.click(detailsToggle(dialog));
+
+      // Closed again, and saying so — the phone number is still going to be saved.
+      expect(within(dialog).getByText("1 detail filled in")).toBeInTheDocument();
+    });
+
+    expect(trail.jobs.add).toHaveBeenCalledWith(
+      expect.objectContaining({ contact: expect.objectContaining({ phone: "0400 000 000" }) }),
+    );
+  });
+});
+
+describe("choosing a contact the user already has", () => {
+  const PRIYA = {
+    id: "saved-priya",
+    name: "Priya Raman",
+    kind: "recruiter",
+    agency: "Northstar Talent",
+  } as const;
+
+  const withSavedContacts = () =>
+    renderWithJobs(<BoardView />, {
+      trail: createTrail({
+        jobs: SEED_JOBS,
+        contacts: [PRIYA, { id: "saved-sam", name: "Sam Ridge", kind: "hiring_manager" }],
+      }),
+    });
+
+  it("ADD-8: searches saved contacts as the name is typed", async () => {
+    const { user } = withSavedContacts();
+    const dialog = await openDialog(user);
+
+    // Nothing is offered until there is something to search for.
+    expect(within(dialog).queryByRole("list", { name: "Matching contacts" })).toBeNull();
+
+    await user.type(within(dialog).getByLabelText("Name"), "priya");
+
+    const matches = within(dialog).getByRole("list", { name: "Matching contacts" });
+    expect(within(matches).getAllByRole("listitem")).toHaveLength(1);
+    expect(within(matches).getByText("Recruiter · Northstar Talent")).toBeInTheDocument();
+  });
+
+  it("ADD-8: links the chosen contact by id rather than saving them a second time", async () => {
+    const { user, trail } = withSavedContacts();
+    const before = await trail.contacts.list();
+    const dialog = await openDialog(user);
+
+    await user.type(within(dialog).getByLabelText("Company"), "Alpine Robotics");
+    await user.type(within(dialog).getByLabelText("Role title"), "Principal Designer");
+    await user.type(within(dialog).getByLabelText("Name"), "priya");
+    await user.click(within(dialog).getByRole("button", { name: /Priya Raman/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Add to board" }));
+
+    expect(trail.jobs.add).toHaveBeenCalledWith(
+      expect.objectContaining({ contact: { contactId: PRIYA.id } }),
+    );
+    // Still one Priya Raman, now on one more Job.
+    const after = await trail.contacts.list();
+    expect(after.map((contact) => contact.name)).toEqual(before.map((contact) => contact.name));
+    const priya = (name: string) => (contact: { name: string }) => contact.name === name;
+    expect(after.find(priya(PRIYA.name))!.jobCount).toBe(
+      before.find(priya(PRIYA.name))!.jobCount + 1,
+    );
+  });
+
+  it("ADD-8: 'Change' puts the search back, so the wrong person is not stuck on the job", async () => {
+    const { user } = withSavedContacts();
+    const dialog = await openDialog(user);
+
+    await user.type(within(dialog).getByLabelText("Name"), "priya");
+    await user.click(within(dialog).getByRole("button", { name: /Priya Raman/ }));
+
+    // The chosen person replaces the fields they would have been typed into.
+    expect(within(dialog).queryByLabelText("Name")).toBeNull();
+
+    await user.click(within(dialog).getByRole("button", { name: "Change" }));
+
+    expect(within(dialog).getByLabelText("Name")).toHaveValue("");
   });
 });
 

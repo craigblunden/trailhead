@@ -69,30 +69,41 @@ export async function generationQuota(now: Date = new Date()): Promise<QuotaStat
 }
 
 /** What a letter is written from, and the Draft a Rewrite would start from (empty when none). */
-export type CoverLetterSources = Pick<CoverLetterInputs, "company" | "role" | "description" | "resumeText"> & {
+export type CoverLetterSources = Pick<
+  CoverLetterInputs,
+  "company" | "role" | "description" | "resumeText" | "sampleLetter"
+> & {
   draft: string;
 };
 
 /**
  * What the letter is written from: the Job's company, role, and description, its attached resume's
- * extracted text, and its Draft. A missing and a foreign Job are the same `NotFoundError`; a Job
- * with no usable resume, or no description — or, for a Rewrite, no Draft — is refused with a message
- * saying what to do, before any quota is taken, because there is nothing to write the letter from.
+ * extracted text, the user's latest uploaded cover letter as a guide to their voice, and its Draft.
+ * A missing and a foreign Job are the same `NotFoundError`; a Job with no usable resume, or no
+ * description — or, for a Rewrite, no Draft — is refused with a message saying what to do, before any
+ * quota is taken, because there is nothing to write the letter from. Having no cover letter on file
+ * refuses nothing: the guide is an improvement on the letter, never a requirement for one.
  */
 export async function coverLetterSources(
   jobId: string,
   { rewrite = false }: { rewrite?: boolean } = {},
 ): Promise<CoverLetterSources> {
   const { userId } = await requireSession();
-  const job = await withTenant(userId, (_tx, tenant) =>
-    ownJob(tenant, jobId, {
+  const { job, sample } = await withTenant(userId, async (tx, tenant) => ({
+    job: await ownJob(tenant, jobId, {
       company: true,
       role: true,
       description: true,
       draft: true,
       resume: { select: { text: true, ingestion: true, deletedAt: true } },
     }),
-  );
+    // The newest one they uploaded, whichever Jobs it is attached to — this is about their voice.
+    sample: await tx.document.findFirst({
+      where: { userId, kind: "cover_letter", ingestion: "ready", deletedAt: null },
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+      select: { text: true },
+    }),
+  }));
   const resume = job.resume;
   if (!resume || resume.ingestion !== "ready" || resume.deletedAt || !resume.text.trim()) {
     throw new RuleError("no-resume", GENERATION_FAILURES["no-resume"]);
@@ -101,7 +112,14 @@ export async function coverLetterSources(
     throw new RuleError("no-description", GENERATION_FAILURES["no-description"]);
   }
   if (rewrite && !job.draft) throw new RuleError("no-draft", GENERATION_FAILURES["no-draft"]);
-  return { company: job.company, role: job.role, description: job.description, resumeText: resume.text, draft: job.draft };
+  return {
+    company: job.company,
+    role: job.role,
+    description: job.description,
+    resumeText: resume.text,
+    sampleLetter: sample?.text.trim() || undefined,
+    draft: job.draft,
+  };
 }
 
 /**

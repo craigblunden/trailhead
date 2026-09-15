@@ -80,6 +80,14 @@ describe("A11Y-1: no structural violations", () => {
     expect(await axe(document.body, AXE_OPTIONS)).toHaveNoViolations();
   });
 
+  it("board with the add-job dialog's contact details open", async () => {
+    const { user } = renderWithJobs(<BoardView />);
+    await user.click(screen.getByRole("button", { name: /add job/i }));
+    await user.click(screen.getByRole("button", { name: "Add their details" }));
+
+    expect(await axe(document.body, AXE_OPTIONS)).toHaveNoViolations();
+  });
+
   it("job detail", async () => {
     const { container } = renderWithJobs(
       <JobDetail jobId="harvest-lead-product-designer" />,

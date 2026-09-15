@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createJobAction, setJobStageAction, updateJobAction } from "@/server/actions/jobs";
+import { createContact, listContacts } from "@/server/data/contacts";
 import { NotFoundError } from "@/server/data/errors";
 import { createJob, getJob, listJobs, setJobStage, updateJob } from "@/server/data/jobs";
 import { prisma } from "@/server/db/prisma";
@@ -310,5 +311,75 @@ describe("ticket 11: the detail page is real, and stage and notes persist", () =
     const untouched = await getJob(jobA.id);
     expect(untouched).toMatchObject({ notes: "", stage: "interested" });
     expect(untouched?.activity).toHaveLength(1);
+  });
+});
+
+describe("a job added with a contact beside it", () => {
+  const dana = {
+    name: "Dana Pike",
+    kind: "recruiter",
+    title: "Talent Partner",
+    agency: "Northstar Talent",
+    email: "dana@northstar.example",
+    phone: "0400 000 000",
+    linkedinUrl: "",
+  } as const;
+
+  it("creates the person and links them in the job's own transaction", async () => {
+    signInAs(newUserId());
+    const job = await createJob({ ...input, contact: dana }, FROZEN);
+
+    expect(job.contacts).toEqual([
+      {
+        id: expect.any(String),
+        name: "Dana Pike",
+        kind: "recruiter",
+        title: "Talent Partner",
+        agency: "Northstar Talent",
+        email: "dana@northstar.example",
+        otherJobCount: 0,
+      },
+    ]);
+    // A Contact of the user's, not a detail of the Job: it is on their contacts list too.
+    expect(await listContacts()).toMatchObject([{ name: "Dana Pike", jobCount: 1 }]);
+  });
+
+  it("links a contact the user already has instead of saving them twice", async () => {
+    signInAs(newUserId());
+    const existing = await createContact({ ...dana, notes: "", lastSpokenOn: null });
+    const job = await createJob({ ...input, contact: { contactId: existing.id } }, FROZEN);
+
+    expect(job.contacts.map((contact) => contact.id)).toEqual([existing.id]);
+    expect(await listContacts()).toMatchObject([{ id: existing.id, jobCount: 1 }]);
+  });
+
+  it("a job with no contact is stored with none, and adds nobody to the list", async () => {
+    signInAs(newUserId());
+    for (const contact of [undefined, null]) {
+      const job = await createJob({ ...input, contact }, FROZEN);
+      expect(job.contacts).toEqual([]);
+    }
+    expect(await listContacts()).toEqual([]);
+  });
+
+  it("refuses another user's contact id, and writes no job at all", async () => {
+    signInAs(newUserId());
+    const theirs = await createContact({ ...dana, notes: "", lastSpokenOn: null });
+
+    signInAs(newUserId());
+    await expect(createJob({ ...input, contact: { contactId: theirs.id } }, FROZEN)).rejects.toThrow(
+      NotFoundError,
+    );
+    // The whole create is one transaction, so a refused contact leaves no half-made job behind.
+    expect(await listJobs()).toEqual([]);
+  });
+
+  it("refuses an id that names nobody, rather than inventing a contact for it", async () => {
+    signInAs(newUserId());
+
+    await expect(
+      createJob({ ...input, contact: { contactId: "no-such-contact" } }, FROZEN),
+    ).rejects.toThrow(NotFoundError);
+    expect(await listJobs()).toEqual([]);
   });
 });

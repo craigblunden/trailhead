@@ -77,6 +77,50 @@ test.describe("ticket 14: contacts", () => {
     await expect(page.getByRole("region", { name: "Contacts" }).getByText(/No contacts saved/)).toBeVisible();
   });
 
+  test("a contact entered beside a new job is saved with it, then offered for the next one", async ({
+    page,
+  }) => {
+    const suffix = Math.random().toString(36).slice(2, 6);
+    const name = `Dana Pike ${suffix}`;
+
+    await page.goto("/board");
+    await page.getByRole("button", { name: /add job/i }).first().click();
+    const dialog = page.getByRole("dialog", { name: "Add a job" });
+    const firstRole = `Principal Designer ${suffix}`;
+    await dialog.getByLabel("Company").fill("Alpine Robotics");
+    await dialog.getByLabel("Role title").fill(firstRole);
+    await dialog.getByLabel("Name").fill(name);
+    await dialog.getByRole("button", { name: "Add their details" }).click();
+    await dialog.getByLabel("Agency").fill("Northstar Talent");
+    await dialog.getByLabel("Email").fill("dana@northstar.example");
+    // Closing the section puts the fields away without discarding them.
+    await dialog.getByRole("button", { name: "Add their details" }).click();
+    await expect(dialog.getByText("2 details filled in")).toBeVisible();
+    await dialog.getByRole("button", { name: "Add to board" }).click();
+    await expect(dialog).toBeHidden();
+
+    // The second job finds the person the first one saved, rather than asking for them again.
+    const secondRole = `Staff Designer ${suffix}`;
+    await page.getByRole("button", { name: /add job/i }).first().click();
+    await dialog.getByLabel("Company").fill("Fernwood");
+    await dialog.getByLabel("Role title").fill(secondRole);
+    await dialog.getByLabel("Name").fill(suffix);
+    await dialog.getByRole("button", { name: new RegExp(name) }).click();
+    await expect(dialog.getByText("Recruiter · Northstar Talent")).toBeVisible();
+    await dialog.getByRole("button", { name: "Add to board" }).click();
+    await expect(dialog).toBeHidden();
+
+    // One Dana Pike, on both jobs — the whole point of searching before creating.
+    await page.getByRole("link", { name: secondRole, exact: true }).click();
+    const card = page.getByRole("region", { name: "Contacts" });
+    await expect(card.getByRole("link", { name, exact: true })).toBeVisible();
+    await expect(card.getByText("dana@northstar.example")).toBeVisible();
+    await expect(card.getByRole("link", { name: /Also on 1 other job/ })).toBeVisible();
+
+    await page.goto("/contacts");
+    await expect(page.getByRole("link", { name: new RegExp(name) })).toHaveCount(1);
+  });
+
   test("the header links to Board and Contacts at md width and up", async ({ page }) => {
     await page.goto("/board");
     const nav = page.getByRole("navigation", { name: "Primary" });

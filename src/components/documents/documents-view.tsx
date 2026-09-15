@@ -121,7 +121,7 @@ export function DocumentsView() {
                 Nothing on file yet. Upload the resume you send most, then attach it to any job.
               </p>
             ) : (
-              <ul className="mt-3 grid grid-cols-1 gap-3 2xl:grid-cols-2">
+              <ul className="mt-3 flex flex-col gap-3">
                 {documents.data.map((document) => (
                   <li
                     key={document.id}

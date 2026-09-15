@@ -22,8 +22,10 @@ type SummitHeaderFrameProps = {
  *
  * The scene is pinned to the bottom of the sky at a fixed height, and the sky around it is the scene's
  * own colour, so a title that wraps only makes the sky taller. The title panel overlaps the top of the
- * scene, which is sky in every drawing, only from `lg`, where it holds under half the width: on a
- * narrower screen it would run across the peak in the middle, so it sits just above the picture.
+ * scene, which is sky in every drawing, only from `lg`, where it stops short of the near peak, which
+ * every drawing puts right of centre: on a narrower screen it would run across that peak, so it sits
+ * just above the picture. The wider the sky, the more of the scene it shows either side of the peak,
+ * so the panel gives back a little of its share at `2xl` to stay clear.
  *
  * In the strip, the controls keep a column of their own from `lg`, and the caption wraps under the
  * steps rather than pushing them onto a second row; below it, the controls take a row beneath.
@@ -43,7 +45,7 @@ export function SummitHeaderFrame({ stage, scenes, title, progress, controls }: 
         </div>
         <div className="relative mx-auto w-full max-w-[110rem] px-4 pt-5 pb-[calc(var(--scene-h)*0.9)] sm:px-6 sm:pb-[calc(var(--scene-h)*0.95)] lg:pb-[calc(var(--scene-h)*0.62)]">
           <JobBackLink />
-          <div className="flex w-fit max-w-full min-w-0 items-center gap-4 rounded-2xl bg-card/55 px-4 py-3.5 shadow-sm ring-1 ring-white/60 backdrop-blur-md sm:px-5 sm:py-4 lg:max-w-[46%] lg:gap-5 lg:px-6 lg:py-5">
+          <div className="flex w-fit max-w-full min-w-0 items-center gap-4 rounded-2xl bg-card/55 px-4 py-3.5 shadow-sm ring-1 ring-white/60 backdrop-blur-md sm:px-5 sm:py-4 lg:max-w-[54%] lg:gap-5 lg:px-6 lg:py-5 2xl:max-w-[50%]">
             {title}
           </div>
         </div>

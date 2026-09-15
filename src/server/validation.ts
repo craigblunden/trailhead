@@ -27,6 +27,9 @@ import { STAGES } from "@/lib/jobs";
 
 export { JOB_LIMITS };
 
+/** Ids are opaque cuids; this only stops a caller handing us a novel. */
+export const idSchema = z.string().trim().min(1).max(64);
+
 /** Thousands per year. Nobody is paid a billion; this bounds accidental and hostile input alike. */
 const SALARY_MAX = 100_000;
 
@@ -93,10 +96,6 @@ const jobFields = {
     boundedText(JOB_LIMITS.description),
   ),
 };
-
-export const newJobSchema = z.object(jobFields);
-
-export type NewJobInput = z.infer<typeof newJobSchema>;
 
 /**
  * Editing is an allowlist, not a filter. What the user typed when adding the Job — company, role,
@@ -182,6 +181,60 @@ export const contactPatchSchema = z.strictObject({
 
 export type ContactPatchInput = z.infer<typeof contactPatchSchema>;
 
+/**
+ * The optional Contact the add-job form offers. It is the Contact's own field rules, so a person
+ * entered beside a Job is bounded exactly as one entered on the contacts page. Notes and "last
+ * spoke" are not offered here: they are about the relationship, not about who this is, and belong
+ * on the Contact's own page.
+ *
+ * Strict, because this is one arm of a union: a body carrying both a `contactId` and a name has to
+ * be refused outright. Were the extra key merely dropped, it would fall through to here and save a
+ * second copy of the very person it named — the duplicate the choosing exists to prevent.
+ */
+export const newJobContactSchema = z.strictObject(
+  newContactSchema.pick({
+    name: true,
+    kind: true,
+    title: true,
+    agency: true,
+    email: true,
+    phone: true,
+    linkedinUrl: true,
+  }).shape,
+);
+
+export type NewJobContactInput = z.infer<typeof newJobContactSchema>;
+
+/**
+ * Which Contact a new Job carries: one the user already has, chosen by id, or a new person to
+ * create with the Job. Choosing is what keeps the same recruiter from being saved twice, and it is
+ * the reason the add-job form searches before it creates, as the job page's own dialog does.
+ */
+export const jobContactSchema = z.union([
+  z.strictObject({ contactId: idSchema }),
+  newJobContactSchema,
+]);
+
+export type JobContactInput = z.infer<typeof jobContactSchema>;
+
+/** True when the form chose one of the user's own Contacts rather than describing a new one. */
+export function isChosenContact(contact: JobContactInput): contact is { contactId: string } {
+  return "contactId" in contact;
+}
+
+/**
+ * Adding a Job, defined here because it may carry a Contact: absent, null, one the user already
+ * has, or a whole new person, created and linked with the Job. A half-filled new contact is refused
+ * with the Job rather than saved without the detail that was typed — the form asks for a name as
+ * soon as any other field is used.
+ */
+export const newJobSchema = z.object({
+  ...jobFields,
+  contact: jobContactSchema.nullable().optional(),
+});
+
+export type NewJobInput = z.infer<typeof newJobSchema>;
+
 /** A resume or a cover letter: what a Document is, and which slot of a Job's application kit it fills. */
 export const documentKindSchema = z.enum(DOCUMENT_KINDS, "Choose resume or cover letter");
 
@@ -239,9 +292,6 @@ export const appFeedbackSchema = z.strictObject({
 });
 
 export type AppFeedbackInput = z.infer<typeof appFeedbackSchema>;
-
-/** Ids are opaque cuids; this only stops a caller handing us a novel. */
-export const idSchema = z.string().trim().min(1).max(64);
 
 
 /** Field name → first message, in the shape the forms render inline. */

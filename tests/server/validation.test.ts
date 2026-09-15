@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { CONTACT_LIMITS } from "@/lib/contacts";
 import { FEEDBACK_MAX_CHARS } from "@/lib/generation";
 import { LOCATION_FALLBACK, locationOrFallback, salaryFromText } from "@/lib/job-fields";
 import {
   JOB_LIMITS,
   coverLetterRequestSchema,
+  isChosenContact,
   jobPatchSchema,
   newJobSchema,
   parseInput,
@@ -113,6 +115,92 @@ describe("newJobSchema", () => {
   it("VAL-7: refuses input that is not an object at all", () => {
     expect(parseInput(newJobSchema, null).ok).toBe(false);
     expect(parseInput(newJobSchema, "company=Acme").ok).toBe(false);
+  });
+});
+
+describe("the contact a new job may carry", () => {
+  const newPerson = {
+    name: "Dana Pike",
+    kind: "recruiter",
+    title: "Talent Partner",
+    agency: "Northstar Talent",
+    email: "dana@northstar.example",
+    phone: "0400 000 000",
+    linkedinUrl: "",
+  };
+
+  it("VAL-10: an absent, undefined, or null contact all mean nobody was entered", () => {
+    for (const contact of [undefined, null]) {
+      expect(parseInput(newJobSchema, { ...valid, contact })).toMatchObject({ ok: true });
+    }
+    expect(parseInput(newJobSchema, valid)).toMatchObject({ ok: true });
+  });
+
+  it("VAL-10: accepts one of the user's own, named only by id", () => {
+    const result = parseInput(newJobSchema, { ...valid, contact: { contactId: "  c1  " } });
+
+    expect(result.ok && result.data.contact).toEqual({ contactId: "c1" });
+    expect(result.ok && isChosenContact(result.data.contact!)).toBe(true);
+  });
+
+  it("VAL-10: a chosen contact carries nothing but the id — no name to copy in beside it", () => {
+    const result = parseInput(newJobSchema, {
+      ...valid,
+      contact: { contactId: "c1", name: "Someone Else" },
+    });
+
+    expect(result.ok).toBe(false);
+  });
+
+  it("VAL-10: an id sent alongside a whole person is refused, never quietly saved as a new one", () => {
+    // Dropping the unknown `contactId` here would link nobody and create a second Dana Pike —
+    // exactly the duplicate that choosing an existing contact exists to prevent.
+    const result = parseInput(newJobSchema, {
+      ...valid,
+      contact: { contactId: "c1", ...newPerson },
+    });
+
+    expect(result.ok).toBe(false);
+  });
+
+  it("VAL-11: accepts a whole new person, trimmed, and reads them as new rather than chosen", () => {
+    const result = parseInput(newJobSchema, {
+      ...valid,
+      contact: { ...newPerson, name: "  Dana Pike  " },
+    });
+
+    expect(result.ok && result.data.contact).toEqual(newPerson);
+    expect(result.ok && isChosenContact(result.data.contact!)).toBe(false);
+  });
+
+  it("VAL-11: a new person needs a name — the rest is no use without one", () => {
+    const result = parseInput(newJobSchema, { ...valid, contact: { ...newPerson, name: "   " } });
+
+    expect(result.ok).toBe(false);
+  });
+
+  it("VAL-11: holds a contact entered beside a job to the contacts page's own rules", () => {
+    const refused = [
+      { ...newPerson, email: "not-an-email" },
+      { ...newPerson, phone: "call me" },
+      { ...newPerson, kind: "friend" },
+      { ...newPerson, name: "x".repeat(CONTACT_LIMITS.name + 1) },
+      { ...newPerson, linkedinUrl: "javascript:alert(1)" },
+    ];
+    for (const contact of refused) {
+      expect(parseInput(newJobSchema, { ...valid, contact }).ok, JSON.stringify(contact)).toBe(
+        false,
+      );
+    }
+  });
+
+  it("VAL-11: notes and last spoken are not offered here — they belong on the contact's page", () => {
+    const result = parseInput(newJobSchema, {
+      ...valid,
+      contact: { ...newPerson, notes: "Met at a meetup", lastSpokenOn: "2026-07-01" },
+    });
+
+    expect(result.ok).toBe(false);
   });
 });
 

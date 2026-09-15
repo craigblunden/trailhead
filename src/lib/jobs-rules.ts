@@ -42,11 +42,24 @@ export function movedToLabel(stage: Stage): string {
   return `Moved to ${STAGE_META[stage].label}`;
 }
 
+/** A Contact entered beside a new Job: only what a Job shows of a Contact matters to these rules. */
+export type NewJobContact = Pick<Contact, "name" | "kind" | "title" | "agency" | "email">;
+
+/** One of the user's own Contacts, chosen beside a new Job instead of typed. */
+export type ChosenContact = { contactId: string };
+
+export function isChosenContact(contact: NewJobContact | ChosenContact): contact is ChosenContact {
+  return "contactId" in contact;
+}
+
 /** What the user types when adding a Job. Everything else about a new Job is decided here. */
 export type NewJobFields = Pick<
   Job,
   "company" | "role" | "location" | "salaryMin" | "salaryMax" | "postingUrl" | "description"
->;
+> & {
+  /** The optional person the form asked about: created and linked with the Job, or linked if chosen. */
+  contact?: NewJobContact | ChosenContact | null;
+};
 
 /** A new Job apart from what the user typed and the ids a store assigns. */
 export type NewJobFacts = {
@@ -85,13 +98,36 @@ export function newJobFacts(today: string, existingCount: number): NewJobFacts {
   };
 }
 
-/** The whole new Job, for a store that holds Jobs in memory and assigns its own ids. */
+/**
+ * The whole new Job, for a store that holds Jobs in memory and assigns its own ids. A Contact
+ * typed with the Job is on it from the start, linked to this Job and no other; a Contact chosen by
+ * id is one the store already holds, so who they are waits for the answer that carries their name.
+ */
 export function newJob(
-  fields: NewJobFields,
+  { contact, ...fields }: NewJobFields,
   { today, existingCount, newId }: { today: string; existingCount: number; newId: () => string },
 ): Job {
   const { opening, ...facts } = newJobFacts(today, existingCount);
-  return { ...fields, ...facts, id: newId(), activity: [{ id: newId(), ...opening }] };
+  return {
+    ...fields,
+    ...facts,
+    contacts:
+      contact && !isChosenContact(contact)
+        ? [
+            {
+              id: newId(),
+              name: contact.name,
+              kind: contact.kind,
+              title: contact.title,
+              agency: contact.agency,
+              email: contact.email,
+              otherJobCount: 0,
+            },
+          ]
+        : facts.contacts,
+    id: newId(),
+    activity: [{ id: newId(), ...opening }],
+  };
 }
 
 export type StageChange = {

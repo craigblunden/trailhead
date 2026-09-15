@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
 
 import { unwrapping } from "@/components/action-client";
 import { jobCache, type WriteResult } from "@/components/job-cache";
+import { contactsCache } from "@/lib/contacts-client";
 import { todayUtc } from "@/lib/dates";
 import type { Job, Stage } from "@/lib/jobs";
 import { jobsCache } from "@/lib/jobs-cache";
@@ -94,7 +95,15 @@ export function JobsProvider({
               fallback: "That job wasn't saved. Check your connection and try again.",
             },
           )
-          .then(report);
+          .then((result) => {
+            report(result);
+            // A Job added with a Contact either saved a new person or linked one the user already
+            // had, so the contact list holds neither the right names nor the right role counts —
+            // and the next Job's search reads that list to offer them.
+            if (result.ok && input.contact) {
+              void queryClient.invalidateQueries({ queryKey: contactsCache.listKey });
+            }
+          });
       },
       updateJob: (id, patch) =>
         cache
@@ -124,7 +133,7 @@ export function JobsProvider({
       dismissError: () => setError(null),
       reload: () => void refetch(),
     }),
-    [jobs, status, cache, client, report, error, refetch],
+    [jobs, status, cache, client, report, error, refetch, queryClient],
   );
 
   return <JobsContext.Provider value={value}>{children}</JobsContext.Provider>;

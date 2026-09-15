@@ -169,7 +169,12 @@ export function LinkContactDialog({
             </p>
 
             {shown.length > 0 && (
-              <ul aria-label="Matching contacts" className="space-y-1.5">
+              // Capped and scrolled, so a user with many contacts opens the same short dialog as a
+              // user with two: the search box and "Create" stay in view without scrolling.
+              <ul
+                aria-label="Matching contacts"
+                className="max-h-44 space-y-1.5 overflow-y-auto pr-1"
+              >
                 {shown.map((contact) => (
                   <li key={contact.id}>
                     <Button

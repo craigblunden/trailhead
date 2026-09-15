@@ -6,8 +6,8 @@ import { newJobFacts, stageChange } from "@/lib/jobs-rules";
 import { requireSession } from "@/server/auth/session";
 import { todayUtc } from "@/lib/dates";
 import { toDateColumn, toIsoDate, toJobDto, type JobRow } from "@/server/db/mappers";
-import { withTenant, type Tenant } from "@/server/db/tenant";
-import type { JobPatchInput, NewJobInput } from "@/server/validation";
+import { withTenant, type Tenant, type TenantClient } from "@/server/db/tenant";
+import { isChosenContact, type JobPatchInput, type NewJobInput } from "@/server/validation";
 
 import { NotFoundError } from "./errors";
 
@@ -83,7 +83,10 @@ export async function getJob(id: string): Promise<Job | null> {
 /**
  * One transaction writes the job and its single opening activity entry together: a crash between
  * them must not leave a job with no history. What a new Job is — its Stage, dates, notes, accent,
- * and opening entry — is `newJobFacts`, the rule the board's optimistic update applies too.
+ * and opening entry — is `newJobFacts`, the rule the board's optimistic update applies too. A
+ * Contact typed into the same form is created and linked in that transaction, so the person is
+ * never saved without the Job that was the reason for them; a Contact chosen from the user's own is
+ * linked instead, which is how the form avoids saving the same person twice.
  */
 export async function createJob(input: NewJobInput, now: Date = new Date()): Promise<Job> {
   const { userId } = await requireSession();
@@ -91,6 +94,7 @@ export async function createJob(input: NewJobInput, now: Date = new Date()): Pro
   const row = await withTenant(userId, async (tx) => {
     const existing = await tx.job.count({ where: { userId } });
     const { opening, ...facts } = newJobFacts(todayUtc(now), existing);
+    const contactLink = await newJobContactLink(tx, userId, input.contact);
     return tx.job.create({
       data: {
         userId,
@@ -109,11 +113,33 @@ export async function createJob(input: NewJobInput, now: Date = new Date()): Pro
         activity: {
           create: { userId, label: opening.label, date: toDateColumn(opening.date) },
         },
+        ...(contactLink ? { contacts: { create: contactLink } } : {}),
       },
       include: JOB_INCLUDE,
     });
   });
   return toJobDto(row);
+}
+
+/**
+ * The `JobContact` row a new Job carries, nested inside its own create: the Contact chosen from the
+ * user's own, or a new person made with the Job. A chosen id came from the browser, so the Contact
+ * is named as this user's in the query rather than trusted — a foreign id is not found, and never
+ * becomes a link row.
+ */
+async function newJobContactLink(
+  tx: TenantClient,
+  userId: string,
+  contact: NewJobInput["contact"],
+): Promise<Prisma.JobContactCreateWithoutJobInput | null> {
+  if (!contact) return null;
+  if (!isChosenContact(contact)) return { userId, contact: { create: { userId, ...contact } } };
+  const own = await tx.contact.findFirst({
+    where: { id: contact.contactId, userId },
+    select: { id: true },
+  });
+  if (!own) throw new NotFoundError("contact");
+  return { userId, contact: { connect: { id: own.id } } };
 }
 
 /** The patch has already been through the allowlist; only its fields are written. */
