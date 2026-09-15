@@ -581,7 +581,7 @@ function AccountLoading() {
 
       <PageMain>
         <SectionTitle>Account</SectionTitle>
-        <SectionLede>Who you’re signed in as, and your plan.</SectionLede>
+        <SectionLede>Who you’re signed in as, your plan, and deleting your account.</SectionLede>
 
         <div className="mt-6 max-w-3xl space-y-6">
           <GhostRows title="Your account" rows={3} />

@@ -10,7 +10,7 @@ import type { AccountSummary } from "@/lib/account";
 import type { QuotaStatus } from "@/lib/generation";
 import { PLANS, PLAN_LIMITS, type Plan } from "@/lib/plans";
 import { createTrail } from "../fakes/trail";
-import { render, renderWithJobs, screen, within } from "../test-utils";
+import { render, renderWithJobs, screen, waitFor, within } from "../test-utils";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
@@ -142,5 +142,104 @@ describe("the account page (account issue 05)", () => {
       "Delete account",
     ]);
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
+  });
+});
+
+describe("the Delete account dialog (account issue 06)", () => {
+  async function openDialog(summary: Partial<AccountSummary> = {}) {
+    account.summary.mockResolvedValue({ ...SUMMARY, ...summary });
+    const rendered = renderWithJobs(<AccountView />);
+    const section = await screen.findByRole("region", { name: "Delete account" });
+    await rendered.user.click(within(section).getByRole("button", { name: "Delete account…" }));
+    const dialog = await screen.findByRole("dialog", { name: "Delete your account?" });
+    return { ...rendered, dialog };
+  }
+
+  const confirmButton = (dialog: HTMLElement) => within(dialog).getByRole("button", { name: /^(Delete my account|Deleting your account…)$/ });
+  const emailField = (dialog: HTMLElement) =>
+    within(dialog).getByRole("textbox", { name: `Type ${SUMMARY.email} to confirm` });
+
+  it("DLG-1: lists what goes with its counts, points at Documents, and says what cannot be recalled or undone", async () => {
+    const { dialog } = await openDialog();
+
+    expect(dialog).toHaveTextContent("12 jobs, 2 documents, and 8 contacts — with their history, notes, and drafts.");
+    expect(within(dialog).getByRole("link", { name: "Documents" })).toHaveAttribute("href", "/documents");
+    expect(dialog).toHaveTextContent("Want your files? Download them from Documents first.");
+    expect(dialog).toHaveTextContent("Feedback you’ve already sent us isn’t recalled.");
+    expect(dialog).toHaveTextContent("This can’t be undone.");
+  });
+
+  it("DLG-2: counts pluralise", async () => {
+    const { dialog } = await openDialog({ jobs: 1, documents: 1, contacts: 1 });
+    expect(dialog).toHaveTextContent("1 job, 1 document, and 1 contact — with their history, notes, and drafts.");
+  });
+
+  it.each([
+    ["free", null],
+    ["basic", "Your Basic plan ends with your account."],
+    ["pro", "Your Pro plan ends with your account."],
+  ] as const)("DLG-3: on %s the Plan line is %s", async (plan, line) => {
+    const { dialog } = await openDialog({ plan });
+    if (line) expect(dialog).toHaveTextContent(line);
+    else expect(dialog).not.toHaveTextContent(/plan ends with your account/);
+  });
+
+  it("DLG-4: the button stays disabled until the Account's email is typed — any case, spaces around it", async () => {
+    const { user, dialog } = await openDialog();
+
+    expect(confirmButton(dialog)).toBeDisabled();
+    await user.type(emailField(dialog), "sam.rivera@example.co");
+    expect(confirmButton(dialog)).toBeDisabled();
+
+    await user.clear(emailField(dialog));
+    await user.type(emailField(dialog), "  SAM.Rivera@Example.com ");
+    expect(confirmButton(dialog)).toBeEnabled();
+  });
+
+  it("DLG-5: while deleting, the button shows the wait, the dialog cannot be dismissed, and it cannot be sent twice", async () => {
+    // Settled before the test ends: React entangles every transition with a pending async one.
+    let settle = () => {};
+    account.remove.mockReturnValue(new Promise<void>((resolve) => (settle = resolve)));
+    const { user, dialog } = await openDialog();
+
+    await user.type(emailField(dialog), SUMMARY.email);
+    await user.click(confirmButton(dialog));
+
+    expect(confirmButton(dialog)).toHaveTextContent("Deleting your account…");
+    expect(confirmButton(dialog)).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: "Keep my account" })).toBeDisabled();
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("dialog", { name: "Delete your account?" })).toBeInTheDocument();
+
+    await user.click(confirmButton(dialog));
+    expect(account.remove).toHaveBeenCalledTimes(1);
+    expect(account.remove).toHaveBeenCalledWith(SUMMARY.email);
+
+    settle();
+    await waitFor(() => expect(confirmButton(dialog)).toHaveTextContent("Delete my account"));
+  });
+
+  it("DLG-6: a refusal is shown inside the dialog, and what was typed is kept", async () => {
+    account.remove.mockResolvedValue({
+      ok: false,
+      error: "failed",
+      code: "storage",
+      message: "We couldn't delete your files, so nothing was deleted. Please try again.",
+    });
+    const { user, dialog } = await openDialog();
+
+    await user.type(emailField(dialog), SUMMARY.email);
+    await user.click(confirmButton(dialog));
+
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+      "We couldn't delete your files, so nothing was deleted. Please try again.",
+    );
+    expect(emailField(dialog)).toHaveValue(SUMMARY.email);
+    await waitFor(() => expect(confirmButton(dialog)).toBeEnabled());
+  });
+
+  it("DLG-7: the open dialog has no axe violations", async () => {
+    const { dialog } = await openDialog({ plan: "pro" });
+    expect(await axe(dialog, AXE_OPTIONS)).toHaveNoViolations();
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import LandingPage from "@/app/page";
 
@@ -55,6 +56,27 @@ describe("landing page", () => {
     expect(within(feature).queryByRole("button")).toBeNull();
     expect(within(feature).queryByRole("textbox")).toBeNull();
     expect(feature.querySelector("[aria-hidden='true']")).toHaveTextContent("Rewrite");
+  });
+
+  it("LAND-5: after Account deletion, announces it once and drops the flag from the URL", async () => {
+    window.history.replaceState(null, "", "/?deleted=1");
+    const user = userEvent.setup();
+    render(<LandingPage />);
+
+    const notice = screen.getByRole("status");
+    expect(notice).toHaveTextContent("Your account and everything in it has been deleted.");
+    expect(window.location.pathname + window.location.search).toBe("/");
+
+    await user.click(within(notice).getByRole("button", { name: "Dismiss" }));
+    expect(screen.getByRole("status")).toHaveTextContent("");
+  });
+
+  it("LAND-5: says nothing without the flag", () => {
+    window.history.replaceState(null, "", "/");
+    render(<LandingPage />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("");
+    expect(screen.queryByRole("button", { name: "Dismiss" })).toBeNull();
   });
 
   it("LAND-1: hides the decorative scene from assistive technology", () => {

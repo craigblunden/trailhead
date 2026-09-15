@@ -25,3 +25,12 @@ describe("the account page's pure rules (account issue 04)", () => {
     expect(signInMethodLabels([])).toEqual([]);
   });
 });
+
+describe("what Account deletion says goes (account issue 06)", () => {
+  it("ACCT-8: counts every kind, pluralised", async () => {
+    const { deletionContents } = await import("@/lib/account");
+    expect(deletionContents({ jobs: 12, documents: 3, contacts: 8 })).toBe("12 jobs, 3 documents, and 8 contacts");
+    expect(deletionContents({ jobs: 1, documents: 1, contacts: 1 })).toBe("1 job, 1 document, and 1 contact");
+    expect(deletionContents({ jobs: 0, documents: 0, contacts: 0 })).toBe("0 jobs, 0 documents, and 0 contacts");
+  });
+});

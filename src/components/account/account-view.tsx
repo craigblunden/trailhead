@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useId } from "react";
 
 import { accountClient } from "@/components/account/account-client";
+import { DeleteAccount } from "@/components/account/delete-account";
 import { PlanComparison } from "@/components/account/plan-comparison";
 import { AppHeader } from "@/components/app-header";
 import { BrandLogo } from "@/components/brand-logo";
@@ -33,7 +34,7 @@ export function AccountView() {
 
       <PageMain>
         <h1 className="text-3xl tracking-tight">Account</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Who you’re signed in as, and your plan.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Who you’re signed in as, your plan, and deleting your account.</p>
 
         {summary.isError ? (
           <div role="alert" className="mt-6 max-w-3xl rounded-md border border-dashed border-border p-4 text-sm">
@@ -91,6 +92,7 @@ export function AccountView() {
                 End your account and erase everything in it — every job, contact, document, and draft — at once
                 and for good.
               </p>
+              <DeleteAccount summary={account} />
             </Section>
           </div>
         )}

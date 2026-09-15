@@ -60,3 +60,8 @@ export function lettersLeftLine(quota: QuotaStatus): string {
   if (quota.limit === "unlimited") return `${pluralize(quota.used, "cover letter")} written this week`;
   return `${quota.remaining} of ${quota.limit} cover letters left this week`;
 }
+
+/** What Account deletion erases, counted: "12 jobs, 3 documents, and 8 contacts". */
+export function deletionContents({ jobs, documents, contacts }: Pick<AccountSummary, "jobs" | "documents" | "contacts">) {
+  return `${pluralize(jobs, "job")}, ${pluralize(documents, "document")}, and ${pluralize(contacts, "contact")}`;
+}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AccountDeletedNotice } from "@/components/landing/account-deleted-notice";
 import { SiteHeader } from "@/components/landing/header";
 import { TrailScene } from "@/components/trail-scene";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ export default function LandingPage() {
   return (
     <div className="scene-wash flex flex-1 flex-col">
       <SiteHeader />
+      <AccountDeletedNotice />
 
       <main className="flex flex-1 flex-col">
         <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center px-6 py-20 text-center sm:py-14 ">
