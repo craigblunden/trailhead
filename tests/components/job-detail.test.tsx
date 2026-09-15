@@ -21,8 +21,11 @@ vi.mock("next/navigation", () => ({
 
 const HARVEST = "harvest-lead-product-designer";
 const harvest = SEED_JOBS.find((job) => job.id === HARVEST)!;
+const QUILL = "quill-product-designer";
+const quill = SEED_JOBS.find((job) => job.id === QUILL)!;
 
 const detailsPanel = () => screen.getByRole("region", { name: "Details" });
+const editDescription = () => screen.getByRole("button", { name: "Edit" });
 
 /** A request still on its way, settled when the test says (mirrors job-cache.test.ts). */
 function deferred<T>() {
@@ -245,8 +248,9 @@ describe("editing the applied date", () => {
 describe("editing free text", () => {
   const saveButton = () => screen.getByRole("button", { name: "Save description" });
 
-  it("DET-6: saves the description when asked, not while typing", async () => {
+  it("DET-6: saves the description when asked, not while typing, then closes back to its excerpt", async () => {
     const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
+    await user.click(editDescription());
     const field = screen.getByRole("textbox", { name: "Job description" });
     expect(saveButton()).toBeDisabled();
 
@@ -264,14 +268,16 @@ describe("editing free text", () => {
     expect(trail.jobs.update).toHaveBeenCalledWith(HARVEST, {
       description: "Rewritten description.",
     });
-    expect(field).toHaveValue("Rewritten description.");
-    expect(saveButton()).toBeDisabled();
+    expect(screen.queryByRole("textbox", { name: "Job description" })).not.toBeInTheDocument();
+    expect(screen.getByText("Rewritten description.")).toBeInTheDocument();
+    expect(editDescription()).toBeInTheDocument();
   });
 
   it("DET-6: typing the description back to what is saved leaves nothing to save", async () => {
     const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, {
       initialJobs: [{ ...harvest, description: "Short" }],
     });
+    await user.click(editDescription());
     const field = screen.getByRole("textbox", { name: "Job description" });
 
     await user.type(field, "!");
@@ -282,7 +288,7 @@ describe("editing free text", () => {
     expect(saveButton()).toBeDisabled();
   });
 
-  it("DET-6: a refused description save says why and keeps the text to fix", async () => {
+  it("DET-6: a refused description save says why, keeps the text to fix, and stays open", async () => {
     const trail = createTrail({ jobs: SEED_JOBS });
     const update = vi.fn<(id: string, patch: JobPatch) => Promise<Job>>().mockRejectedValue(
       new ActionError("invalid", "Check the highlighted fields.", {
@@ -293,6 +299,7 @@ describe("editing free text", () => {
       trail,
       client: { ...trail.jobs, update },
     });
+    await user.click(editDescription());
     const field = screen.getByRole("textbox", { name: "Job description" });
 
     await user.clear(field);
@@ -335,6 +342,7 @@ describe("editing free text", () => {
 
   it("DET-6: each field saves on its own, without touching the other", async () => {
     const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
+    await user.click(editDescription());
 
     await user.type(screen.getByRole("textbox", { name: "Job description" }), " More.");
     await user.type(screen.getByRole("textbox", { name: "Notes" }), " Later.");
@@ -346,8 +354,40 @@ describe("editing free text", () => {
   });
 });
 
+describe("the description excerpt", () => {
+  it("DET-19: a saved description opens as an excerpt, and Edit reveals the full field", async () => {
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />);
+
+    expect(screen.queryByRole("textbox", { name: "Job description" })).not.toBeInTheDocument();
+    expect(screen.getByText(harvest.description)).toBeInTheDocument();
+
+    await user.click(editDescription());
+
+    expect(screen.getByRole("textbox", { name: "Job description" })).toHaveValue(
+      harvest.description,
+    );
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+  });
+
+  it("DET-19: an empty description has nothing to excerpt, so it opens straight to the editable field", () => {
+    renderWithJobs(<JobDetail jobId={HARVEST} />, {
+      initialJobs: [{ ...harvest, description: "" }],
+    });
+
+    expect(screen.getByRole("textbox", { name: "Job description" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+  });
+
+  it("DET-19: applies the same way to a rejected job — no longer folded away completely", () => {
+    renderWithJobs(<JobDetail jobId={QUILL} />);
+
+    expect(screen.getByRole("heading", { name: "Job description" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Job description" })).not.toBeInTheDocument();
+    expect(screen.getByText(quill.description)).toBeInTheDocument();
+  });
+});
+
 describe("a rejected job", () => {
-  const QUILL = "quill-product-designer";
   const rejectionLetterField = () => screen.getByRole("textbox", { name: "Rejection letter" });
   const saveRejectionLetter = () => screen.getByRole("button", { name: "Save rejection letter" });
 
@@ -369,57 +409,13 @@ describe("a rejected job", () => {
     expect(saveRejectionLetter()).toBeDisabled();
   });
 
-  it("DET-17: a job in an Active stage has no Rejection letter to add, and its description open", () => {
+  it("DET-17: a job in an Active stage has no Rejection letter to add", () => {
     renderWithJobs(<JobDetail jobId={HARVEST} />);
 
     expect(screen.queryByRole("textbox", { name: "Rejection letter" })).not.toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Job description" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Show description" })).not.toBeInTheDocument();
-  });
-
-  it("DET-18: the description is folded away on a rejected job, and opens to edit", async () => {
-    const { user, trail } = renderWithJobs(<JobDetail jobId={QUILL} />);
-    const toggle = screen.getByRole("button", { name: "Show description" });
-
-    expect(screen.getByRole("heading", { name: "Job description" })).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "Job description" })).not.toBeInTheDocument();
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-
-    await user.click(toggle);
-
-    expect(screen.getByRole("button", { name: "Hide description" })).toHaveAttribute("aria-expanded", "true");
-    await user.type(screen.getByRole("textbox", { name: "Job description" }), " Updated.");
-    await user.click(screen.getByRole("button", { name: "Save description" }));
-    expect(trail.jobs.update).toHaveBeenCalledWith(QUILL, {
-      description: `${SEED_JOBS.find((job) => job.id === QUILL)!.description} Updated.`,
-    });
-  });
-
-  it("DET-18: moving a job to Rejected folds its description away", async () => {
-    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />);
-
-    await selectStage(user, "Rejected");
-
-    expect(screen.queryByRole("textbox", { name: "Job description" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Show description" })).toBeInTheDocument();
-  });
-
-  it("DET-18: an unsaved description edit folded away still says so, and is there when shown again", async () => {
-    const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
-
-    await user.type(screen.getByRole("textbox", { name: "Job description" }), " Unsaved.");
-    await selectStage(user, "Rejected");
-
-    const description = screen.getByRole("region", { name: "Job description" });
-    expect(within(description).getByText("Unsaved changes")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Show description" }));
-    expect(screen.getByRole("textbox", { name: "Job description" })).toHaveValue(`${harvest.description} Unsaved.`);
-    expect(trail.jobs.update).not.toHaveBeenCalled();
   });
 
   it("DET-17: a Rejection letter is kept, out of sight, while the job is off rejected, and back when it returns", async () => {
-    const quill = SEED_JOBS.find((job) => job.id === QUILL)!;
     const { user } = renderWithJobs(<JobDetail jobId={QUILL} />, {
       initialJobs: [{ ...quill, rejectionLetter: "Thank you for your time." }],
     });

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowUpRight, ChevronDown } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 
 import { AppHeader } from "@/components/app-header";
 import { BrandLogo } from "@/components/brand-logo";
@@ -23,6 +23,7 @@ import { LoadErrorHint } from "@/components/load-error";
 import { JobLoading } from "@/components/page-loading";
 import { PageMain } from "@/components/page-main";
 import { Button } from "@/components/ui/button";
+import { Excerpt } from "@/components/ui/excerpt";
 import {
   Select,
   SelectContent,
@@ -139,8 +140,9 @@ function useSavedText(
     set: setDraft,
     save: async () => {
       const sent = value;
-      if (await save(sent))
-        setDraft((current) => (current === sent ? null : current));
+      const ok = await save(sent);
+      if (ok) setDraft((current) => (current === sent ? null : current));
+      return ok;
     },
   };
 }
@@ -151,7 +153,7 @@ function SaveRow({
   children,
 }: {
   changed: boolean;
-  onSave: () => Promise<void>;
+  onSave: () => Promise<unknown>;
   children: string;
 }) {
   return (
@@ -188,17 +190,16 @@ function JobDetailView({
     onPatch({ rejectionLetter: value }),
   );
   const posting = webLink(job.postingUrl);
-
-  // A rejected Job leads with its Rejection letter, so its description starts folded away, and
-  // folds again whenever the Stage changes.
   const rejected = job.stage === "rejected";
-  const [descriptionShown, setDescriptionShown] = useState(false);
-  const [shownAtStage, setShownAtStage] = useState(job.stage);
-  if (shownAtStage !== job.stage) {
-    setShownAtStage(job.stage);
-    setDescriptionShown(false);
+
+  // A saved description opens as an excerpt to save room for the Draft below; there is nothing to
+  // excerpt until it holds something, and only Save — never this state on its own — closes it again.
+  const [editingDescription, setEditingDescription] = useState(false);
+  const hasDescription = job.description.trim().length > 0;
+  const descriptionExpanded = editingDescription || !hasDescription;
+  async function saveDescription() {
+    if (await description.save()) setEditingDescription(false);
   }
-  const descriptionFolded = rejected && !descriptionShown;
 
   return (
     <div className="flex flex-1 flex-col bg-background">
@@ -291,38 +292,17 @@ function JobDetailView({
                 aria-labelledby="description-heading"
                 className="rounded-lg bg-card p-5 ring-1 ring-foreground/10"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <h2 id="description-heading" className="text-lg">
-                    Job description
-                  </h2>
-                  {rejected && (
-                    <div className="flex items-center gap-3">
-                      {/* The Save row goes with the fold, so an edit left unsaved still says so. */}
-                      {descriptionFolded && description.changed && (
-                        <span className="text-sm text-muted-foreground">
-                          Unsaved changes
-                        </span>
-                      )}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        aria-expanded={!descriptionFolded}
-                        aria-controls={descriptionFolded ? undefined : "description-body"}
-                        onClick={() => setDescriptionShown((shown) => !shown)}
-                      >
-                        {descriptionFolded ? "Show description" : "Hide description"}
-                        <ChevronDown
-                          aria-hidden="true"
-                          className={descriptionFolded ? undefined : "rotate-180"}
-                        />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-                {/* Unmounted rather than hidden while folded: the unsaved text lives in `description`,
-                    so it is still there when the description is shown again. */}
-                {!descriptionFolded && (
+                <h2 id="description-heading" className="text-lg">
+                  Job description
+                </h2>
+                <Excerpt
+                  expanded={descriptionExpanded}
+                  onToggle={() => setEditingDescription(true)}
+                  collapsedLabel="Edit"
+                  controlsId="description-body"
+                  preview={job.description}
+                  previewClassName="mt-3 text-muted-foreground"
+                >
                   <div id="description-body">
                     <p
                       id="description-hint"
@@ -338,14 +318,11 @@ function JobDetailView({
                       onChange={(event) => description.set(event.target.value)}
                       className="mt-3 min-h-56 resize-y"
                     />
-                    <SaveRow
-                      changed={description.changed}
-                      onSave={description.save}
-                    >
+                    <SaveRow changed={description.changed} onSave={saveDescription}>
                       Save description
                     </SaveRow>
                   </div>
-                )}
+                </Excerpt>
               </section>
 
               {rejected && (

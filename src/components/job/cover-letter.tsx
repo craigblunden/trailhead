@@ -7,6 +7,7 @@ import { Copy, RotateCcw, Sparkles } from "lucide-react";
 import { jobCache } from "@/components/job-cache";
 import { coverLetterClient } from "@/components/job/cover-letter-client";
 import { Button } from "@/components/ui/button";
+import { Excerpt } from "@/components/ui/excerpt";
 import {
   Dialog,
   DialogContent,
@@ -55,6 +56,7 @@ type State =
 export function CoverLetterCard({ job }: { job: Job }) {
   const headingId = useId();
   const feedbackId = useId();
+  const letterId = useId();
   const queryClient = useQueryClient();
   const cache = useMemo(() => jobCache(queryClient), [queryClient]);
   const status = useQuery({ queryKey: STATUS_KEY, queryFn: coverLetterClient.status, staleTime: 60_000 });
@@ -62,6 +64,9 @@ export function CoverLetterCard({ job }: { job: Job }) {
   const [feedback, setFeedback] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [copied, setCopied] = useState(false);
+  // A Draft already on the Job when the page loaded opens as an excerpt; one just written or
+  // rewritten in this sitting is shown in full, since the user is here to read it.
+  const [letterShown, setLetterShown] = useState(false);
 
   const quota = status.data;
   // The Plan's letters per week, when there is a number to show; an unlimited Limit has none.
@@ -94,6 +99,9 @@ export function CoverLetterCard({ job }: { job: Job }) {
       );
       setFeedback("");
       setState({ phase: "written", letter: result.letter, verdict: result.verdict, setAside: result.setAside });
+      // A letter just written is shown in full — the user is here to read it — but "Show less"
+      // still works afterward, so this only opens it, never fights a later collapse.
+      setLetterShown(true);
     } else if (result.error === "held" && result.quota?.held) {
       // The status now says letters are paused, and until when; the card needs no second line for it.
       setState({ phase: "idle" });
@@ -138,9 +146,9 @@ export function CoverLetterCard({ job }: { job: Job }) {
         )}
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        Written from this job’s description and the resume in its application kit. The letter comes back
-        as plain text, with no formatting and nothing hidden in it, ready to paste into your own
-        cover-letter template. Each letter is written by a paid AI model
+        Written from this job’s description and the resume in its application kit. The cover letter
+        comes back as plain text, with no formatting and nothing hidden in it, ready to paste into your
+        own cover-letter template. Each cover letter is written by a paid AI model
         {perWeek !== null && `, so there are ${perWeek} a week`}.
       </p>
       {/* On the page from the start: a live region that arrives already holding its text is often
@@ -150,10 +158,10 @@ export function CoverLetterCard({ job }: { job: Job }) {
       </p>
 
       {status.isPending ? (
-        <p className="mt-4 text-sm text-muted-foreground">Checking your letters…</p>
+        <p className="mt-4 text-sm text-muted-foreground">Checking your cover letters…</p>
       ) : status.isError ? (
         <p role="alert" className="mt-4 text-sm">
-          We couldn’t check how many letters you have left.{" "}
+          We couldn’t check how many cover letters you have left.{" "}
           <Button variant="link" className="h-auto p-0" onClick={() => status.refetch()}>
             Try again
           </Button>
@@ -164,16 +172,16 @@ export function CoverLetterCard({ job }: { job: Job }) {
         <>
           {!job.resume ? (
             <p className="mt-4 text-sm">
-              Attach a resume in this job’s application kit to write a letter from it.
+              Attach a resume in this job’s application kit to write a cover letter from it.
             </p>
           ) : !hasDescription ? (
             <p className="mt-4 text-sm">
-              Paste the job posting into this job’s description to write a letter from it.
+              Paste the job posting into this job’s description to write a cover letter from it.
             </p>
           ) : job.description.trim().length < SHORT_DESCRIPTION_CHARS ? (
             <p className="mt-4 text-sm">
-              Short descriptions make generic letters. Paste the whole posting into the job description
-              for a better one.
+              Short descriptions make generic cover letters. Paste the whole posting into the job
+              description for a better one.
             </p>
           ) : null}
 
@@ -186,7 +194,7 @@ export function CoverLetterCard({ job }: { job: Job }) {
             perWeek !== null &&
             !writing && (
               <p className="mt-4 text-sm">
-                You’ve used all {perWeek} letters this week. Each one is written fresh by a paid AI
+                You’ve used all {perWeek} cover letters this week. Each one is written fresh by a paid AI
                 model; your next {perWeek} arrive {resetDay}.
               </p>
             )
@@ -206,7 +214,9 @@ export function CoverLetterCard({ job }: { job: Job }) {
           {state.phase === "failed" && (
             <div role="alert" className="mt-4 rounded-md border border-destructive/40 bg-card px-4 py-3 text-sm">
               <p>{state.message}</p>
-              {state.refunded && <p className="mt-1 text-muted-foreground">This didn’t use one of your letters.</p>}
+              {state.refunded && (
+                <p className="mt-1 text-muted-foreground">This didn’t use one of your cover letters.</p>
+              )}
               {/* Hidden characters are the user's to remove; resending the same text would be a second Flag. */}
               {canWrite && state.error !== "hidden-feedback" && (letter ? change.length > 0 : true) && (
                 <Button variant="outline" size="sm" className="mt-3" onClick={() => write(change)}>
@@ -219,17 +229,28 @@ export function CoverLetterCard({ job }: { job: Job }) {
 
           {letter && (
             <div className="mt-4">
-              <div
-                role="region"
-                aria-label="Your cover letter"
-                className="rounded-md bg-card p-5 text-sm leading-relaxed whitespace-pre-wrap ring-1 ring-foreground/10"
+              <Excerpt
+                expanded={letterShown}
+                onToggle={() => setLetterShown((shown) => !shown)}
+                collapsedLabel="Show full cover letter"
+                expandedLabel="Show less"
+                controlsId={letterId}
+                preview={letter}
+                previewClassName="rounded-md bg-card p-5 ring-1 ring-foreground/10"
               >
-                {letter}
-              </div>
+                <div
+                  id={letterId}
+                  role="region"
+                  aria-label="Your cover letter"
+                  className="rounded-md bg-card p-5 text-sm leading-relaxed whitespace-pre-wrap ring-1 ring-foreground/10"
+                >
+                  {letter}
+                </div>
+              </Excerpt>
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <Button variant="outline" className="h-9 px-3.5" onClick={() => copy(letter)}>
                   <Copy aria-hidden="true" />
-                  Copy letter
+                  Copy cover letter
                 </Button>
                 <p role="status" className="text-sm text-muted-foreground">
                   {copied ? "Copied to your clipboard." : ""}
@@ -239,20 +260,20 @@ export function CoverLetterCard({ job }: { job: Job }) {
 
               {state.phase === "written" && state.verdict === "material" && (
                 <p role="status" className="mt-3 text-sm">
-                  This posting contains instructions aimed at AI tools. The letter ignored them; you may
-                  want to read the posting for them.
+                  This posting contains instructions aimed at AI tools. The cover letter ignored them;
+                  you may want to read the posting for them.
                 </p>
               )}
               {state.phase === "written" && state.setAside && (
                 <p role="status" className="mt-3 text-sm">
-                  The letter keeps to what the resume shows; feedback asking for more than that was set
-                  aside.
+                  The cover letter keeps to what the resume shows; feedback asking for more than that was
+                  set aside.
                 </p>
               )}
               {firstFlag && (
                 <p role="alert" className="mt-3 rounded-md border border-destructive/40 bg-card px-4 py-3 text-sm">
                   Your feedback contained directions to the writer, which it ignores. A second this week
-                  pauses letters until {resetDay}.
+                  pauses cover letters until {resetDay}.
                 </p>
               )}
 
@@ -264,11 +285,11 @@ export function CoverLetterCard({ job }: { job: Job }) {
                   <p>The more specific you are, the better the rewrite. Things worth a look:</p>
                   <ul className="mt-1 list-disc space-y-0.5 pl-4">
                     <li>Tone: warmer, more direct, or more formal.</li>
-                    <li>Anything on your resume the posting asks for that the letter missed.</li>
+                    <li>Anything on your resume the posting asks for that the cover letter missed.</li>
                     <li>Experience from an earlier role that carries over to this one.</li>
                     <li>Sentences or paragraphs a hiring manager could do without.</li>
                   </ul>
-                  <p className="mt-1">A rewrite uses one of your letters.</p>
+                  <p className="mt-1">A rewrite uses one of your cover letters.</p>
                 </div>
                 <Textarea
                   id={feedbackId}
@@ -312,15 +333,17 @@ export function CoverLetterCard({ job }: { job: Job }) {
       <Dialog open={confirming} onOpenChange={(next) => !next && setConfirming(false)}>
         <DialogContent className="gap-0 p-6 sm:max-w-md">
           <DialogHeader className="mb-4">
-            <DialogTitle className="text-xl">Write a fresh letter?</DialogTitle>
-            <DialogDescription>It replaces the current draft and uses one of your letters.</DialogDescription>
+            <DialogTitle className="text-xl">Write a fresh cover letter?</DialogTitle>
+            <DialogDescription>
+              It replaces the current draft and uses one of your cover letters.
+            </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mx-0 mb-0 gap-2 border-t-0 bg-transparent p-0 pt-2">
             <Button variant="outline" className="h-10 px-4" onClick={() => setConfirming(false)}>
               Keep the draft
             </Button>
             <Button className="h-10 px-4" onClick={() => write("")}>
-              Write a fresh letter
+              Write a fresh cover letter
             </Button>
           </DialogFooter>
         </DialogContent>
