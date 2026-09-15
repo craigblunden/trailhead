@@ -233,10 +233,20 @@ function GhostJobCard() {
  * header's strip and the cards in outline. The scene itself arrives with the page.
  * ---------------------------------------------------------------------------------------------- */
 
-/** Also the job page's own wait, for the rare load where the browser holds no jobs at all. */
-export function JobLoading({ id }: { id: string }) {
+/**
+ * Also the job page's own wait, for the rare load where the browser holds no jobs at all.
+ *
+ * `job` lets a caller that already has the Job — `JobDetail`, following a redirect to a Job's
+ * saved id — hand it over directly, rather than this component reading the cache a second time
+ * under a different id. Two independent reads of the same cache, gated by different conditions,
+ * can disagree about what "now" holds; a second, later render then finds them inconsistent with
+ * each other, which shows up as a hydration mismatch. Omitted, this falls back to its own lookup
+ * by `id` — the route's `loading.tsx`, shown before `JobDetail` itself has mounted, has nothing
+ * else to hand it.
+ */
+export function JobLoading({ id, job: known }: { id: string; job?: Job }) {
   const queryClient = useQueryClient();
-  const job = queryClient.getQueryData<Job[]>(jobsCache.key)?.find((candidate) => candidate.id === id);
+  const job = known ?? queryClient.getQueryData<Job[]>(jobsCache.key)?.find((candidate) => candidate.id === id);
 
   return (
     <div className="flex flex-1 flex-col bg-background">

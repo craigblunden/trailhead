@@ -52,6 +52,9 @@ export function JobDetail({
   // Set only for a job opened at the optimistic id it was added under: the id a `useEffect` below
   // follows to where the add actually saved, the moment the server answers.
   const redirectTo = !job ? redirectFor(jobId) : undefined;
+  // Read from the same `jobs` the branch below already agreed on — not a second, later lookup —
+  // so the redirect's preview can never disagree with the decision to show it.
+  const redirectJob = redirectTo ? getJob(redirectTo) : undefined;
 
   useEffect(() => {
     if (redirectTo) router.replace(`/board/${redirectTo}`);
@@ -59,7 +62,7 @@ export function JobDetail({
 
   // The same outline the navigation showed; here it stays until the client's own fetch answers, or
   // — for a job clicked open before its add settled — until the redirect above lands.
-  if (!job && (status === "pending" || redirectTo)) return <JobLoading id={jobId} />;
+  if (!job && (status === "pending" || redirectTo)) return <JobLoading id={jobId} job={redirectJob} />;
   // The list failed to load, not this one job: say so, with a way to retry, same as the board.
   if (!job && status === "error") return <JobDetailError onRetry={reload} />;
   // An unknown id and another user's id are the same thing here, on purpose.

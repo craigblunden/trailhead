@@ -1,19 +1,35 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ActionError } from "@/components/action-client";
+import { jobCache } from "@/components/job-cache";
 import { JobDetail } from "@/components/job/job-detail";
 import { SummitScenes } from "@/components/job/summit-scenes";
 import { LOCATION_FALLBACK } from "@/lib/job-fields";
 import { STAGES, type Job, type Stage } from "@/lib/jobs";
-import type { JobPatch } from "@/lib/jobs-client";
+import type { JobPatch, JobsClient } from "@/lib/jobs-client";
 import { createTrail } from "../fakes/trail";
 import { SEED_JOBS } from "../fixtures/jobs";
-import { freezeClock, renderWithJobs, screen, within } from "../test-utils";
+import { freezeClock, renderWithJobs, screen, waitFor, within } from "../test-utils";
+
+const navigation = vi.hoisted(() => ({ replace: vi.fn(), pathname: "/board/harvest-lead-product-designer" }));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: navigation.replace, prefetch: vi.fn() }),
+  usePathname: () => navigation.pathname,
+  useSelectedLayoutSegment: () => null,
+}));
 
 const HARVEST = "harvest-lead-product-designer";
 const harvest = SEED_JOBS.find((job) => job.id === HARVEST)!;
 
 const detailsPanel = () => screen.getByRole("region", { name: "Details" });
+
+/** A request still on its way, settled when the test says (mirrors job-cache.test.ts). */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => (resolve = res));
+  return { promise, resolve };
+}
 
 /** Activity entries, newest first, as "<label> <date>". */
 function activityEntries() {
@@ -36,6 +52,7 @@ async function selectStage(
 
 beforeEach(() => {
   freezeClock();
+  navigation.replace.mockReset();
 });
 
 afterEach(() => {
@@ -82,6 +99,54 @@ describe("rendering a job", () => {
     expect(screen.getByRole("link", { name: "Back to your trail" })).toHaveAttribute(
       "href",
       "/board",
+    );
+  });
+
+  it("DET-14: a failed list load says so, with a way to retry — not 'this job isn't on your trail'", async () => {
+    let attempts = 0;
+    const client: JobsClient = {
+      ...createTrail({ jobs: SEED_JOBS }).jobs,
+      list: async () => {
+        attempts += 1;
+        if (attempts === 1) throw new Error("database unreachable");
+        return SEED_JOBS;
+      },
+    };
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, {
+      client,
+      seedCache: false,
+    });
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/couldn.t load this job/i);
+    expect(
+      screen.queryByRole("heading", { name: /This job isn’t on your trail/ }),
+    ).toBeNull();
+
+    await user.click(within(alert).getByRole("button", { name: /try again/i }));
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(harvest.role);
+  });
+
+  it("DET-15: a job opened at the optimistic id it was added under follows the redirect once the server assigns its own", async () => {
+    const { queryClient } = renderWithJobs(<JobDetail jobId="optimistic-new" />, {
+      initialJobs: [],
+    });
+    const cache = jobCache(queryClient);
+    const send = deferred<Job>();
+
+    cache.add(() => ({ ...harvest, id: "optimistic-new" }), {
+      send: () => send.promise,
+      fallback: "That job wasn't saved.",
+    });
+    // Shown at once from the optimistic entry — no redirect yet, nothing to wait on.
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(harvest.role),
+    );
+    expect(navigation.replace).not.toHaveBeenCalled();
+
+    send.resolve({ ...harvest, id: "server-assigned-id" });
+    await waitFor(() =>
+      expect(navigation.replace).toHaveBeenCalledWith("/board/server-assigned-id"),
     );
   });
 });

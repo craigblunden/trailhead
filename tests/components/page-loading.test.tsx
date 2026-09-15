@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
 
-import { ContactLoading, PageLoading } from "@/components/page-loading";
+import { ContactLoading, JobLoading, PageLoading } from "@/components/page-loading";
 import { LoadingTrail } from "@/components/loading-trail";
 import { SessionProvider } from "@/components/session-provider";
 import { contactsCache } from "@/lib/contacts-client";
@@ -114,6 +114,21 @@ describe("a Job's page", () => {
     queryClient.setQueryData(jobsCache.key, SEED_JOBS);
     const { container } = renderLoading(<PageLoading />, queryClient);
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
+  });
+
+  it("shows a Job handed to it directly, without reading the cache under its own id — the id passed in may not be its own", () => {
+    // JobDetail hands this Job over by id "redirected-to", the id it was actually saved under —
+    // not the id (here, none at all) this component would otherwise have looked itself up under.
+    // A second, independent cache read here — gated by different conditions than the one that
+    // decided to render this component — is exactly what produced the hydration mismatch this
+    // guards against: the two reads can disagree with each other about what the cache holds "now".
+    const job = SEED_JOBS[1];
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(jobsCache.key, []);
+    renderLoading(<JobLoading id="some-other-id" job={job} />, queryClient);
+
+    expect(screen.getByText(job.role)).toBeInTheDocument();
+    expect(screen.getByText(`${job.company} · ${job.location}`)).toBeInTheDocument();
   });
 });
 
