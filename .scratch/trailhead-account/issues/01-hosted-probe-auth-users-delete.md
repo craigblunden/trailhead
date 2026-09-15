@@ -31,3 +31,5 @@ Expected: `can_delete = true`; every row's table is in `auth`, and `confdeltype 
   operator-run script) come back to the table.
 
 ## Comments
+
+**2026-09-15 (implementation):** Not run. The agent could not query hosted, and the user chose to build 02–07 against the local stack first. The probe and where to record its result are now in `docs/provisioning.md` ("Before Account deletion goes live"). ADR-0004 stays `proposed` until this passes.

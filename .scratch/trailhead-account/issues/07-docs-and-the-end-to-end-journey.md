@@ -1,6 +1,6 @@
 # 07: The end-to-end journey, and the docs
 
-**Status:** ready
+**Status:** ready-for-review
 **Blocked by:** 03, 06
 
 ## What to build
@@ -28,3 +28,5 @@ The global teardown must not choke on a user that no longer exists.
 - ADR-0004 `status: accepted`, once issue 01 and this journey pass.
 
 ## Comments
+
+**2026-09-15 (implementation):** `e2e/account.spec.ts` passes on the local stack. The global teardown now erases each test account through `erase_my_account()` too, so it also removes quota weeks, and a user a spec already deleted is simply not found. ADR-0004 is left `proposed`: issue 01 has not run.

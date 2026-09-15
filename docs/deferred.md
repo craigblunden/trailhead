@@ -55,11 +55,11 @@ query rather than an inference call. The glossary terms (`Requirement`, `Evidenc
 | --- | --- | --- |
 | **Streaming the generated letter** as it is written | The letter is 250–400 words and arrives in 10–25 s behind an honest waiting state | The generation Route Handler returns a stream instead of JSON; its callers do not change shape, which is why this was cheap to postpone |
 | **Dark mode** | Open since Phase 1 | Colour tokens are centralised in `src/app/globals.css`; contrast (A11Y-3) must be re-proven for a second palette |
-| **Removing orphaned objects for users who never return** | Removing a Storage object takes the owner's session; no `service_role` key exists by design (tickets 15, 16) | A server-side job with a narrowly scoped credential, e.g. `pg_net` from `pg_cron` with a key in Vault — a reversal of "no `service_role` anywhere", so a decision first |
+| **Removing orphaned objects for users who never return** — and two cases after Account deletion: a file uploaded through a signed upload URL minted before deletion (tokens live 2 h), and an upload from a second tab whose access token outlived the Account | Removing a Storage object takes the owner's session; no `service_role` key exists by design (tickets 15, 16; ADR-0004). The janitor keeps such a file's Document row as the only record of it | A server-side job with a narrowly scoped credential, e.g. `pg_net` from `pg_cron` with a key in Vault — a reversal of "no `service_role` anywhere", so a decision first |
 | Teams, sharing, multi-user tenants | Tenancy means isolation, never collaboration | Out of scope by definition |
 | Agency as a record; document versioning | Decided against for this phase (`CONTEXT.md`, tickets 14, 18) | Each is a glossary change before it is a schema change |
 | ~~Storing generated letters~~ | Reversed by ADR-0002: a Job keeps its last **Draft** so a Rewrite has a trusted starting point | — |
-| Account deletion and data export | Not in this phase | Needs the storage removal above solved for the deleting user |
+| Data export | Not in this phase; Documents already download one at a time. Account deletion shipped without it (`.scratch/trailhead-account`) | One read of every tenant table and a signed link per file, as the user, bundled for download |
 | Charts | Nothing needs one | Recharts via shadcn/ui is the standing choice |
 
 ## Verified only locally — for the first hosted deployment

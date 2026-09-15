@@ -1,6 +1,6 @@
 # 02: The erase function
 
-**Status:** ready
+**Status:** ready-for-review
 **Blocked by:** 01
 
 ## What to build
@@ -44,3 +44,9 @@ It does not touch `storage.objects`: Storage rows are never deleted with SQL (`d
    is the only path.
 
 ## Comments
+
+**2026-09-15 (implementation):** `supabase/migrations/20260915010000_erase_my_account.sql` and `prisma/migrations/20260915000000_account_deletion_grants`; tests ERASE-1..7 in `tests/integration/account-deletion.test.ts`. Built on the local stack only, ahead of 01.
+
+Found while building: Supabase's default privileges grant EXECUTE on every function `postgres` creates in `public` to `anon`, `authenticated`, and `service_role`, and `public` is exposed through the Data API. The Plans migration revoked only from `public`, so the publishable key could call `auth_email_of` / `auth_user_id_by_email` through `/rpc` (confirmed locally). Closed in `20260915000000_close_email_lookups.sql`; every new definer function revokes all four roles, and ERASE-6 fails if any definer function in `public` is executable by the Data API roles.
+
+`db:reset` order was not re-run end to end (it wipes local data); `supabase migration up` + `prisma migrate deploy` applied cleanly, and plpgsql resolves the tables at call time.

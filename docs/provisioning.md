@@ -54,6 +54,10 @@ server. Never enable it on the hosted project, and never `supabase config push` 
 | --- | --- | --- |
 | Extensions, the two roles, schema grants, the `documents` bucket, storage policies, the janitor's cron schedule | Supabase CLI migration, run as `postgres` | `supabase/migrations/20260911000000_provision_trailhead.sql` |
 | The migrator's read of `auth.users`, for `npm run db:plan` to find a user by email | Supabase CLI migration, run as `postgres` | `supabase/migrations/20260912000000_plans.sql` |
+| Revoking those two lookups from the Data API roles, which Supabase grants every new function to | Supabase CLI migration, run as `postgres` | `supabase/migrations/20260915000000_close_email_lookups.sql` |
+| `erase_my_account()`, the definer function Account deletion goes through (ADR-0004) | Supabase CLI migration, run as `postgres` | `supabase/migrations/20260915010000_erase_my_account.sql` |
+| `sweep_accountless()` and its hourly cron schedule | Supabase CLI migration, run as `postgres` | `supabase/migrations/20260915020000_sweep_accountless.sql` |
+| `postgres`'s SELECT and DELETE on the tenant tables, for those two functions | Prisma migration, beside the tables | `prisma/migrations/20260915000000_account_deletion_grants/` |
 | Local bucket declaration, auth settings (confirmations on, 8-character minimum), redirect allow-list, social providers | Supabase CLI config | `supabase/config.toml` |
 | Application tables, enums, indexes, RLS policies, the sweep function | Prisma migrations, run as `trailhead_migrator` | `prisma/migrations/` |
 | Development passwords for the two roles (never pushed) | Local seed | `supabase/seed.sql` |
@@ -107,6 +111,32 @@ Things only a dashboard login can do. Do them once, in this order.
    reach.
 9. **Confirm the bucket** under _Storage_: `documents`, private, 5 MB limit, MIME types
    `application/pdf` and the DOCX type. The migration creates it; this is a check.
+
+## Before Account deletion goes live: the hosted probe
+
+Account deletion rests on one fact about the platform (ADR-0004): `postgres` may delete from
+`auth.users`, and nothing outside `auth` references that table without cascading. It was verified on
+the local stack only (2026-09-15, Postgres 17.6); hosted Supabase has tightened the `auth` schema
+before. Run this once in the hosted SQL editor, which runs as `postgres`. It only reads:
+
+```sql
+select has_table_privilege('postgres', 'auth.users', 'DELETE') as can_delete;
+
+select conrelid::regclass::text as tbl, conname, confdeltype
+  from pg_constraint
+ where confrelid = 'auth.users'::regclass;
+```
+
+Expected: `can_delete = true`, and every row's table is in `auth` with `confdeltype = 'c'`. Record
+the result here and in `.scratch/trailhead-account/issues/01-hosted-probe-auth-users-delete.md`.
+If either fails, stop: ADR-0004 reopens.
+
+**Result:** not yet run.
+
+Then push what the effort added — `npx supabase db push` for the three `20260915…` Supabase
+migrations, and `npm run db:deploy` for `20260915000000_account_deletion_grants` — and delete a
+throwaway Account on the deployment as the smoke test. Both commands also apply any earlier migration
+not yet on hosted; `npx supabase migration list` shows which.
 
 ## Putting an account on a Plan
 

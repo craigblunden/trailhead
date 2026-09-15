@@ -1,6 +1,6 @@
 # 05: The account page
 
-**Status:** ready
+**Status:** ready-for-review
 **Blocked by:** 04 (for `accountSummary()`; the page can be built against a stub first)
 
 ## What to build
@@ -39,3 +39,5 @@ listed there, and to `e2e/routes.ts`.
 2. The axe and responsive e2e suites include `/account`.
 
 ## Comments
+
+**2026-09-15 (implementation):** UI copy keeps the app's existing lowercase for common nouns ("2 of 3 documents", "Free plan", "Paying for a plan is coming soon."), as the Documents page and user menu already do; the capitalised forms in the tickets are glossary style. Letters left uses the cover-letter card's own status action; on Hold the line says letters are paused until the reset day.

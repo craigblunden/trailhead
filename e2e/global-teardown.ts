@@ -37,9 +37,9 @@ function databaseUrls() {
  * Removes the accounts this run created, and their data, from the LOCAL stack (ticket 20).
  *
  * - Only accounts on `@example.com` created since the run started are touched.
- * - Application rows are deleted as `trailhead_app` under each account's own tenant id, so the same
- *   row-level security that guards the app decides what can be deleted — `postgres` has no rights on
- *   those tables, by design.
+ * - Each account is erased as `trailhead_app` under its own tenant id, through the same
+ *   `erase_my_account()` the account page uses, so nothing here can reach another account's rows. An
+ *   account a spec already deleted is not found, and so not touched.
  * - An account that still has files in Storage is left alone and reported: removing an object takes
  *   the owner's session, which the teardown does not have, and deleting its row would orphan the file.
  *   The specs that upload delete what they upload.
@@ -70,21 +70,17 @@ export default async function globalTeardown() {
         kept.push(id);
         continue;
       }
+      // The application's own Account deletion, minus its Storage step (ADR-0004): every row, then the
+      // Auth user, in one transaction under the account's own tenant id.
       await app.query("begin");
       try {
         await app.query("select set_config('app.tenant_id', $1, true)", [id]);
-        // Not GenerationQuota: the application may only reserve and refund letters, never delete the
-        // counter, and a test's cleanup is no reason to grant it more. Those rows hold a user id, a
-        // week, and a count — nothing else — and are left behind.
-        for (const table of ["JobContact", "ActivityEntry", "Job", "Contact", "Document"]) {
-          await app.query(`delete from "${table}" where "userId" = $1`, [id]);
-        }
+        await app.query("select public.erase_my_account()");
         await app.query("commit");
       } catch (error) {
         await app.query("rollback");
         throw error;
       }
-      await admin.query("delete from auth.users where id = $1", [id]);
     }
     console.log(
       `e2e teardown: removed ${users.length - kept.length} test account(s)` +

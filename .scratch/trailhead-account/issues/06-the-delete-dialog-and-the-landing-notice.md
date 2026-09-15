@@ -1,6 +1,6 @@
 # 06: The delete dialog and the landing notice
 
-**Status:** ready
+**Status:** ready-for-review
 **Blocked by:** 04, 05
 
 ## What to build
@@ -32,3 +32,5 @@ a reload does not repeat it.
 2. The landing page shows the notice for `?deleted=1` and not otherwise.
 
 ## Comments
+
+**2026-09-15 (implementation):** The landing page stays static: the notice reads `deleted=1` from the address after hydration and drops it with `history.replaceState`, rather than making `/` dynamic with `searchParams`. The dialog's wait is a `useTransition` around the action, which lasts until the redirect lands.

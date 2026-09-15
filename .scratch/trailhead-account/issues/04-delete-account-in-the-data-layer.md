@@ -1,6 +1,6 @@
 # 04: Delete account in the data layer
 
-**Status:** ready
+**Status:** ready-for-review
 **Blocked by:** 02
 
 ## What to build
@@ -45,3 +45,5 @@ messages in `action-result.ts`:
 5. STO-1 still passes.
 
 ## Comments
+
+**2026-09-15 (implementation):** Sign-in methods come from `app_metadata.providers` (every linked identity, verified on local accounts with email + a social identity), falling back to `app_metadata.provider`; `amr` is only how this session signed in. `Session` gained `providers`. The held-Documents predicate is shared as `heldBy()` in `documents.ts`. The erase failure is tested for real by revoking EXECUTE from `trailhead_app` for the duration (DEL-4, ACCT-7). `logError` now accepts extra fields, for `step`.

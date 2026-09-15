@@ -3,8 +3,8 @@
 Trailhead is one Next.js application deployed to Vercel, backed by one Supabase project (Postgres,
 Auth, Storage), with a single outbound AI call to the Anthropic API and one outbound mail call to
 Resend, which carries App feedback to the owner. There is no queue, no worker, and no second
-service: generation, document ingestion, and that mail run in-request, and `pg_cron` runs one
-janitor.
+service: generation, document ingestion, and that mail run in-request, and `pg_cron` runs a
+janitor with two jobs.
 
 The terms below are the glossary's (`CONTEXT.md`): a **Job**, a **Contact**, a **Document**, a
 **Tenant**.
@@ -29,7 +29,7 @@ flowchart LR
     pooler["Supavisor<br/>transaction mode"]
     pg[("Postgres<br/>row-level security on every table")]
     storage["Storage<br/>private documents bucket"]
-    cron["pg_cron<br/>document janitor"]
+    cron["pg_cron<br/>janitor: documents,<br/>rows with no Account"]
   end
 
   anthropic["Anthropic API<br/>claude-sonnet-5"]
@@ -52,7 +52,7 @@ flowchart LR
   dal -->|"as the user: sign, download, remove"| storage
   dal --> ingest
   auth --> smtp
-  cron -->|"as postgres: finish tombstones"| pg
+  cron -->|"as postgres: finish tombstones,<br/>sweep rows with no Account"| pg
   storage -. "objects are rows under RLS" .- pg
 ```
 
@@ -145,6 +145,39 @@ Storage rows are never deleted with SQL. A tombstone is kept until the signed up
 its row has expired, because that URL can put a file back even after the Document is deleted. Objects
 are removed only through the Storage API, as their owner — so `pg_cron` finishes rows but cannot
 remove files, and a user who never returns can leave a file behind (`docs/deferred.md`).
+
+The janitor's second job, `sweep_accountless()`, runs hourly on a schedule of its own. It deletes
+rows in every tenant table whose `userId` has no `auth.users` row: what a second tab writes with an
+access token that outlived its Account (below). A row last written within two hours — longer than
+an access token lives — is left for a later run, and a Document row is kept while its object still
+exists, since that row is the only record of a file no one can now remove.
+
+## Deleting an Account
+
+Account deletion (`CONTEXT.md`) ends the Account and erases its Tenant at once, from the Delete
+account section of `/account`. No transaction spans Storage and Postgres, so the order is the design
+(ADR-0004, `src/server/data/account.ts`):
+
+```mermaid
+flowchart LR
+  confirm["deleteAccountAction<br/>typed email matches"] --> files["1 · Storage API, as the user:<br/>list every object under &lt;userId&gt;/,<br/>add every Document row's key, remove"]
+  files -- fails --> stop1["stop: nothing erased<br/>'try again'"]
+  files --> erase["2 · withTenant → erase_my_account()<br/>security definer, owned by postgres:<br/>every tenant row, then auth.users"]
+  erase -- fails --> stop2["stop: board intact, files may be gone<br/>'try again to finish'"]
+  erase --> out["3 · sign out,<br/>redirect to /?deleted=1"]
+```
+
+- **The function takes no argument.** It erases the tenant in scope — the same transaction-local
+  setting every policy trusts — and raises outside `withTenant()`. It is the one thing `trailhead_app`
+  can call that reaches `auth.users`; Auth's identities and sessions cascade from it.
+- **A retry finishes.** Removing a missing object is a no-op, and the function returns 0 for an
+  Account already gone.
+- **A token outlives its Account.** `getClaims()` verifies an access token without asking Auth, so
+  another tab can write rows until the token expires. The janitor sweeps those rows (above). A file
+  uploaded after deletion through a still-valid signed upload URL cannot be removed by anyone
+  (`docs/deferred.md`).
+- **Logged once per outcome** as operation `account.delete` with the tenant id and, on failure, the
+  step — never the email.
 
 ## Writing a cover letter
 
@@ -268,7 +301,7 @@ transaction as the count it guards.
 - `CONTEXT.md` — the glossary.
 - `.scratch/trailhead-build/issues/` — each ticket, with a record of what was built and why. Later
   efforts sit beside it, one directory each: `trailhead-performance`, `trailhead-architecture`,
-  `trailhead-board-dnd`.
+  `trailhead-board-dnd`, `trailhead-account`.
 - `docs/provisioning.md` — the hosted setup, the two database roles, and what was verified on the
   local stack.
 - `docs/supersedes.md` and `docs/deferred.md` — what this replaced, and what it deliberately left out.
