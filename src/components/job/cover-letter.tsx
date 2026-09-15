@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useMemo, useState } from "react";
-import { Copy, RotateCcw, Sparkles } from "lucide-react";
+import { Copy, RotateCcw, Sparkles, TriangleAlert } from "lucide-react";
 
 import { jobCache } from "@/components/job-cache";
 import { coverLetterClient } from "@/components/job/cover-letter-client";
@@ -53,7 +53,7 @@ type State =
  * first Flag and what a second one means, and a Hold until Monday. On Hold both buttons are off and
  * the Draft stays copyable; nothing else about the page changes.
  */
-export function CoverLetterCard({ job }: { job: Job }) {
+export function CoverLetterCard({ job, id }: { job: Job; id?: string }) {
   const headingId = useId();
   const feedbackId = useId();
   const letterId = useId();
@@ -131,9 +131,11 @@ export function CoverLetterCard({ job }: { job: Job }) {
 
   return (
     <section
+      id={id}
+      tabIndex={-1}
       aria-labelledby={headingId}
       aria-busy={writing}
-      className="rounded-lg bg-accent/70 p-5 ring-1 ring-primary/15"
+      className="scroll-mt-20 rounded-lg bg-accent/70 p-5 ring-1 ring-primary/15 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 id={headingId} className="text-lg">
@@ -259,10 +261,19 @@ export function CoverLetterCard({ job }: { job: Job }) {
               <p className="mt-2 text-xs text-muted-foreground">Saved with this job. Each write replaces it.</p>
 
               {state.phase === "written" && state.verdict === "material" && (
-                <p role="status" className="mt-3 text-sm">
-                  This posting contains instructions aimed at AI tools. The cover letter ignored them;
-                  you may want to read the posting for them.
-                </p>
+                <div
+                  role="status"
+                  className="mt-3 flex gap-2.5 rounded-md border border-warning/50 bg-warning/10 px-4 py-3 text-sm"
+                >
+                  <TriangleAlert
+                    aria-hidden="true"
+                    className="mt-0.5 size-4 shrink-0 text-warning"
+                  />
+                  <p>
+                    This posting contains instructions aimed at AI tools. The cover letter ignored them;
+                    you may want to read the posting for them.
+                  </p>
+                </div>
               )}
               {state.phase === "written" && state.setAside && (
                 <p role="status" className="mt-3 text-sm">

@@ -22,6 +22,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-warning: var(--warning);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -74,6 +75,9 @@
   --accent: #e4e9db;
   --accent-foreground: #2f3529;
   --destructive: #a4443a;
+  /* A posting talking to AI tools, or other worth-a-look notices — distinct from destructive, which
+     is reserved for something the user themselves needs to fix. */
+  --warning: #8a5a12;
 
   --border: #dde1d5;
   --input: #d6dbcc;
@@ -140,6 +144,7 @@
   --accent: #333a30;
   --accent-foreground: #eaeee4;
   --destructive: #d97b70;
+  --warning: #d9a441;
 
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 18%);
@@ -168,7 +173,7 @@
     @apply border-border outline-ring/90;
   }
   html {
-    @apply font-sans;
+    @apply font-sans motion-safe:scroll-smooth;
     /* Room for the scrollbar is kept whether or not the page scrolls. A loading outline is often
        shorter than the page it stands in for; without this the scrollbar comes and goes with it, the
        page's width changes, and the header's contents shift sideways on every navigation. */

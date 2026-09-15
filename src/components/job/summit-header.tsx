@@ -30,7 +30,13 @@ type SummitHeaderFrameProps = {
  * In the strip, the controls keep a column of their own from `lg`, and the caption wraps under the
  * steps rather than pushing them onto a second row; below it, the controls take a row beneath.
  */
-export function SummitHeaderFrame({ stage, scenes, title, progress, controls }: SummitHeaderFrameProps) {
+export function SummitHeaderFrame({
+  stage,
+  scenes,
+  title,
+  progress,
+  controls,
+}: SummitHeaderFrameProps) {
   const summit = stage ? SUMMIT[stage] : null;
 
   return (
@@ -40,10 +46,13 @@ export function SummitHeaderFrame({ stage, scenes, title, progress, controls }: 
         style={{ backgroundColor: summit?.sky }}
         className="relative overflow-hidden bg-sky [--scene-h:8rem] motion-safe:transition-colors motion-safe:duration-700 sm:[--scene-h:14.5rem] lg:[--scene-h:16.5rem] 2xl:[--scene-h:20rem]"
       >
-        <div data-summit={stage ?? undefined} className="absolute inset-x-0 bottom-0 h-(--scene-h)">
+        <div
+          data-summit={stage ?? undefined}
+          className="absolute inset-x-0 bottom-0 h-(--scene-h)"
+        >
           {scenes}
         </div>
-        <div className="relative mx-auto w-full max-w-[110rem] px-4 pt-5 pb-[calc(var(--scene-h)*0.9)] sm:px-6 sm:pb-[calc(var(--scene-h)*0.95)] lg:pb-[calc(var(--scene-h)*0.62)]">
+        <div className="relative mx-auto w-full max-w-[110rem] px-4 pt-5 pb-[calc(var(--scene-h)*0.9)] sm:px-6 sm:pb-[calc(var(--scene-h)*0.95)] lg:pb-[calc(var(--scene-h)*0.40)]">
           <JobBackLink />
           <div className="flex w-fit max-w-full min-w-0 items-center gap-4 rounded-2xl bg-card/55 px-4 py-3.5 shadow-sm ring-1 ring-white/60 backdrop-blur-md sm:px-5 sm:py-4 lg:max-w-[54%] lg:gap-5 lg:px-6 lg:py-5 2xl:max-w-[50%]">
             {title}
@@ -53,8 +62,12 @@ export function SummitHeaderFrame({ stage, scenes, title, progress, controls }: 
 
       <div className="border-b border-border bg-card">
         <div className="mx-auto flex w-full max-w-[110rem] flex-col gap-3 px-4 py-2.5 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-x-6">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-1">{progress}</div>
-          <div className="flex flex-wrap items-center gap-3 sm:justify-end">{controls}</div>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-1">
+            {progress}
+          </div>
+          <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+            {controls}
+          </div>
         </div>
       </div>
     </div>
@@ -71,13 +84,19 @@ export function SummitProgress({ stage }: { stage: Stage }) {
 
   return (
     <>
-      <ol aria-label="Summit attempt" className="flex flex-wrap items-center gap-1.5 text-xs">
+      <ol
+        aria-label="Summit attempt"
+        className="flex flex-wrap items-center gap-1.5 text-xs"
+      >
         {ACTIVE_STAGES.map((step, index) => (
           <li key={step} className="flex items-center gap-1.5">
             {index > 0 && (
               <span
                 aria-hidden="true"
-                className={cn("h-0.5 w-4 rounded sm:w-8", index <= at ? "bg-primary" : "bg-border")}
+                className={cn(
+                  "h-0.5 w-4 rounded sm:w-8",
+                  index <= at ? "bg-primary" : "bg-border",
+                )}
               />
             )}
             <span
@@ -97,7 +116,10 @@ export function SummitProgress({ stage }: { stage: Stage }) {
           </li>
         ))}
         {stage === "rejected" && (
-          <li aria-current="step" className="ml-2 rounded-full bg-[#efd6bf] px-2 py-0.5 font-bold text-[#6b4a2e]">
+          <li
+            aria-current="step"
+            className="ml-2 rounded-full bg-[#efd6bf] px-2 py-0.5 font-bold text-[#6b4a2e]"
+          >
             {SUMMIT.rejected.step}
             <span className="sr-only">, {STAGE_META.rejected.label}</span>
           </li>

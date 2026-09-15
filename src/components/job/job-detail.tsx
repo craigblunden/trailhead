@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Sparkles } from "lucide-react";
 
 import { AppHeader } from "@/components/app-header";
 import { BrandLogo } from "@/components/brand-logo";
@@ -23,6 +23,7 @@ import { LoadErrorHint } from "@/components/load-error";
 import { JobLoading } from "@/components/page-loading";
 import { PageMain } from "@/components/page-main";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Excerpt } from "@/components/ui/excerpt";
 import {
   Select,
@@ -46,8 +47,16 @@ export function JobDetail({
   jobId: string;
   scenes?: React.ReactNode;
 }) {
-  const { getJob, updateJob, setStage, status, error, dismissError, reload, redirectFor } =
-    useJobs();
+  const {
+    getJob,
+    updateJob,
+    setStage,
+    status,
+    error,
+    dismissError,
+    reload,
+    redirectFor,
+  } = useJobs();
   const job = getJob(jobId);
   const router = useRouter();
   // Set only for a job opened at the optimistic id it was added under: the id a `useEffect` below
@@ -63,7 +72,8 @@ export function JobDetail({
 
   // The same outline the navigation showed; here it stays until the client's own fetch answers, or
   // — for a job clicked open before its add settled — until the redirect above lands.
-  if (!job && (status === "pending" || redirectTo)) return <JobLoading id={jobId} job={redirectJob} />;
+  if (!job && (status === "pending" || redirectTo))
+    return <JobLoading id={jobId} job={redirectJob} />;
   // The list failed to load, not this one job: say so, with a way to retry, same as the board.
   if (!job && status === "error") return <JobDetailError onRetry={reload} />;
   // An unknown id and another user's id are the same thing here, on purpose.
@@ -170,6 +180,35 @@ function SaveRow({
         {children}
       </Button>
     </div>
+  );
+}
+
+/**
+ * A shortcut to the Cover letter section, which sits at the foot of the main column below the
+ * Description and Notes. Tinted the same as that section, so the two read as one thing split across
+ * the page. Nothing to jump to for a Rejected job that never got a Draft, so the card sits out rather
+ * than pointing at an empty prompt for an application that's already closed.
+ */
+function CoverLetterJumpCard({ job }: { job: Job }) {
+  const hasDraft = job.draft.trim().length > 0;
+  if (!hasDraft && job.stage === "rejected") return null;
+
+  return (
+    <Card className="bg-accent/70 ring-primary/15 [--card-spacing:--spacing(4)]">
+      <CardContent className="flex flex-col">
+        <p className="text-sm">
+          {hasDraft
+            ? "Your draft is ready to copy."
+            : "Generate a unique cover letter based on the job description and your selected resume."}
+        </p>
+        <Button asChild className="mt-3 h-9 px-3.5">
+          <a href="#cover-letter">
+            <Sparkles aria-hidden="true" />
+            Cover Letter
+          </a>
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -308,8 +347,8 @@ function JobDetailView({
                       id="description-hint"
                       className="mt-1 text-sm text-muted-foreground"
                     >
-                      Copy and paste this from the job post website — it feeds your
-                      cover letter later.
+                      Copy and paste this from the job post website — it feeds
+                      your cover letter later.
                     </p>
                     <Textarea
                       aria-labelledby="description-heading"
@@ -318,7 +357,10 @@ function JobDetailView({
                       onChange={(event) => description.set(event.target.value)}
                       className="mt-3 min-h-56 resize-y"
                     />
-                    <SaveRow changed={description.changed} onSave={saveDescription}>
+                    <SaveRow
+                      changed={description.changed}
+                      onSave={saveDescription}
+                    >
                       Save description
                     </SaveRow>
                   </div>
@@ -343,7 +385,9 @@ function JobDetailView({
                     aria-labelledby="rejection-letter-heading"
                     aria-describedby="rejection-letter-hint"
                     value={rejectionLetter.value}
-                    onChange={(event) => rejectionLetter.set(event.target.value)}
+                    onChange={(event) =>
+                      rejectionLetter.set(event.target.value)
+                    }
                     className="mt-3 min-h-40 resize-y"
                   />
                   <SaveRow
@@ -374,11 +418,12 @@ function JobDetailView({
                 </SaveRow>
               </section>
 
-              <CoverLetterCard job={job} />
+              <CoverLetterCard job={job} id="cover-letter" />
             </div>
 
             <aside className="grid min-w-0 grid-cols-1 items-start gap-6 2xl:grid-cols-2">
               <div className="min-w-0 space-y-6">
+                <CoverLetterJumpCard job={job} />
                 <DetailsCard job={job} onChange={onPatch} />
                 <ApplicationKitCard job={job} />
               </div>

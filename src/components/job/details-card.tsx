@@ -9,7 +9,11 @@ import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import type { JobPatch } from "@/components/jobs-provider";
 import { calendarDate, isoDateLocal, todayUtc } from "@/lib/dates";
 import { salaryFromText } from "@/lib/job-fields";
@@ -47,7 +51,11 @@ function AppliedDateField({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" className="mt-1 h-9 gap-2 px-3 font-normal">
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-1 h-9 gap-2 px-3 font-normal"
+        >
           <CalendarIcon aria-hidden="true" className="text-muted-foreground" />
           {formatLongDate(appliedOn)}
         </Button>
@@ -78,11 +86,13 @@ function AppliedDateField({
 export function DetailsCard({ job, onChange }: DetailsCardProps) {
   const fieldId = useId();
   // Read the way validation reads it, so what is sent is what the server would make of the text.
-  const [min, setMin, flushMin] = useDraft(job.salaryMin?.toString() ?? "", (value) =>
-    onChange({ salaryMin: salaryFromText(value) }),
+  const [min, setMin, flushMin] = useDraft(
+    job.salaryMin?.toString() ?? "",
+    (value) => onChange({ salaryMin: salaryFromText(value) }),
   );
-  const [max, setMax, flushMax] = useDraft(job.salaryMax?.toString() ?? "", (value) =>
-    onChange({ salaryMax: salaryFromText(value) }),
+  const [max, setMax, flushMax] = useDraft(
+    job.salaryMax?.toString() ?? "",
+    (value) => onChange({ salaryMax: salaryFromText(value) }),
   );
 
   return (
@@ -137,7 +147,7 @@ export function DetailsCard({ job, onChange }: DetailsCardProps) {
           </p>
         </fieldset>
 
-        <div>
+        <div className="flex flex-col gap-2">
           <FieldLabel>{job.appliedOn ? "Applied" : "Added"}</FieldLabel>
           {job.appliedOn ? (
             <AppliedDateField
@@ -148,7 +158,6 @@ export function DetailsCard({ job, onChange }: DetailsCardProps) {
             <p className="mt-1">{formatLongDate(job.addedOn)}</p>
           )}
         </div>
-
       </CardContent>
     </Card>
   );
