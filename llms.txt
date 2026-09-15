@@ -1,0 +1,31 @@
+# Trailhead
+
+> The repository behind Trail to Offer (https://www.trailtooffer.com): a job-application tracker for one job seeker running many applications at once. One Next.js 16 application on Vercel, one Supabase project (Postgres, Auth, Storage), and outbound calls to the Anthropic API and Resend.
+
+This file is for coding agents working in the repository. It is not served by the app: the public `/llms.txt`, which describes the product for users' own LLMs, is `src/app/llms.txt/route.ts`.
+
+Read these before changing anything. This Next.js version has breaking changes from what most training data knows; its guides ship in `node_modules/next/dist/docs/`.
+
+## Start here
+
+- [AGENTS.md](AGENTS.md): the rules every agent follows in this repo
+- [CONTEXT.md](CONTEXT.md): the glossary. Use its terms in code, tests and prose, and none of the words it says to avoid.
+- [docs/architecture.md](docs/architecture.md): the system, tenancy, and how requests reach the database
+
+## Decisions
+
+- [docs/adr/](docs/adr/): architecture decision records, numbered in order
+- [docs/deferred.md](docs/deferred.md): what was deliberately not built, and the questions to answer first
+- [docs/supersedes.md](docs/supersedes.md): which requirements from the earlier specs stopped being true, and what replaced each
+
+## Working in the repo
+
+- [docs/provisioning.md](docs/provisioning.md): how a clean clone reaches a running app, and what the hosted project needs
+- [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md): tickets are local markdown under `.scratch/`
+- [docs/agents/domain.md](docs/agents/domain.md): how the domain docs are laid out
+- [README.md](README.md): the stack, running locally, testing, deploying, and where things live
+
+## Optional
+
+- [prisma/schema.prisma](prisma/schema.prisma): the data model
+- `tests/`: unit and component tests (`npm test`), integration tests against the local Supabase stack (`npm run test:integration`), and end-to-end journeys in `e2e/` (`npm run test:e2e`)

@@ -198,9 +198,10 @@ npx supabase db push          # roles, the private documents bucket, storage pol
 | `/signup`, `/login` | Create an account (with email verification), sign in — email or Google/GitHub |
 | `/forgot-password`, `/reset-password` | Request and use a password reset link |
 | `/board` | The board across five stages, and the "Add a job" dialog |
-| `/board/[id]` | A job: description, notes, stage and history, contacts, application kit, cover letter and its draft |
+| `/board/[id]` | A job: description, notes, stage and history, contacts, application kit, cover letter and its draft, and a Rejection letter while rejected |
 | `/contacts`, `/contacts/[id]` | The people in the search, and every role each one is part of, grouped by stage |
 | `/documents` | Resumes and cover letters on file (up to three), upload and delete |
+| `/llms.txt` | The product described for users’ own LLMs: each page and what its forms accept. Built from the same constants as validation; the repo-root `llms.txt` is for coding agents and is not served |
 | `POST /api/jobs/[id]/cover-letter` | Writes a cover letter from the job and the resume in its application kit |
 
 ## Where things live
