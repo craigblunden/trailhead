@@ -29,3 +29,35 @@ export function isoDateLocal(date: Date): string {
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
+
+/**
+ * The quota week: Monday to Sunday, UTC, like every other date here. Two features count against a
+ * week of their own — cover letters (`@/lib/generation`) and Interview Simulator Attempts
+ * (`@/lib/interview`) — and both mean the same week, so the arithmetic lives here rather than in
+ * either of them.
+ */
+
+/** The Monday (UTC) that starts the quota week containing `now`. */
+export function weekStartOf(now: Date = new Date()): string {
+  const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const sinceMonday = (day.getUTCDay() + 6) % 7;
+  day.setUTCDate(day.getUTCDate() - sinceMonday);
+  return isoDate(day);
+}
+
+/** The Monday (UTC) after `weekStart`: when the next window opens. */
+export function nextWeekStart(weekStart: string): string {
+  const day = new Date(`${weekStart}T00:00:00.000Z`);
+  day.setUTCDate(day.getUTCDate() + 7);
+  return isoDate(day);
+}
+
+/** "Monday, Sep 14" — when the next window opens, and when a Hold lapses. */
+export function formatResetDay(iso: string): string {
+  return new Date(`${iso}T00:00:00.000Z`).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}

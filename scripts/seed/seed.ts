@@ -6,7 +6,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { PrismaClient, type Prisma } from "@/generated/prisma/client";
 import { todayUtc } from "@/lib/dates";
 import { DOCUMENTS_BUCKET } from "@/lib/documents";
-import { weekStartOf } from "@/lib/generation";
+import { weekStartOf } from "@/lib/dates";
 import { toDateColumn } from "@/server/db/mappers";
 
 import { waitForMail } from "../../e2e/mail";

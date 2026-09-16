@@ -67,11 +67,25 @@ vi.mock("next/navigation", async (importOriginal) => ({
  * then its Auth user — and the janitor sweeps whatever a stale token writes afterwards.
  */
 
-const TENANT_TABLES = ["Job", "ActivityEntry", "Contact", "JobContact", "Document", "GenerationQuota", "UserPlan"] as const;
+const TENANT_TABLES = [
+  "Job",
+  "ActivityEntry",
+  "Contact",
+  "JobContact",
+  "Document",
+  "GenerationQuota",
+  "UserPlan",
+  "Attempt",
+  "AttemptQuestion",
+  "InterviewQuota",
+] as const;
 
 type Counts = Record<(typeof TENANT_TABLES)[number], number>;
 
-/** One row in every tenant table for `userId`: a Job with its Activity, a linked Contact, a Document, a quota week. */
+/**
+ * One row in every tenant table for `userId`: a Job with its Activity, a linked Contact, a Document,
+ * a cover-letter quota week, and an Attempt with a question and its own quota week.
+ */
 async function seedTenant(userId: string) {
   await withTenant(userId, async (tx: TenantClient) => {
     const job = await tx.job.create({
@@ -99,6 +113,15 @@ async function seedTenant(userId: string) {
     });
     await tx.job.update({ where: { id: job.id }, data: { resumeId: document.id } });
     await tx.generationQuota.create({ data: { userId, weekStart: new Date("2026-07-20"), used: 2 } });
+    await tx.attempt.create({
+      data: {
+        userId,
+        jobId: job.id,
+        length: 5,
+        questions: { create: { userId, category: "personal", order: 0, text: "Why this role?" } },
+      },
+    });
+    await tx.interviewQuota.create({ data: { userId, weekStart: new Date("2026-07-20"), used: 1 } });
   });
   await setPlan(userId, "pro");
 }
@@ -123,8 +146,8 @@ async function footprint(userId: string) {
   });
 }
 
-const EVERYTHING: Counts = { Job: 1, ActivityEntry: 1, Contact: 1, JobContact: 1, Document: 1, GenerationQuota: 1, UserPlan: 1 };
-const NOTHING: Counts = { Job: 0, ActivityEntry: 0, Contact: 0, JobContact: 0, Document: 0, GenerationQuota: 0, UserPlan: 0 };
+const EVERYTHING = Object.fromEntries(TENANT_TABLES.map((table) => [table, 1])) as Counts;
+const NOTHING = Object.fromEntries(TENANT_TABLES.map((table) => [table, 0])) as Counts;
 
 const erase = (userId: string) =>
   withTenant(userId, (tx) => tx.$queryRaw<{ erased: number }[]>`select public.erase_my_account() as erased`);

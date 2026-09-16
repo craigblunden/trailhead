@@ -1,4 +1,5 @@
-import { formatResetDay, type QuotaStatus } from "@/lib/generation";
+import { formatResetDay } from "@/lib/dates";
+import type { QuotaStatus } from "@/lib/generation";
 import { pluralize } from "@/lib/jobs";
 import type { Limit, Plan } from "@/lib/plans";
 

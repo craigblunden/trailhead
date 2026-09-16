@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { UserMenu } from "@/components/user-menu";
@@ -33,7 +33,35 @@ describe("UserMenu", () => {
   it("offers the account page after the sections and before Sign out", async () => {
     const menu = await openMenu("free");
     const items = within(menu).getAllByRole("menuitem").map((item) => item.textContent);
-    expect(items).toEqual(["Your trail", "Contacts", "Documents", "Account", "Sign out"]);
+    expect(items).toEqual([
+      "Your trail",
+      "Contacts",
+      "Documents",
+      "Interview practicePro",
+      "Account",
+      "Sign out",
+    ]);
     expect(within(menu).getByRole("menuitem", { name: "Account" })).toHaveAttribute("href", "/account");
+  });
+
+  /**
+   * On a phone this menu is the only way to the primary nav's routes, so it carries the Interview
+   * Simulator too — marked for the Plans that cannot start an Attempt yet (interview simulator
+   * ticket 08), and unmarked on `pro`, where the mark would say nothing.
+   */
+  it("carries interview practice, marked as Pro only for the Plans that cannot use it", async () => {
+    for (const plan of ["free", "basic"] as const) {
+      const menu = await openMenu(plan);
+      const item = within(menu).getByRole("menuitem", { name: /Interview practice/ });
+      expect(item).toHaveAttribute("href", "/interview");
+      expect(item).toHaveTextContent("Pro");
+      cleanup();
+    }
+
+    const pro = await openMenu("pro");
+    expect(within(pro).getByRole("menuitem", { name: "Interview practice" })).toHaveAttribute(
+      "href",
+      "/interview",
+    );
   });
 });

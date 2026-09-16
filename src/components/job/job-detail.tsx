@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ArrowUpRight, Sparkles, Trash2 } from "lucide-react";
+import { ArrowUpRight, MessagesSquare, Sparkles, Trash2 } from "lucide-react";
 
 import { AppHeader } from "@/components/app-header";
 import { BrandLogo } from "@/components/brand-logo";
@@ -216,6 +216,34 @@ function SaveRow({
  * the page. Nothing to jump to for a Rejected job that never got a Draft, so the card sits out rather
  * than pointing at an empty prompt for an application that's already closed.
  */
+/**
+ * Straight into this Job's Interview Simulator, skipping the hub's picker (interview simulator
+ * ticket 07). Beside the cover letter's card, because the two are the same kind of thing: what this
+ * application does with a Job once the posting and the resume are on it.
+ *
+ * Shown on every Plan and at every Stage. A Tenant not on `pro` lands on the locked start screen,
+ * which is the point of the preview; and a Job at `interviewing` is exactly the one worth rehearsing
+ * for, so nothing here reads the Stage.
+ */
+function InterviewJumpCard({ job }: { job: Job }) {
+  return (
+    <Card className="bg-accent/70 ring-primary/15 [--card-spacing:--spacing(4)]">
+      <CardContent className="flex flex-col">
+        <p className="text-sm">
+          Rehearse for this interview against questions written from this
+          posting and your resume.
+        </p>
+        <Button asChild variant="outline" className="mt-3 h-9 px-3.5">
+          <Link href={`/interview/${job.id}`}>
+            <MessagesSquare aria-hidden="true" />
+            Practice interview
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 function CoverLetterJumpCard({ job }: { job: Job }) {
   const hasDraft = job.draft.trim().length > 0;
   if (!hasDraft && job.stage === "rejected") return null;
@@ -279,8 +307,9 @@ function DeleteJobCard({
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Removes {job.role} at {job.company} from your board, for good — its activity goes with
-            it. Documents and contacts linked to it are untouched.
+            Removes {job.role} at {job.company} from your board, for good — its
+            activity goes with it. Documents and contacts linked to it are
+            untouched.
           </p>
           <Button
             ref={deleteTrigger}
@@ -385,7 +414,7 @@ function JobDetailView({
                 company={job.company}
                 accent={job.accent}
                 size="lg"
-                className="lg:size-16 lg:rounded-lg lg:text-3xl"
+                className="lg:size-16 lg:rounded-lg lg:text-3xl self-start"
               />
               <div className="min-w-0">
                 <h1 className="text-3xl leading-tight tracking-tight text-balance sm:text-4xl lg:text-5xl 2xl:text-6xl">
@@ -555,13 +584,18 @@ function JobDetailView({
             <aside className="grid min-w-0 grid-cols-1 items-start gap-6 2xl:grid-cols-2">
               <div className="min-w-0 space-y-6">
                 <CoverLetterJumpCard job={job} />
+                <InterviewJumpCard job={job} />
                 <DetailsCard job={job} onChange={onPatch} />
                 <ApplicationKitCard job={job} />
               </div>
               <div className="min-w-0 space-y-6">
                 <ContactsCard job={job} />
                 <ActivityCard entries={job.activity} />
-                <DeleteJobCard job={job} deleting={deleting} onDelete={onDelete} />
+                <DeleteJobCard
+                  job={job}
+                  deleting={deleting}
+                  onDelete={onDelete}
+                />
               </div>
             </aside>
           </div>

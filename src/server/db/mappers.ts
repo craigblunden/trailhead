@@ -1,5 +1,7 @@
 import type {
   ActivityEntry as ActivityEntryRow,
+  Attempt as AttemptModel,
+  AttemptQuestion as AttemptQuestionRow,
   Contact as ContactRow,
   Document as DocumentRow,
   Job as JobModel,
@@ -8,6 +10,7 @@ import type {
 import type { ContactDetail, ContactListItem } from "@/lib/contacts";
 import { isoDate } from "@/lib/dates";
 import type { DocumentSummary } from "@/lib/documents";
+import { ATTEMPT_LENGTHS, isAttemptLength, type Attempt } from "@/lib/interview";
 import { STAGES, type ActivityEntry, type Contact, type Job } from "@/lib/jobs";
 
 /**
@@ -206,5 +209,42 @@ export function toDocumentSummary(row: DocumentSummaryRow): DocumentSummary {
           byId(a, b),
       )
       .map((job) => ({ id: job.id, company: job.company, role: job.role })),
+  };
+}
+
+/** An Attempt row with its questions, in order — what an Attempt DTO is built from. */
+export type AttemptRow = AttemptModel & { questions: AttemptQuestionRow[] };
+
+/**
+ * An Attempt as the page holds it. A question the Tenant was mid-way through when they navigated
+ * away carries no Answer at all — it is never partly recorded — so `nextQuestion()` resumes on it
+ * rather than inside it.
+ *
+ * A question carries an Answer once it has been answered **or** scored. The second half matters for
+ * an Attempt the clock ended: its unreached questions were never answered, but they are still scored
+ * (the scorer marks the silence), and the Scorecard has to be able to show that. Scores exist only
+ * on a completed Attempt, so this can never make an in-progress one look answered.
+ */
+export function toAttemptDto(row: AttemptRow): Attempt {
+  return {
+    id: row.id,
+    jobId: row.jobId,
+    // The column is an integer; only `ATTEMPT_LENGTHS` are ever written to it (the routes refuse
+    // anything else), so a row that somehow holds another number reads as the shortest Attempt.
+    length: isAttemptLength(row.length) ? row.length : ATTEMPT_LENGTHS[0],
+    activeSeconds: row.activeSeconds,
+    completedAt: row.completedAt?.toISOString() ?? null,
+    overallScore: row.overallScore,
+    questions: [...row.questions]
+      .sort((a, b) => a.order - b.order)
+      .map((question) => ({
+        id: question.id,
+        category: question.category,
+        order: question.order,
+        text: question.text,
+        ...(question.answeredAt || question.score !== null
+          ? { answer: { transcript: question.transcript, score: question.score, rationale: question.rationale } }
+          : {}),
+      })),
   };
 }

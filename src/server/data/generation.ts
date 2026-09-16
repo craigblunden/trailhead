@@ -1,14 +1,13 @@
 import "server-only";
 
 import { Prisma } from "@/generated/prisma/client";
-import { todayUtc } from "@/lib/dates";
+import { todayUtc, weekStartOf } from "@/lib/dates";
 import {
   GENERATION_FAILURES,
   HOLD_FLAGS,
   NO_COUNTS,
   isHeld,
   quotaStatus,
-  weekStartOf,
   type QuotaCounts,
   type QuotaStatus,
 } from "@/lib/generation";

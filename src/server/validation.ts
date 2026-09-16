@@ -11,6 +11,13 @@ import { CONTACT_KINDS, CONTACT_LIMITS } from "@/lib/contacts";
 import { todayUtc } from "@/lib/dates";
 import { DOCUMENT_KINDS, MAX_UPLOAD_BYTES, UPLOAD_REFUSALS, extensionOf } from "@/lib/documents";
 import { FEEDBACK_MAX_CHARS } from "@/lib/generation";
+import {
+  ATTEMPT_LENGTHS,
+  TRANSCRIPT_MAX_CHARS,
+  attemptSeconds,
+  isAttemptLength,
+  type AttemptLength,
+} from "@/lib/interview";
 import { stripInvisible } from "@/lib/invisible";
 import { JOB_LIMITS, locationOrFallback, salaryFromText } from "@/lib/job-fields";
 import { STAGES } from "@/lib/jobs";
@@ -320,3 +327,44 @@ export function parseInput<T>(schema: z.ZodType<T>, input: unknown): ParseResult
   }
   return { ok: false, errors };
 }
+
+/**
+ * Starting an Attempt (interview simulator tickets 01, 05): a length the Plan allows, and whether
+ * the Tenant asked to reset an unfinished Attempt rather than resume it. The length is checked here
+ * as one of the three the app knows; whether this Tenant's Plan allows it is the orchestration
+ * layer's (`src/server/interview/start-attempt.ts`), because only it knows the Plan.
+ */
+export const startAttemptSchema = z.strictObject({
+  length: z.custom<AttemptLength>(isAttemptLength, "Pick an interview length"),
+  reset: z.preprocess((value) => value ?? false, z.boolean("Reset must be true or false")),
+});
+
+/**
+ * Recording an Answer (ticket 02): which question it answers, what was said — spoken or typed, the
+ * same field either way — and how much of the countdown it consumed. The transcript is bounded like
+ * every other free text crossing the boundary, and stripped: it reaches a scoring prompt, so it is
+ * material, never instructions.
+ */
+export const recordAnswerSchema = z.strictObject({
+  questionId: idSchema,
+  transcript: z.preprocess(
+    (value) => (value === null || value === undefined ? "" : value),
+    z
+      .string("An answer must be text")
+      .transform((text) => stripInvisible(text).trim())
+      .pipe(z.string().max(TRANSCRIPT_MAX_CHARS, `Keep an answer under ${TRANSCRIPT_MAX_CHARS} characters`)),
+  ),
+  /**
+   * The browser's own count of the seconds this answer took. Bounded by the longest Attempt, so a
+   * tab reporting a nonsense number cannot make the countdown jump; the server adds it to the
+   * Attempt's active time rather than trusting a deadline the client computed.
+   */
+  elapsedSeconds: z.preprocess(
+    (value) => (value === null || value === undefined ? 0 : value),
+    z
+      .number("Elapsed time must be a number")
+      .int()
+      .min(0)
+      .max(attemptSeconds(ATTEMPT_LENGTHS[ATTEMPT_LENGTHS.length - 1])),
+  ),
+});

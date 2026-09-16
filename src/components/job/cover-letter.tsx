@@ -17,8 +17,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { todayUtc } from "@/lib/dates";
-import { FEEDBACK_MAX_CHARS, SHORT_DESCRIPTION_CHARS, formatResetDay, type Verdict } from "@/lib/generation";
+import { formatResetDay, todayUtc } from "@/lib/dates";
+import { FEEDBACK_MAX_CHARS, SHORT_DESCRIPTION_CHARS, type Verdict } from "@/lib/generation";
 import type { Job } from "@/lib/jobs";
 import { optimisticId, withDraft } from "@/lib/jobs-rules";
 import type { GenerationStatus } from "@/server/actions/generation";

@@ -15,6 +15,9 @@ export const PRIVATE_ROUTES = [
   { name: "board", path: "/board", heading: "Your trail" },
   { name: "contacts", path: "/contacts", heading: "Contacts" },
   { name: "documents", path: "/documents", heading: "Documents" },
+  // The hub, not a Job's start screen: the latter needs a Job the test created, like the job detail
+  // and contact pages, so `e2e/interview.spec.ts` opens that one for itself.
+  { name: "interview", path: "/interview", heading: "Interview practice" },
   { name: "account", path: "/account", heading: "Account" },
 ] as const;
 

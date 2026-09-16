@@ -1,4 +1,4 @@
-import { isoDate } from "@/lib/dates";
+import { nextWeekStart } from "@/lib/dates";
 import type { Limit } from "@/lib/plans";
 
 /**
@@ -34,20 +34,6 @@ export type QuotaStatus = {
   held: boolean;
 };
 
-/** The Monday (UTC) that starts the quota week containing `now`. */
-export function weekStartOf(now: Date = new Date()): string {
-  const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const sinceMonday = (day.getUTCDay() + 6) % 7;
-  day.setUTCDate(day.getUTCDate() - sinceMonday);
-  return isoDate(day);
-}
-
-export function nextWeekStart(weekStart: string): string {
-  const day = new Date(`${weekStart}T00:00:00.000Z`);
-  day.setUTCDate(day.getUTCDate() + 7);
-  return isoDate(day);
-}
-
 /** A Tenant is on Hold while this week's Flags have reached `HOLD_FLAGS`. Derived, never stored. */
 export function isHeld(flagged: number): boolean {
   return flagged >= HOLD_FLAGS;
@@ -70,16 +56,6 @@ export function quotaStatus({ used, flagged }: QuotaCounts, weekStart: string, l
   // negative "left".
   const clamped = Math.min(Math.max(used, 0), limit);
   return { limit, used: clamped, remaining: limit - clamped, resetsOn, flags, held };
-}
-
-/** "Monday, Sep 14" — when the next letters arrive, and when a Hold lapses. */
-export function formatResetDay(isoDate: string): string {
-  return new Date(`${isoDate}T00:00:00.000Z`).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
 }
 
 /**

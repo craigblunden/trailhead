@@ -2,7 +2,7 @@ import { join } from "node:path";
 
 import type { Page } from "@playwright/test";
 
-import { nextWeekStart, weekStartOf } from "../src/lib/generation";
+import { nextWeekStart, weekStartOf } from "../src/lib/dates";
 import { COVER_LETTER_REWRITTEN_LABEL, COVER_LETTER_WRITTEN_LABEL } from "../src/lib/jobs-rules";
 
 import { expectNoAxeViolations } from "./checks";

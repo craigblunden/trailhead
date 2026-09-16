@@ -66,7 +66,10 @@ test("A11Y-2: the whole board is reachable and operable from the keyboard", asyn
   await expect(page.getByRole("heading", { name: "Your trail" })).toBeVisible();
 
   const reached: string[] = [];
-  for (let i = 0; i < 6; i += 1) {
+  // Enough stops to cross the header's links — the skip link, the logo, and one per primary-nav
+  // route — and reach the page's own controls. A count tight against today's nav would fail the
+  // next time a section is added rather than say anything about the keyboard.
+  for (let i = 0; i < 12; i += 1) {
     await page.keyboard.press("Tab");
     reached.push(
       await page.evaluate(() => {

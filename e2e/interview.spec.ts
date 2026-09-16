@@ -1,0 +1,190 @@
+import { join } from "node:path";
+
+import type { Page } from "@playwright/test";
+
+import { setPlanByEmail, withMigrator } from "../scripts/plan/set-plan";
+import type { Plan } from "../src/lib/plans";
+
+import { expectNoAxeViolations } from "./checks";
+import { SIGNED_OUT, createJob, expect, signUpAndVerify, test } from "./fixtures";
+
+/**
+ * The Interview Simulator end to end (interview simulator tickets 01–08), against the fake Anthropic
+ * API Playwright starts (`tests/fakes/anthropic-server.mjs`). Everything on the app's side — the
+ * routes, the quota, the persisted question set, the Answers, the Scorecard — is the real thing.
+ *
+ * Chromium exposes the speech-recognition API, so the page opens in speaking mode — which is what
+ * ticket 06 asks for and is asserted below. Driving it further would need a real speech service to
+ * transcribe against, so every answer here goes through the switch to typing, the other half of the
+ * same ticket. That both modes write the same field is covered in the component tests, where the API
+ * can be stubbed.
+ */
+
+const POSTING =
+  "Fernwood is a subscription plant company. The Growth design team owns onboarding, pricing, and the referral loop, and works closely with lifecycle marketing and data science. ".repeat(
+    3,
+  );
+
+const MIGRATOR_URL =
+  process.env.DIRECT_URL ?? "postgresql://trailhead_migrator:trailhead_migrator@127.0.0.1:54322/postgres";
+
+/**
+ * Puts the Tenant behind `email` on a Plan, through `npm run db:plan`'s own statements as
+ * `trailhead_migrator` (ADR-0001). Nothing in the application can do this — the app role has no
+ * grant to write "UserPlan" — so a test that wants a `pro` Tenant has to go the same way the
+ * operator does.
+ */
+async function putOnPlan(email: string, plan: Plan) {
+  await withMigrator(MIGRATOR_URL, (client) => setPlanByEmail(client, email, plan));
+}
+
+/** A Job with a description and an attached resume — both needed before questions can be written. */
+async function jobReadyToRehearse(page: Page) {
+  const job = await createJob(page, { company: "Fernwood", description: POSTING });
+  const kit = page.getByRole("region", { name: "Application kit" });
+  await kit
+    .getByRole("region", { name: "Upload another" })
+    .getByLabel("Choose a file to upload")
+    .setInputFiles(join(process.cwd(), "tests", "fixtures", "documents", "resume.pdf"));
+  await expect(kit.getByRole("group", { name: "Resume" }).getByText("On 1 job")).toBeVisible();
+  return job;
+}
+
+/**
+ * Answers the question on screen, through the untimed pause before it. `dwellMs` holds the question
+ * open for that long first — the clock counts whole seconds, and Playwright types faster than one,
+ * so a test that wants to see time actually spent has to spend some.
+ */
+async function answerOne(page: Page, text: string, dwellMs = 0) {
+  await page.getByRole("button", { name: /^(Start answering|Next question)$/ }).click();
+  // Chromium opens in speaking mode with no speech service behind it, so take the typed path.
+  const switchToTyping = page.getByRole("button", { name: /Type this answer instead/ });
+  if (await switchToTyping.isVisible()) await switchToTyping.click();
+  await page.getByRole("textbox", { name: "Your answer" }).fill(text);
+  if (dwellMs > 0) await page.waitForTimeout(dwellMs);
+  await page.getByRole("button", { name: "Submit answer" }).click();
+}
+
+test.describe("interview simulator: a pro Tenant rehearses and is scored", () => {
+  // The Plan is set per account, so this cannot share the worker's account with other specs.
+  test.use({ storageState: SIGNED_OUT });
+
+  test("start from a Job, answer every question against one clock, and read the Scorecard", async ({ page }) => {
+    test.setTimeout(180_000);
+    const account = await signUpAndVerify(page);
+    await putOnPlan(account.email, "pro");
+    await jobReadyToRehearse(page);
+
+    // Straight from the Job's page, skipping the picker (ticket 07).
+    await page.getByRole("link", { name: "Practice interview" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Interview practice" })).toBeVisible();
+
+    // The real length choice, and the breakdown that length produces (ticket 05).
+    await expect(page.getByRole("button", { name: /^5 minutes/ })).toBeEnabled();
+    await page.getByRole("button", { name: /^5 minutes/ }).click();
+    await expect(page.getByText("5 questions across all five areas")).toBeVisible();
+
+    // Speaking is the default where the browser can transcribe, with the reason beside it (ticket 06).
+    await expect(page.getByRole("button", { name: /Speak my answers/ })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByText(/no audio is recorded, uploaded, or stored/i)).toBeVisible();
+
+    await page.getByRole("button", { name: "Start interview" }).click();
+
+    // One countdown for the whole Attempt, not one per question, and it waits on the pause.
+    const clock = page.getByRole("timer");
+    await expect(clock).toHaveText("5:00 left", { timeout: 60_000 });
+    await expect(page.getByText(/Question 1 of 5/)).toBeVisible();
+    await expect(page.getByText(/the clock is stopped/)).toBeVisible();
+
+    for (let index = 1; index <= 5; index += 1) {
+      await expect(page.getByText(new RegExp(`Question ${index} of 5`))).toBeVisible();
+      await answerOne(page, `My answer to question ${index}: I led the Meridian reporting redesign.`);
+    }
+
+    // Every question answered: what is left is the Scorecard, and it costs no second interview.
+    const score = page.getByRole("button", { name: "Score my interview" });
+    await expect(score).toBeVisible();
+    await expect(page.getByText(/doesn’t use another of this week’s interviews/)).toBeVisible();
+    await score.click();
+
+    await expect(page.getByText("Overall")).toBeVisible({ timeout: 60_000 });
+    // A score and a rationale for every Answer, grouped by Category with each Category's rollup.
+    for (const category of ["Personal", "Behavioural", "Stakeholder", "Technical", "Design"]) {
+      const section = page.getByRole("region", { name: category });
+      await expect(section).toBeVisible();
+      await expect(section).toContainText("/ 100");
+      await expect(section).toContainText("you named the work but not what came of it");
+    }
+    await expectNoAxeViolations(page);
+
+    // The Scorecard is stored, not just shown: a reload lands back on it rather than a start screen.
+    await page.reload();
+    await expect(page.getByText("Overall")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Score my interview" })).toHaveCount(0);
+  });
+
+  test("an interview left mid-way is resumed on the question it reached, with the time it had left", async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    const account = await signUpAndVerify(page);
+    await putOnPlan(account.email, "pro");
+    const job = await jobReadyToRehearse(page);
+
+    await page.getByRole("link", { name: "Practice interview" }).click();
+    await page.getByRole("button", { name: "Start interview" }).click();
+    await expect(page.getByRole("timer")).toBeVisible({ timeout: 60_000 });
+    await answerOne(page, "The one answer I finished before the phone rang.", 3_000);
+    await expect(page.getByText(/Question 2 of 5/)).toBeVisible();
+
+    // The tab closes mid-question two. Nothing was recorded for it, and no time drains while away.
+    await page.goto(job.href);
+    await page.getByRole("link", { name: "Practice interview" }).click();
+
+    await expect(page.getByRole("heading", { name: "You have an interview in progress" })).toBeVisible();
+    await page.getByRole("button", { name: "Resume" }).click();
+
+    // The same question set, resumed at question two — not inside the one that was abandoned.
+    await expect(page.getByText(/Question 2 of 5/)).toBeVisible();
+    // The budget is what was left when they walked away — the seconds that first answer took are
+    // gone, and nothing drained in between.
+    await expect(page.getByRole("timer")).not.toHaveText("5:00 left");
+    await expect(page.getByRole("timer")).toHaveText(/^4:5\d left$/);
+  });
+});
+
+test.describe("interview simulator: the locked preview (ticket 08)", () => {
+  test.use({ storageState: SIGNED_OUT });
+
+  test("a free Tenant sees the real start screen, locked, from the nav and from a Job", async ({ page }) => {
+    test.setTimeout(180_000);
+    await signUpAndVerify(page); // A new account has no Plan row, so it is on `free`.
+    const job = await jobReadyToRehearse(page);
+
+    // From the primary navigation, marked as a Pro feature rather than hidden.
+    const nav = page.getByRole("navigation", { name: "Primary" });
+    await expect(nav.getByRole("link", { name: /Interview/ })).toContainText("Pro");
+    await nav.getByRole("link", { name: /Interview/ }).click();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Pro");
+
+    // The picker still works for them: the tease is the start screen, not a wall before it.
+    await page.getByRole("searchbox", { name: /Which job/ }).fill("Fernwood");
+    await page.getByRole("list", { name: "Matching jobs" }).getByRole("link").first().click();
+
+    await expect(page.getByText(/interview simulator is a Pro feature/i)).toBeVisible();
+    // The real screen: every length, and the real Category breakdown — all of it refused.
+    for (const minutes of [5, 10, 30]) {
+      await expect(page.getByRole("button", { name: new RegExp(`^${minutes} minutes`) })).toBeDisabled();
+    }
+    await expect(page.getByText("Personal")).toBeVisible();
+    // Not a disabled start button: no start action at all.
+    await expect(page.getByRole("button", { name: "Start interview" })).toHaveCount(0);
+    await expectNoAxeViolations(page);
+
+    // The same locked screen from the Job's own page, so the tease does not depend on the way in.
+    await page.goto(job.href);
+    await page.getByRole("link", { name: "Practice interview" }).click();
+    await expect(page.getByText(/interview simulator is a Pro feature/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Start interview" })).toHaveCount(0);
+  });
+});

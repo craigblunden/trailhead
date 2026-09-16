@@ -1,0 +1,220 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  ATTEMPT_LENGTHS,
+  CATEGORIES,
+  CATEGORY_MIX,
+  INTERVIEW_PLAN,
+  attemptSeconds,
+  canStartAttempt,
+  formatClock,
+  interviewQuotaStatus,
+  isAttemptLength,
+  isComplete,
+  isScored,
+  nextQuestion,
+  questionCount,
+  remainingSeconds,
+  rollUp,
+  scoreBand,
+  type Attempt,
+  type AttemptQuestion,
+  type Category,
+} from "@/lib/interview";
+import { PLANS, PLAN_LIMITS } from "@/lib/plans";
+
+/**
+ * The Interview Simulator's pure rules, on both sides of the boundary: the Category mix, the
+ * active-time countdown, where a resumed Attempt picks up, and the Scorecard's rollups.
+ */
+
+const question = (
+  order: number,
+  category: Category,
+  answer?: { transcript?: string; score?: number | null; rationale?: string },
+): AttemptQuestion => ({
+  id: `q${order}`,
+  category,
+  order,
+  text: `${category}?`,
+  ...(answer
+    ? {
+        answer: {
+          transcript: answer.transcript ?? "Said something.",
+          score: answer.score ?? null,
+          rationale: answer.rationale ?? "",
+        },
+      }
+    : {}),
+});
+
+const attempt = (questions: AttemptQuestion[], overrides: Partial<Attempt> = {}): Attempt => ({
+  id: "attempt-1",
+  jobId: "job-1",
+  length: 5,
+  activeSeconds: 0,
+  completedAt: null,
+  overallScore: null,
+  questions,
+  ...overrides,
+});
+
+describe("the Category mix (ticket 05)", () => {
+  it("IV-1: every length spans all five Categories, and the counts are the spec's table", () => {
+    expect(ATTEMPT_LENGTHS).toEqual([5, 10, 30]);
+    expect(CATEGORIES).toEqual(["personal", "behavioural", "stakeholder", "technical", "design"]);
+    for (const length of ATTEMPT_LENGTHS) {
+      for (const category of CATEGORIES) expect(CATEGORY_MIX[length][category]).toBeGreaterThan(0);
+    }
+    expect(CATEGORY_MIX[5]).toEqual({ personal: 1, behavioural: 1, stakeholder: 1, technical: 1, design: 1 });
+    expect(CATEGORY_MIX[10]).toEqual({ personal: 2, behavioural: 2, stakeholder: 2, technical: 2, design: 2 });
+    expect(CATEGORY_MIX[30]).toEqual({ personal: 2, behavioural: 3, stakeholder: 3, technical: 4, design: 3 });
+  });
+
+  it("IV-2: the totals are 5, 10, and 15 questions, and the countdown is the length in minutes", () => {
+    expect([5, 10, 30].map((length) => questionCount(length as 5 | 10 | 30))).toEqual([5, 10, 15]);
+    expect(attemptSeconds(5)).toBe(300);
+    expect(attemptSeconds(30)).toBe(1_800);
+  });
+
+  it("IV-3: only the three lengths are lengths", () => {
+    expect([5, 10, 30].every(isAttemptLength)).toBe(true);
+    for (const value of [0, 1, 15, 45, "5", null, undefined, NaN]) expect(isAttemptLength(value)).toBe(false);
+  });
+});
+
+describe("which Plans may run one (ticket 08)", () => {
+  it("IV-4: the simulator runs on pro this phase; free and basic see the locked preview", () => {
+    expect(INTERVIEW_PLAN).toBe("pro");
+    expect(PLANS.filter(canStartAttempt)).toEqual(["pro"]);
+  });
+
+  it("IV-5: every Plan still carries a real Attempts-per-week Limit and its own length choices", () => {
+    expect(PLAN_LIMITS.free.interviewsPerWeek).toBe(1);
+    expect(PLAN_LIMITS.basic.interviewsPerWeek).toBe(3);
+    expect(PLAN_LIMITS.pro.interviewsPerWeek).toBe(10);
+    expect(PLAN_LIMITS.free.interviewLengths).toEqual([5]);
+    expect(PLAN_LIMITS.basic.interviewLengths).toEqual([5, 10]);
+    expect(PLAN_LIMITS.pro.interviewLengths).toEqual([5, 10, 30]);
+  });
+});
+
+describe("the countdown (tickets 02, 04)", () => {
+  it("IV-6: time left is the budget less the active seconds, and never negative", () => {
+    expect(remainingSeconds({ length: 5, activeSeconds: 0 })).toBe(300);
+    expect(remainingSeconds({ length: 5, activeSeconds: 120 })).toBe(180);
+    expect(remainingSeconds({ length: 5, activeSeconds: 300 })).toBe(0);
+    // A clock that over-reported cannot show a negative countdown.
+    expect(remainingSeconds({ length: 5, activeSeconds: 400 })).toBe(0);
+  });
+
+  it("IV-7: the clock reads as minutes and padded seconds", () => {
+    expect(formatClock(300)).toBe("5:00");
+    expect(formatClock(65)).toBe("1:05");
+    expect(formatClock(9)).toBe("0:09");
+    expect(formatClock(0)).toBe("0:00");
+    expect(formatClock(-5)).toBe("0:00");
+  });
+});
+
+describe("where a resumed Attempt picks up (ticket 04)", () => {
+  it("IV-8: the next question is the first with no Answer, in order, whatever order the rows arrive in", () => {
+    const shuffled = [
+      question(2, "stakeholder"),
+      question(0, "personal", {}),
+      question(1, "behavioural"),
+    ];
+
+    expect(nextQuestion(attempt(shuffled))?.order).toBe(1);
+  });
+
+  it("IV-9: a question left mid-answer carries no Answer at all, so returning resumes on it, never inside it", () => {
+    // The Tenant navigated away while answering question 1: nothing was recorded for it.
+    const interrupted = attempt([question(0, "personal", {}), question(1, "behavioural"), question(2, "stakeholder")]);
+
+    expect(nextQuestion(interrupted)?.order).toBe(1);
+    expect(interrupted.questions[1].answer).toBeUndefined();
+    expect(isComplete(interrupted)).toBe(false);
+  });
+
+  it("IV-10: an Attempt is complete when every question has an Answer, and an empty one is never complete", () => {
+    expect(isComplete(attempt([question(0, "personal", {}), question(1, "design", {})]))).toBe(true);
+    expect(nextQuestion(attempt([question(0, "personal", {})]))).toBeUndefined();
+    expect(isComplete(attempt([]))).toBe(false);
+  });
+
+  it("IV-11: an Attempt is scored once it carries an overall score", () => {
+    expect(isScored({ overallScore: null })).toBe(false);
+    expect(isScored({ overallScore: 0 })).toBe(true);
+    expect(isScored({ overallScore: 71 })).toBe(true);
+  });
+});
+
+describe("the Scorecard's rollups (ticket 03)", () => {
+  it("IV-12: each Category is its own questions' average, and overall is the average across every answered question", () => {
+    const scorecard = rollUp([
+      question(0, "personal", { score: 80 }),
+      question(1, "technical", { score: 40 }),
+      question(2, "technical", { score: 60 }),
+      question(3, "technical", { score: 50 }),
+    ]);
+
+    expect(scorecard.categories).toEqual([
+      { category: "personal", score: 80, questions: 1 },
+      { category: "technical", score: 50, questions: 3 },
+    ]);
+    // Not the average of the two Category averages (65) — that would weigh one question as heavily
+    // as three.
+    expect(scorecard.overall).toBe(58);
+  });
+
+  it("IV-13: a Category is listed in the fixed Category order, and one with nothing answered is left out rather than shown as a zero", () => {
+    const scorecard = rollUp([
+      question(0, "design", { score: 90 }),
+      question(1, "personal", { score: 70 }),
+      // Answered but unscored, and unanswered: neither earns a Category a zero.
+      question(2, "stakeholder", { score: null }),
+      question(3, "behavioural"),
+    ]);
+
+    expect(scorecard.categories.map((category) => category.category)).toEqual(["personal", "design"]);
+    expect(scorecard.overall).toBe(80);
+  });
+
+  it("IV-14: an Attempt with nothing scored rolls up to zero rather than to NaN", () => {
+    expect(rollUp([question(0, "personal"), question(1, "design")])).toEqual({ overall: 0, categories: [] });
+    expect(rollUp([])).toEqual({ overall: 0, categories: [] });
+  });
+
+  it("IV-15: a score reads as a band, so the Scorecard is words as well as a number", () => {
+    expect([100, 80].map(scoreBand)).toEqual(["strong", "strong"]);
+    expect([79, 60].map(scoreBand)).toEqual(["solid", "solid"]);
+    expect([59, 40].map(scoreBand)).toEqual(["developing", "developing"]);
+    expect([39, 0].map(scoreBand)).toEqual(["weak", "weak"]);
+  });
+});
+
+describe("this week's Attempts (ticket 01)", () => {
+  it("IV-16: the status says what is used, what is left, and when the week rolls over", () => {
+    expect(interviewQuotaStatus(3, "2026-09-14", 10)).toEqual({
+      limit: 10,
+      used: 3,
+      remaining: 7,
+      resetsOn: "2026-09-21",
+    });
+  });
+
+  it("IV-17: a Tenant moved to a smaller Plan never sees a negative count left", () => {
+    expect(interviewQuotaStatus(25, "2026-09-14", 10)).toMatchObject({ used: 10, remaining: 0 });
+    expect(interviewQuotaStatus(-1, "2026-09-14", 10)).toMatchObject({ used: 0, remaining: 10 });
+  });
+
+  it("IV-18: an unlimited Limit leaves the count alone and has nothing left to count down", () => {
+    expect(interviewQuotaStatus(40, "2026-09-14", "unlimited")).toEqual({
+      limit: "unlimited",
+      used: 40,
+      remaining: "unlimited",
+      resetsOn: "2026-09-21",
+    });
+  });
+});

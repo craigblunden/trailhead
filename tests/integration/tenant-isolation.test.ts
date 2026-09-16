@@ -5,7 +5,18 @@ import { withTenant, type TenantClient } from "@/server/db/tenant";
 
 import { newUserId, resetTables, setPlan } from "./helpers";
 
-const TABLES = ["Job", "ActivityEntry", "Contact", "JobContact", "Document", "GenerationQuota", "UserPlan"] as const;
+const TABLES = [
+  "Job",
+  "ActivityEntry",
+  "Contact",
+  "JobContact",
+  "Document",
+  "GenerationQuota",
+  "UserPlan",
+  "Attempt",
+  "AttemptQuestion",
+  "InterviewQuota",
+] as const;
 
 /** Seeds one row in every application table for `userId`, returning the ids. */
 async function seedEverything(tx: TenantClient, userId: string) {
@@ -38,6 +49,15 @@ async function seedEverything(tx: TenantClient, userId: string) {
     },
   });
   await tx.generationQuota.create({ data: { userId, weekStart: new Date("2026-07-20"), used: 2, flagged: 1 } });
+  await tx.attempt.create({
+    data: {
+      userId,
+      jobId: job.id,
+      length: 5,
+      questions: { create: { userId, category: "personal", order: 0, text: "Why this role?" } },
+    },
+  });
+  await tx.interviewQuota.create({ data: { userId, weekStart: new Date("2026-07-20"), used: 1 } });
   return { job, contact, document };
 }
 
@@ -51,10 +71,13 @@ async function countAll(db: TenantClient | typeof prisma) {
     Document: await db.document.count(),
     GenerationQuota: await db.generationQuota.count(),
     UserPlan: await db.userPlan.count(),
+    Attempt: await db.attempt.count(),
+    AttemptQuestion: await db.attemptQuestion.count(),
+    InterviewQuota: await db.interviewQuota.count(),
   };
 }
 
-const NOTHING = { Job: 0, ActivityEntry: 0, Contact: 0, JobContact: 0, Document: 0, GenerationQuota: 0, UserPlan: 0 };
+const NOTHING = Object.fromEntries(TABLES.map((table) => [table, 0])) as Record<(typeof TABLES)[number], number>;
 
 beforeEach(async () => {
   await resetTables();
@@ -124,6 +147,9 @@ describe("ticket 04: tenant isolation, proven", () => {
       Document: 1,
       GenerationQuota: 1,
       UserPlan: 1,
+      Attempt: 1,
+      AttemptQuestion: 1,
+      InterviewQuota: 1,
     });
 
     const asB = await withTenant(userB, (tx) => countAll(tx));

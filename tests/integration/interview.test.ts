@@ -1,0 +1,565 @@
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+
+import Anthropic from "@anthropic-ai/sdk";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { signInAs, signOut } from "./session-mock";
+
+import {
+  CATEGORIES,
+  CATEGORY_MIX,
+  attemptSeconds,
+  nextQuestion,
+  remainingSeconds,
+  type AttemptLength,
+  type Category,
+} from "@/lib/interview";
+import { PLAN_LIMITS } from "@/lib/plans";
+import { setJobDocument } from "@/server/data/documents";
+import { interviewQuota, latestAttempt } from "@/server/data/interview";
+import { createJob } from "@/server/data/jobs";
+import { withTenant } from "@/server/db/tenant";
+import { answerQuestion, endAttempt, scoreAttempt } from "@/server/interview/answer-attempt";
+import { INTERVIEW_MODEL } from "@/server/interview/claude";
+import { startAttempt } from "@/server/interview/start-attempt";
+
+import { newUserId, resetTables, setPlan } from "./helpers";
+
+/**
+ * The Interview Simulator's orchestration layer against the real database (interview simulator
+ * tickets 01–05). Nothing is mocked but the session: the Claude call goes through a real SDK client
+ * — the seam the orchestration takes — to a local fake of the Messages API, so every other layer
+ * runs for real: the quota upsert, the policies, the refunds, the persisted question set, the
+ * Answers, and the active-time accounting.
+ */
+type Reply = { status?: number; delayMs?: number; body: unknown };
+
+let reply: Reply;
+let requests = 0;
+let server: Server;
+let baseURL: string;
+
+const message = (overrides: Record<string, unknown>) => ({
+  id: "msg_test",
+  type: "message",
+  role: "assistant",
+  model: INTERVIEW_MODEL,
+  content: [],
+  stop_reason: "end_turn",
+  stop_sequence: null,
+  stop_details: null,
+  usage: { input_tokens: 900, output_tokens: 400 },
+  ...overrides,
+});
+
+const answer = (object: Record<string, unknown>) =>
+  message({ content: [{ type: "text", text: JSON.stringify(object) }] });
+
+/** A question set with exactly the mix the length's table asks for. */
+const questionSet = (length: AttemptLength) =>
+  CATEGORIES.flatMap((category) =>
+    Array.from({ length: CATEGORY_MIX[length][category] }, (_, index) => ({
+      category,
+      text: `A ${category} question ${index + 1}?`,
+    })),
+  );
+
+const QUESTIONS = (length: AttemptLength = 5) => answer({ questions: questionSet(length) });
+
+beforeAll(async () => {
+  server = createServer((request, response) => {
+    let raw = "";
+    request.on("data", (chunk) => (raw += chunk));
+    request.on("end", () => {
+      requests += 1;
+      setTimeout(() => {
+        if (response.destroyed) return;
+        response.writeHead(reply.status ?? 200, { "content-type": "application/json" });
+        response.end(JSON.stringify(reply.body));
+      }, reply.delayMs ?? 0);
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  baseURL = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+});
+
+afterAll(async () => {
+  server.closeAllConnections();
+  await new Promise((resolve) => server.close(resolve));
+});
+
+const claude = (timeout = 5_000) => new Anthropic({ apiKey: "test-key", baseURL, maxRetries: 0, timeout });
+
+const MONDAY = new Date("2026-07-20T09:00:00.000Z");
+
+/** A `pro` Tenant with a Job that has both a description and a ready resume. */
+async function proTenantWithJob(description = "Own onboarding, pricing, and the referral loop.") {
+  const userId = newUserId();
+  await setPlan(userId, "pro");
+  signInAs(userId);
+  const job = await createJob(
+    {
+      company: "Fernwood",
+      role: "Product Designer",
+      location: "Remote",
+      salaryMin: null,
+      salaryMax: null,
+      postingUrl: "",
+      description,
+    },
+    MONDAY,
+  );
+  const resume = await withTenant(userId, (tx) =>
+    tx.document.create({
+      data: {
+        userId,
+        kind: "resume",
+        fileName: "resume.pdf",
+        storageKey: `${userId}/${crypto.randomUUID()}.pdf`,
+        mimeType: "application/pdf",
+        text: "Sam Rivera — Senior Product Designer.",
+        ingestion: "ready",
+      },
+    }),
+  );
+  await setJobDocument(job.id, "resume", resume.id);
+  return { userId, jobId: job.id };
+}
+
+const start = (jobId: string, length: AttemptLength = 5, reset = false) =>
+  startAttempt(jobId, { client: claude(), length, reset });
+
+const usedThisWeek = (userId: string) =>
+  withTenant(userId, async (tx) => (await tx.interviewQuota.findFirst({ select: { used: true } }))?.used ?? 0);
+
+/** Answers every question of an Attempt, `seconds` each. */
+async function answerAll(attemptId: string, questions: { id: string }[], seconds = 10) {
+  let last;
+  for (const question of questions) {
+    last = await answerQuestion(attemptId, {
+      questionId: question.id,
+      transcript: `An answer to ${question.id}.`,
+      elapsedSeconds: seconds,
+    });
+  }
+  return last;
+}
+
+beforeEach(async () => {
+  await resetTables();
+  signOut();
+  reply = { body: QUESTIONS() };
+  requests = 0;
+  vi.restoreAllMocks();
+});
+
+describe("ticket 01: starting an Attempt", () => {
+  it("persists a question set spanning all five Categories, in order, and counts one Attempt against the week", async () => {
+    const { userId, jobId } = await proTenantWithJob();
+
+    const outcome = await start(jobId);
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.attempt.questions).toHaveLength(5);
+    expect(outcome.attempt.questions.map((question) => question.order)).toEqual([0, 1, 2, 3, 4]);
+    expect(new Set(outcome.attempt.questions.map((question) => question.category))).toEqual(new Set(CATEGORIES));
+    expect(outcome.attempt.length).toBe(5);
+    expect(outcome.attempt.completedAt).toBeNull();
+    expect(await usedThisWeek(userId)).toBe(1);
+    expect(outcome.quota).toMatchObject({ limit: PLAN_LIMITS.pro.interviewsPerWeek, used: 1, remaining: 9 });
+  });
+
+  it("shows exactly the questions originally generated on reload — nothing is regenerated", async () => {
+    const { jobId } = await proTenantWithJob();
+    const outcome = await start(jobId);
+    if (!outcome.ok) throw new Error("expected a started Attempt");
+
+    // A second call to the fake would return a different set; reading the Attempt back makes none.
+    const callsAfterStart = requests;
+    const reloaded = await latestAttempt(jobId);
+
+    expect(requests).toBe(callsAfterStart);
+    expect(reloaded?.questions).toEqual(outcome.attempt.questions);
+  });
+
+  it("each length persists its own Category mix", async () => {
+    for (const length of [5, 10, 30] as const) {
+      const { jobId } = await proTenantWithJob();
+      reply = { body: QUESTIONS(length) };
+
+      const outcome = await start(jobId, length);
+
+      expect(outcome.ok).toBe(true);
+      if (!outcome.ok) return;
+      for (const category of CATEGORIES) {
+        const count = outcome.attempt.questions.filter((question) => question.category === category).length;
+        expect(count, `${length}m ${category}`).toBe(CATEGORY_MIX[length][category as Category]);
+      }
+    }
+  });
+
+  it("refuses a Job with no resume, and one with no description, before any quota is taken", async () => {
+    const { userId, jobId } = await proTenantWithJob("");
+    expect(await start(jobId)).toMatchObject({ ok: false, reason: "no-description", refunded: false });
+
+    const noResume = await withTenant(userId, (tx) => tx.job.create({
+      data: { userId, company: "Harvest", role: "Designer", location: "Remote", addedOn: MONDAY, accent: "moss", description: "A real posting." },
+    }));
+    expect(await start(noResume.id)).toMatchObject({ ok: false, reason: "no-resume", refunded: false });
+
+    expect(await usedThisWeek(userId)).toBe(0);
+    expect(requests).toBe(0);
+  });
+
+  it("refuses a Tenant who is not on pro, and one asking for a length their Plan does not offer", async () => {
+    const { userId, jobId } = await proTenantWithJob();
+    await setPlan(userId, "basic");
+
+    expect(await start(jobId)).toMatchObject({ ok: false, reason: "not-pro" });
+    expect(await usedThisWeek(userId)).toBe(0);
+    expect(requests).toBe(0);
+
+    await setPlan(userId, "pro");
+    // `pro` chooses between all three; a fourth length never reaches the call.
+    expect(await start(jobId, 45 as AttemptLength)).toMatchObject({ ok: false, reason: "bad-length" });
+    expect(requests).toBe(0);
+  });
+});
+
+describe("ticket 01: the weekly quota, reserved and given back", () => {
+  it("allows a pro Tenant ten Attempts a week, reserved atomically even when requests race", async () => {
+    const { userId, jobId } = await proTenantWithJob();
+    const limit = PLAN_LIMITS.pro.interviewsPerWeek as number;
+
+    // Each start is for its own Job, so the in-progress rule does not get in the way of the race.
+    const jobs = [jobId];
+    for (let index = 1; index < limit + 2; index += 1) {
+      const job = await withTenant(userId, (tx) => tx.job.create({
+        data: { userId, company: `Company ${index}`, role: "Designer", location: "Remote", addedOn: MONDAY, accent: "moss", description: "A real posting.", resumeId: null },
+      }));
+      jobs.push(job.id);
+    }
+    // Every Job needs the resume the questions are drawn from.
+    const resume = await withTenant(userId, (tx) => tx.document.findFirstOrThrow({ select: { id: true } }));
+    for (const job of jobs.slice(1)) await setJobDocument(job, "resume", resume.id);
+
+    const outcomes = await Promise.all(jobs.map((job) => start(job)));
+
+    expect(outcomes.filter((outcome) => outcome.ok)).toHaveLength(limit);
+    expect(outcomes.filter((outcome) => !outcome.ok && outcome.reason === "quota")).toHaveLength(jobs.length - limit);
+    expect(await usedThisWeek(userId)).toBe(limit);
+    expect(await interviewQuota()).toMatchObject({ used: limit, remaining: 0 });
+  });
+
+  it("gives the Attempt back when generation fails, times out, or comes back unfinished — and not when Claude refuses", async () => {
+    const { userId, jobId } = await proTenantWithJob();
+
+    const ours: Reply[] = [
+      { status: 529, body: { type: "error", error: { type: "overloaded_error", message: "Overloaded" } } },
+      { body: message({ stop_reason: "max_tokens", content: [{ type: "text", text: '{"questions": [' }] }) },
+      // A set that does not span the five Categories is malformed, and ours to give back.
+      { body: answer({ questions: questionSet(5).slice(0, 3) }) },
+    ];
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    for (const failure of ours) {
+      reply = failure;
+      expect(await start(jobId)).toMatchObject({ ok: false, refunded: true });
+      expect(await usedThisWeek(userId)).toBe(0);
+    }
+
+    reply = { delayMs: 1_000, body: QUESTIONS() };
+    expect(await startAttempt(jobId, { client: claude(200), length: 5 })).toMatchObject({
+      ok: false,
+      reason: "timed-out",
+      refunded: true,
+    });
+    expect(await usedThisWeek(userId)).toBe(0);
+
+    // A refusal is the one failure the Tenant's own material can cause: it stays counted.
+    reply = { body: message({ stop_reason: "refusal", stop_details: { type: "refusal", category: null } }) };
+    expect(await start(jobId)).toMatchObject({ ok: false, reason: "refused", refunded: false });
+    expect(await usedThisWeek(userId)).toBe(1);
+  });
+
+  it("never gives an Attempt back for being abandoned: a delivered question set is a used Attempt", async () => {
+    const { userId, jobId } = await proTenantWithJob();
+
+    const outcome = await start(jobId);
+    expect(outcome.ok).toBe(true);
+    // The Tenant walks away and comes back days later; the count is unchanged.
+    expect(await usedThisWeek(userId)).toBe(1);
+    expect(await interviewQuota()).toMatchObject({ used: 1, remaining: 9 });
+  });
+});
+
+describe("ticket 02: answering, the clock, and completion", () => {
+  it("records each Answer against its question and adds the seconds it took to the Attempt's active time", async () => {
+    const { jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+    const [first, second] = started.attempt.questions;
+
+    const afterFirst = await answerQuestion(started.attempt.id, {
+      questionId: first.id,
+      transcript: "I led the reporting redesign.",
+      elapsedSeconds: 45,
+    });
+
+    expect(afterFirst.ok).toBe(true);
+    if (!afterFirst.ok) return;
+    expect(afterFirst.attempt.questions[0].answer?.transcript).toBe("I led the reporting redesign.");
+    expect(afterFirst.attempt.activeSeconds).toBe(45);
+    expect(remainingSeconds(afterFirst.attempt)).toBe(attemptSeconds(5) - 45);
+    // The pause between questions is untimed: nothing but a submitted Answer moves the clock.
+    expect(nextQuestion(afterFirst.attempt)?.id).toBe(second.id);
+    expect(afterFirst.attempt.completedAt).toBeNull();
+  });
+
+  it("completes the Attempt once every question has an Answer", async () => {
+    const { jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+
+    const last = await answerAll(started.attempt.id, started.attempt.questions, 20);
+
+    expect(last?.ok).toBe(true);
+    if (!last?.ok) return;
+    expect(last.attempt.completedAt).not.toBeNull();
+    expect(last.attempt.activeSeconds).toBe(100);
+    expect(nextQuestion(last.attempt)).toBeUndefined();
+  });
+
+  it("refuses a second Answer to the same question, and any Answer to a finished Attempt", async () => {
+    const { jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+    const [first] = started.attempt.questions;
+    await answerQuestion(started.attempt.id, { questionId: first.id, transcript: "Once.", elapsedSeconds: 10 });
+
+    expect(
+      await answerQuestion(started.attempt.id, { questionId: first.id, transcript: "Twice.", elapsedSeconds: 10 }),
+    ).toMatchObject({ ok: false, reason: "no-attempt" });
+
+    await answerAll(started.attempt.id, started.attempt.questions.slice(1), 10);
+    expect(
+      await answerQuestion(started.attempt.id, {
+        questionId: started.attempt.questions[1].id,
+        transcript: "After the end.",
+        elapsedSeconds: 10,
+      }),
+    ).toMatchObject({ ok: false, reason: "no-attempt" });
+
+    // The first Answer stands, unchanged by either attempt to overwrite it.
+    const stored = await latestAttempt(jobId);
+    expect(stored?.questions[0].answer?.transcript).toBe("Once.");
+  });
+
+  it("the countdown running out ends the Attempt where it stands: nothing is force-submitted", async () => {
+    const { jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+    await answerQuestion(started.attempt.id, {
+      questionId: started.attempt.questions[0].id,
+      transcript: "The only one I finished.",
+      elapsedSeconds: 30,
+    });
+
+    const ended = await endAttempt(started.attempt.id);
+
+    expect(ended.ok).toBe(true);
+    if (!ended.ok) return;
+    expect(ended.attempt.completedAt).not.toBeNull();
+    expect(remainingSeconds(ended.attempt)).toBe(0);
+    expect(ended.attempt.questions.filter((question) => question.answer)).toHaveLength(1);
+    // The four unanswered questions stay unanswered rather than being recorded empty.
+    expect(ended.attempt.questions.slice(1).every((question) => !question.answer)).toBe(true);
+  });
+});
+
+describe("ticket 04: resuming an interrupted Attempt, or resetting it", () => {
+  it("resumes at the next unanswered question with the remaining budget exactly as it was left", async () => {
+    const { jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+    await answerQuestion(started.attempt.id, {
+      questionId: started.attempt.questions[0].id,
+      transcript: "Answered before the phone rang.",
+      elapsedSeconds: 40,
+    });
+
+    // The tab closes mid-question 2 and the Tenant comes back later.
+    const resumed = await latestAttempt(jobId);
+
+    expect(resumed).not.toBeNull();
+    if (!resumed) return;
+    // Nothing drained while they were away: active time is only what was actually answered for.
+    expect(resumed.activeSeconds).toBe(40);
+    expect(remainingSeconds(resumed)).toBe(attemptSeconds(5) - 40);
+    expect(nextQuestion(resumed)?.id).toBe(started.attempt.questions[1].id);
+    // The question they were mid-way through carries no half-recorded Answer.
+    expect(resumed.questions[1].answer).toBeUndefined();
+    expect(resumed.questions).toEqual(started.attempt.questions.map((question, index) =>
+      index === 0
+        ? { ...question, answer: { transcript: "Answered before the phone rang.", score: null, rationale: "" } }
+        : question,
+    ));
+  });
+
+  it("will not silently start a second Attempt while one is unfinished: it offers the one in progress", async () => {
+    const { userId, jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+
+    const again = await start(jobId);
+
+    expect(again).toMatchObject({ ok: false, reason: "in-progress" });
+    expect(again.ok === false && again.attempt?.id).toBe(started.attempt.id);
+    expect(await usedThisWeek(userId)).toBe(1);
+  });
+
+  it("resetting starts a fresh Attempt and costs another one from the week", async () => {
+    const { userId, jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+
+    const fresh = await start(jobId, 5, true);
+
+    expect(fresh.ok).toBe(true);
+    if (!fresh.ok) return;
+    expect(fresh.attempt.id).not.toBe(started.attempt.id);
+    expect(await usedThisWeek(userId)).toBe(2);
+    // The abandoned Attempt is left behind, not deleted; the newest one is what resumes.
+    expect((await latestAttempt(jobId))?.id).toBe(fresh.attempt.id);
+  });
+
+  it("with no Attempts left, resetting is refused — so abandoning and restarting cannot bypass the Limit", async () => {
+    const { userId, jobId } = await proTenantWithJob();
+    await withTenant(userId, (tx) =>
+      tx.interviewQuota.create({
+        data: { userId, weekStart: new Date("2026-07-20T00:00:00.000Z"), used: PLAN_LIMITS.pro.interviewsPerWeek as number },
+      }),
+    );
+    vi.setSystemTime(new Date("2026-07-22T09:00:00.000Z"));
+
+    expect(await start(jobId, 5, true)).toMatchObject({ ok: false, reason: "quota", refunded: false });
+    expect(requests).toBe(0);
+    vi.useRealTimers();
+  });
+});
+
+describe("ticket 03: scoring a completed Attempt", () => {
+  const scores = (count: number, score = 70) =>
+    answer({ scores: Array.from({ length: count }, (_, index) => ({ score: score + index, rationale: `Because ${index}.` })) });
+
+  it("scores every Answer, rolls them up per Category and overall, and stores the lot", async () => {
+    const { jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+    await answerAll(started.attempt.id, started.attempt.questions, 20);
+
+    reply = { body: scores(5) };
+    const scored = await scoreAttempt(started.attempt.id, { client: claude() });
+
+    expect(scored.ok).toBe(true);
+    if (!scored.ok) return;
+    // 70..74 across five questions, one per Category.
+    expect(scored.scorecard.overall).toBe(72);
+    expect(scored.scorecard.categories).toHaveLength(CATEGORIES.length);
+    for (const question of scored.attempt.questions) {
+      expect(question.answer?.score).toBeGreaterThanOrEqual(70);
+      expect(question.answer?.rationale).toMatch(/^Because \d\.$/);
+    }
+    expect(scored.attempt.overallScore).toBe(72);
+
+    // Stored, not just returned: reloading the Attempt shows the same Scorecard.
+    const reloaded = await latestAttempt(jobId);
+    expect(reloaded?.overallScore).toBe(72);
+    expect(reloaded?.questions[0].answer?.score).toBe(70);
+  });
+
+  it("refuses to score an Attempt that is not finished", async () => {
+    const { jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+    await answerQuestion(started.attempt.id, {
+      questionId: started.attempt.questions[0].id,
+      transcript: "Only the first.",
+      elapsedSeconds: 10,
+    });
+
+    expect(await scoreAttempt(started.attempt.id, { client: claude() })).toMatchObject({
+      ok: false,
+      reason: "incomplete",
+    });
+    expect((await latestAttempt(jobId))?.overallScore).toBeNull();
+  });
+
+  it("scores an Attempt the clock ended, marking its unanswered questions rather than skipping them", async () => {
+    const { jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+    await answerQuestion(started.attempt.id, {
+      questionId: started.attempt.questions[0].id,
+      transcript: "The only one I finished.",
+      elapsedSeconds: 30,
+    });
+    await endAttempt(started.attempt.id);
+
+    reply = { body: scores(5, 0) };
+    const scored = await scoreAttempt(started.attempt.id, { client: claude() });
+
+    expect(scored.ok).toBe(true);
+    if (!scored.ok) return;
+    // Every question is scored, including the four the clock never reached.
+    expect(scored.attempt.questions.every((question) => typeof question.answer?.score === "number")).toBe(true);
+    expect(scored.scorecard.categories).toHaveLength(CATEGORIES.length);
+  });
+
+  it("a scoring failure costs nothing and can be retried: the Attempt was counted when it was started", async () => {
+    const { userId, jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+    await answerAll(started.attempt.id, started.attempt.questions, 20);
+
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    reply = { status: 529, body: { type: "error", error: { type: "overloaded_error", message: "Overloaded" } } };
+    expect(await scoreAttempt(started.attempt.id, { client: claude() })).toMatchObject({ ok: false, reason: "failed" });
+    expect(await usedThisWeek(userId)).toBe(1);
+
+    reply = { body: scores(5) };
+    expect(await scoreAttempt(started.attempt.id, { client: claude() })).toMatchObject({ ok: true });
+    expect(await usedThisWeek(userId)).toBe(1);
+  });
+});
+
+describe("tenant isolation", () => {
+  it("one Tenant cannot see, answer, or score another's Attempt", async () => {
+    const owner = await proTenantWithJob();
+    const started = await start(owner.jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+
+    const intruder = newUserId();
+    await setPlan(intruder, "pro");
+    signInAs(intruder);
+
+    expect(await answerQuestion(started.attempt.id, {
+      questionId: started.attempt.questions[0].id,
+      transcript: "Not mine.",
+      elapsedSeconds: 10,
+    })).toMatchObject({ ok: false, reason: "no-attempt" });
+    expect(await scoreAttempt(started.attempt.id, { client: claude() })).toMatchObject({
+      ok: false,
+      reason: "no-attempt",
+    });
+    // The other Tenant's Job is not on this Tenant's trail at all.
+    await expect(latestAttempt(owner.jobId)).rejects.toThrow(/isn't on your trail/);
+
+    // Nothing the intruder did reached the owner's Attempt.
+    signInAs(owner.userId);
+    const untouched = await latestAttempt(owner.jobId);
+    expect(untouched?.questions[0].answer).toBeUndefined();
+    expect(untouched?.overallScore).toBeNull();
+  });
+});

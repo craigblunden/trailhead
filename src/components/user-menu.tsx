@@ -12,7 +12,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { PlanMark } from "@/components/plan-mark";
+import { PlanBlaze, PlanMark } from "@/components/plan-mark";
+import { canStartAttempt } from "@/lib/interview";
 import type { Plan } from "@/lib/plans";
 
 type UserMenuProps = {
@@ -63,6 +64,19 @@ export function UserMenu({ name, email, plan, signOut }: UserMenuProps) {
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/documents">Documents</Link>
+        </DropdownMenuItem>
+        {/* On a phone this menu is the only way to the primary nav's routes, so it carries the
+            Interview Simulator too — marked, for the Plans that cannot start one yet. */}
+        <DropdownMenuItem asChild>
+          <Link href="/interview" className="justify-between">
+            Interview practice
+            {!canStartAttempt(plan) && (
+              <span className="flex items-center gap-1 text-[0.6875rem] font-medium text-primary">
+                <PlanBlaze plan="pro" />
+                Pro
+              </span>
+            )}
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>

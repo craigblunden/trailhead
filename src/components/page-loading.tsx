@@ -44,6 +44,7 @@ export function PageLoading() {
   if (pathname.startsWith("/board/")) return <JobLoading id={pathname.slice("/board/".length)} />;
   if (pathname.startsWith("/contacts")) return <ContactsLoading selectedId={contactIdIn(pathname)} />;
   if (pathname.startsWith("/documents")) return <DocumentsLoading />;
+  if (pathname.startsWith("/interview")) return <InterviewLoading />;
   if (pathname.startsWith("/account")) return <AccountLoading />;
   // A section this file does not know yet: say so plainly rather than draw another page's outline.
   return <SectionLoading />;
@@ -599,6 +600,45 @@ function AccountLoading() {
             <Bar className="mt-2.5 h-3.5 w-full max-w-md" />
             <Bar className="mt-4 h-9 w-36 rounded-lg" />
           </GhostCard>
+        </div>
+      </PageMain>
+    </div>
+  );
+}
+
+/**
+ * `/interview` and `/interview/<job>`: the hub's picker and a Job's start screen share this outline
+ * — a title, a line, a search box or a length row, and the space the rest fills. Which of the two is
+ * arriving is not worth two outlines: the page's own heading is the same either way, and everything
+ * below it is a bar that becomes either.
+ */
+function InterviewLoading() {
+  return (
+    <div className="flex flex-1 flex-col">
+      <AppHeader leading={<BrandLogo href="/board" />} loading />
+      <PageWait>Loading interview practice…</PageWait>
+
+      <PageMain>
+        <SectionTitle>Interview practice</SectionTitle>
+        <SectionLede>
+          Rehearse for one job against questions written from its posting and your own resume, answered
+          out loud and against the clock, then scored.
+        </SectionLede>
+
+        <div className="mt-6 max-w-2xl space-y-3">
+          <Bar className="h-10 w-full rounded-md" />
+          <Bar className="h-4 w-40" />
+          <div className="flex flex-col gap-1.5">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex items-center gap-3 rounded-md border border-border px-3 py-2.5">
+                <Bar className="size-8 shrink-0 rounded-full" />
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Bar className="h-4 w-1/2" />
+                  <Bar className="h-3 w-1/3" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </PageMain>
     </div>

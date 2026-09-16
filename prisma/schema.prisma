@@ -8,8 +8,9 @@
 // - An applied migration is never edited. A change is a new migration.
 // - Only `src/server/db/` imports the generated client. Mappers are the boundary to the app.
 // - The models are Job, Contact, ActivityEntry, Document, the Job↔Contact link, the weekly
-//   generation quota, and the Tenant's Plan. No Analysis, Requirement, Evidence, queue, or
-//   job-state table: that work left the phase deliberately.
+//   generation quota, the Tenant's Plan, and the Interview Simulator's Attempt, AttemptQuestion,
+//   and weekly InterviewQuota. No Analysis, Requirement, Evidence, queue, or job-state table:
+//   that work left the phase deliberately.
 
 generator client {
   provider        = "prisma-client"
@@ -105,6 +106,7 @@ model Job {
   draftWrittenAt DateTime?
   contacts    JobContact[]
   activity    ActivityEntry[]
+  attempts    Attempt[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -224,4 +226,76 @@ model UserPlan {
   userId    String   @id @db.Uuid
   plan      Plan
   updatedAt DateTime @default(now())
+}
+
+/// The five fixed dimensions an Attempt's questions are drawn from. Members match `CATEGORIES` in
+/// `src/lib/interview.ts`; `enum-assertions.ts` fails the typecheck if they drift.
+enum Category {
+  personal
+  behavioural
+  stakeholder
+  technical
+  design
+}
+
+/// One timed run of the Interview Simulator against one Job (interview simulator ticket 01). Its
+/// question set is generated once and persisted, so a resumed Attempt asks exactly what it asked
+/// the first time. `activeSeconds` is active-time accounting, not a wall-clock deadline: it grows
+/// only while questions are actually being answered, so a closed tab does not drain the budget.
+model Attempt {
+  id            String    @id @default(cuid(2))
+  userId        String    @db.Uuid
+  jobId         String
+  job           Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  /// Minutes. One of `ATTEMPT_LENGTHS`; which are offered depends on the Tenant's Plan.
+  length        Int
+  startedAt     DateTime  @default(now())
+  /// Seconds this Attempt has been answered for. The countdown is `length * 60` less this.
+  activeSeconds Int       @default(0)
+  /// Set once every question has an Answer, or the countdown ran out mid-question.
+  completedAt   DateTime?
+  /// The Scorecard's overall score, 0–100. Null until the Attempt is scored.
+  overallScore  Int?
+  questions     AttemptQuestion[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  /// The Job's detail page and the hub both ask for this Job's newest Attempt.
+  @@index([userId, jobId, startedAt(sort: Desc)])
+}
+
+/// One generated question in an Attempt, with its Category and its place in the order. Persisted at
+/// generation time and never regenerated. Its Answer is the same row: a question has at most one.
+model AttemptQuestion {
+  id        String   @id @default(cuid(2))
+  userId    String   @db.Uuid
+  attemptId String
+  attempt   Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  category  Category
+  /// Position in the Attempt, from 0.
+  order     Int
+  text      String
+  /// What the Tenant said, spoken or typed — the two input modes write the same field. Empty until
+  /// answered; a question left mid-answer when the Tenant navigated away stays empty.
+  transcript  String    @default("")
+  answeredAt  DateTime?
+  /// The Answer's score, 0–100, and why it was marked that way. Null until the Attempt is scored.
+  score       Int?
+  rationale   String    @default("")
+
+  @@unique([attemptId, order])
+  @@index([userId])
+}
+
+/// Interview Attempts taken from one user's weekly quota. Weeks start Monday, UTC, like the
+/// cover-letter quota — but its own table, because that one's Flag and Hold semantics are specific
+/// to cover-letter Feedback abuse and mean nothing here. Reserved atomically before generation runs
+/// and given back only if generation fails (see src/server/data/interview.ts).
+model InterviewQuota {
+  userId    String   @db.Uuid
+  weekStart DateTime @db.Date
+  used      Int      @default(0)
+  updatedAt DateTime @default(now())
+
+  @@id([userId, weekStart])
 }

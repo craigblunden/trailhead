@@ -52,6 +52,59 @@ const answer = ({ letter, verdict = "none", setAside = false }) =>
 
 const fenced = (prompt, tag) => new RegExp(`<${tag}>\\n([\\s\\S]*?)\\n</${tag}>`).exec(prompt)?.[1] ?? null;
 
+/*
+ * The Interview Simulator's two calls (interview simulator tickets 01, 03) are told apart by their
+ * system prompts, and answered in the shape each one's schema asks for. The same description markers
+ * above still apply — `[[refuse]]`, `[[overload]]`, `[[hang]]` — since they are matched on the whole
+ * prompt, so a test can exercise a failed generation the same way it does for a letter.
+ */
+
+const isQuestions = (system) => system.startsWith("You prepare a mock interview");
+const isScoring = (system) => system.startsWith("You score a job seeker's answers");
+
+/** The Category counts the prompt asked for, as its "- personal: 2" lines give them. */
+const requestedMix = (prompt) =>
+  Array.from(prompt.matchAll(/^- (\w+): (\d+)$/gm), ([, category, count]) => ({
+    category,
+    count: Number(count),
+  }));
+
+/** Exactly the mix asked for: a set that is short of one is malformed to the app, by design. */
+const questionsFor = (prompt, company) =>
+  message({
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify({
+          questions: requestedMix(prompt).flatMap(({ category, count }) =>
+            Array.from({ length: count }, (_, index) => ({
+              category,
+              text: `A ${category} question ${index + 1} about working at ${company}?`,
+            })),
+          ),
+        }),
+      },
+    ],
+  });
+
+/** One score per answer, in order, so the app can say which Answer each belongs to. */
+const scoresFor = (prompt) => {
+  const answers = prompt.match(/<answer index="\d+"/g)?.length ?? 0;
+  return message({
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify({
+          scores: Array.from({ length: answers }, (_, index) => ({
+            score: 60 + ((index * 7) % 30),
+            rationale: `Answer ${index + 1}: you named the work but not what came of it.`,
+          })),
+        }),
+      },
+    ],
+  });
+};
+
 createServer((request, response) => {
   if (request.method === "GET" && request.url === "/health") {
     response.writeHead(200, { "content-type": "text/plain" });
@@ -69,6 +122,7 @@ createServer((request, response) => {
       // A malformed request gets a letter-less error below.
     }
     const prompt = String(body.messages?.[0]?.content ?? "");
+    const system = String(body.system ?? "");
     const company = fenced(prompt, "company") ?? "your company";
     const feedback = fenced(prompt, "feedback");
 
@@ -97,6 +151,8 @@ createServer((request, response) => {
       return send(529, { type: "error", error: { type: "overloaded_error", message: "Overloaded" } }, 200);
     }
     const delay = prompt.includes("[[hang]]") ? 30_000 : prompt.includes("[[slow]]") ? 5_000 : 400;
+    if (isQuestions(system)) return send(200, questionsFor(prompt, company), delay);
+    if (isScoring(system)) return send(200, scoresFor(prompt), delay);
     const verdict = feedback?.includes("[[flag]]") ? "feedback" : feedback?.includes("[[material]]") ? "material" : "none";
     const setAside = Boolean(feedback?.includes("[[aside]]"));
     return send(200, answer({ letter: letterFor(company, feedback), verdict, setAside }), delay);

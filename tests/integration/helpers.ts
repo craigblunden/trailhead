@@ -8,10 +8,13 @@ import { setPlanForUser, withMigrator, type SqlClient } from "../../scripts/plan
 const APPLICATION_TABLES = [
   "JobContact",
   "ActivityEntry",
+  "AttemptQuestion",
+  "Attempt",
   "Job",
   "Contact",
   "Document",
   "GenerationQuota",
+  "InterviewQuota",
   "UserPlan",
 ] as const;
 

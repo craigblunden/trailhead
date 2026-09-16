@@ -36,11 +36,32 @@ describe("/llms.txt", () => {
     expect(text).toContain("Recruiter, Hiring manager, Referrer, Other");
   });
 
-  it("LLM-4: describes the board, the job page, Documents and Contacts", async () => {
+  it("LLM-4: describes the board, the job page, interview practice, Documents and Contacts", async () => {
     const { text } = await llmsTxt();
 
-    for (const heading of ["## The board", "## A job's page", "## Documents", "## Contacts"]) {
+    for (const heading of [
+      "## The board",
+      "## A job's page",
+      "## Interview practice",
+      "## Documents",
+      "## Contacts",
+    ]) {
       expect(text).toContain(heading);
     }
+  });
+
+  /**
+   * The file is for a user's own LLM, so it says what the simulator needs from them and what it does
+   * with what they say. Plan numbers stay out, as everywhere else here: they change with pricing.
+   */
+  it("LLM-5: says what interview practice needs, and that no audio is stored", async () => {
+    const { text } = await llmsTxt();
+
+    expect(text).toContain("5, 10, or 30 minutes");
+    expect(text).toContain("personal, behavioural, stakeholder, technical, and design");
+    expect(text).toMatch(/No audio is recorded, uploaded, or stored/);
+    expect(text).toMatch(/the pause to collect your thoughts is untimed/);
+    // No Limit numbers: "10 a week" would go stale quietly.
+    expect(text).not.toMatch(/d+ interviews a week/);
   });
 });
