@@ -158,6 +158,19 @@ export async function updateJob(id: string, patch: JobPatchInput): Promise<Job> 
 }
 
 /**
+ * Removes the Job and everything that hangs off it alone — its activity and its Contact links —
+ * which cascade at the database (`ActivityEntry`, `JobContact`). A Document sent with it only has
+ * its reference cleared, never itself: a Document is the user's, not the Job's.
+ */
+export async function deleteJob(id: string): Promise<void> {
+  const { userId } = await requireSession();
+  await withTenant(userId, async (tx) => {
+    const { count } = await tx.job.deleteMany({ where: { id, userId } });
+    if (count === 0) throw new NotFoundError();
+  });
+}
+
+/**
  * The read, the write, and the activity insert happen in one transaction. What changes is
  * `stageChange`'s decision: re-selecting the current stage writes nothing; a move adds "Moved to …"
  * dated today; leaving `interested` with no applied date backfills one; moving to `interested`

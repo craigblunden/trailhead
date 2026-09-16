@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createJobAction, setJobStageAction, updateJobAction } from "@/server/actions/jobs";
-import { createContact, listContacts } from "@/server/data/contacts";
+import { createJobAction, deleteJobAction, setJobStageAction, updateJobAction } from "@/server/actions/jobs";
+import { createContact, linkContact, listContacts } from "@/server/data/contacts";
 import { NotFoundError } from "@/server/data/errors";
-import { createJob, getJob, listJobs, setJobStage, updateJob } from "@/server/data/jobs";
+import { createJob, deleteJob, getJob, listJobs, setJobStage, updateJob } from "@/server/data/jobs";
 import { prisma } from "@/server/db/prisma";
 
 import { newUserId, resetTables } from "./helpers";
@@ -338,6 +338,62 @@ describe("ticket 11: the detail page is real, and stage and notes persist", () =
     const untouched = await getJob(jobA.id);
     expect(untouched).toMatchObject({ notes: "", stage: "interested" });
     expect(untouched?.activity).toHaveLength(1);
+  });
+});
+
+describe("deleting a job", () => {
+  const dana = {
+    name: "Dana Whitfield",
+    kind: "recruiter" as const,
+    title: "",
+    agency: "",
+    email: "",
+    phone: "",
+    notes: "",
+    linkedinUrl: "",
+    lastSpokenOn: null,
+  };
+
+  it("removes the job, its activity, and its contact links — the contact itself stays", async () => {
+    signInAs(newUserId());
+    const job = await createJob(input, FROZEN);
+    await setJobStage(job.id, "applied", FROZEN);
+    const contact = await createContact(dana);
+    await linkContact(job.id, contact.id);
+
+    await deleteJob(job.id);
+
+    expect(await getJob(job.id)).toBeNull();
+    expect(await listJobs()).toEqual([]);
+    expect(await prisma.activityEntry.count({ where: { jobId: job.id } })).toBe(0);
+    expect(await prisma.jobContact.count({ where: { jobId: job.id } })).toBe(0);
+    const survivor = await listContacts();
+    expect(survivor).toMatchObject([{ id: contact.id, jobCount: 0 }]);
+  });
+
+  it("an unknown id and another user's id are the same refusal", async () => {
+    const userA = newUserId();
+    signInAs(userA);
+    const jobA = await createJob(input, FROZEN);
+
+    await expect(deleteJob("does-not-exist")).rejects.toBeInstanceOf(NotFoundError);
+
+    signInAs(newUserId());
+    await expect(deleteJob(jobA.id)).rejects.toBeInstanceOf(NotFoundError);
+    const foreign = await deleteJobAction(jobA.id);
+    const missing = await deleteJobAction("does-not-exist");
+    expect(foreign).toMatchObject({ ok: false, error: "not-found" });
+    expect(foreign).toEqual(missing);
+
+    signInAs(userA);
+    expect(await getJob(jobA.id)).toMatchObject({ id: jobA.id });
+  });
+
+  it("the action asks for re-authentication when there is no session", async () => {
+    expect(await deleteJobAction("does-not-exist")).toMatchObject({
+      ok: false,
+      error: "unauthenticated",
+    });
   });
 });
 

@@ -242,6 +242,33 @@ describe("a write the server accepts", () => {
   });
 });
 
+describe("deleting a Job", () => {
+  it("CACHE-11: stays in the list until the server agrees, then leaves it for good", async () => {
+    const { cache, list } = setup();
+    const send = deferred<void>();
+
+    const removing = cache.remove(HARVEST, { send: () => send.promise, fallback: "That job wasn't deleted." });
+    expect(list().map((job) => job.id)).toContain(HARVEST);
+
+    send.resolve();
+    expect(await removing).toEqual({ ok: true });
+    expect(list().map((job) => job.id)).toEqual([FERNWOOD, MERIDIAN]);
+  });
+
+  it("CACHE-12: a refusal leaves every Job exactly as it was", async () => {
+    const { cache, list } = setup();
+    const before = list();
+
+    const removing = cache.remove(HARVEST, {
+      send: () => Promise.reject(new Error("503 from the server")),
+      fallback: "That job wasn't deleted.",
+    });
+
+    expect(await removing).toEqual({ ok: false, message: "That job wasn't deleted." });
+    expect(list()).toEqual(before);
+  });
+});
+
 describe("resyncing the list", () => {
   it("CACHE-8: happens once, when the last write in flight settles — not while one is on its way", async () => {
     const { queryClient, cache } = setup();

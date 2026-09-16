@@ -35,11 +35,19 @@ export type JobWrite = {
 
 export type WriteResult = { ok: true; job: Job } | { ok: false; message: string };
 
+export type RemoveResult = { ok: true } | { ok: false; message: string };
+
 export type JobCache = {
   /** Changes one Job. Never throws: a failure comes back as a message, already rolled back. */
   update(jobId: string, write: JobWrite): Promise<WriteResult>;
   /** Adds a Job, built from the list as it stands when the change is shown. */
   add(build: (jobs: Job[]) => Job, write: Omit<JobWrite, "apply">): Promise<WriteResult>;
+  /**
+   * Deletes a Job. Rare and deliberate, like a Contact's delete, so it waits for the server rather
+   * than showing the removal first: the Job stays in the list until the write settles, and leaves
+   * it only once the server has agreed.
+   */
+  remove(jobId: string, write: { send: () => Promise<void>; fallback: string }): Promise<RemoveResult>;
   /** The Jobs may have changed elsewhere — a Document deleted, a Contact renamed: resync once nothing is in flight. */
   refresh(): void;
   /**
@@ -184,6 +192,22 @@ export function jobCache(queryClient: QueryClient): JobCache {
       } catch (error) {
         cancelReads();
         queryClient.setQueryData<Job[]>(jobsCache.key, (jobs) => jobs?.filter((job) => job.id !== optimistic.id));
+        return { ok: false, message: describeFailure(error, fallback) };
+      } finally {
+        settled();
+      }
+    },
+
+    async remove(jobId, { send, fallback }) {
+      cancelReads();
+      inFlight.writes += 1;
+      try {
+        await send();
+        cancelReads();
+        queryClient.setQueryData<Job[]>(jobsCache.key, (jobs) => jobs?.filter((job) => job.id !== jobId));
+        return { ok: true };
+      } catch (error) {
+        cancelReads();
         return { ok: false, message: describeFailure(error, fallback) };
       } finally {
         settled();

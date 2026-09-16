@@ -27,7 +27,7 @@ function rejectingClient(): JobsClient {
     new Promise<never>((_, fail) =>
       setTimeout(() => fail(new Error("503 from the server")), 150),
     );
-  return { list: store.jobs.list, add: reject, update: reject, setStage: reject };
+  return { list: store.jobs.list, add: reject, update: reject, setStage: reject, remove: reject };
 }
 
 async function selectStage(user: ReturnType<typeof renderWithJobs>["user"], stage: string) {

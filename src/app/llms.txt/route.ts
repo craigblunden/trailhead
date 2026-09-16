@@ -61,6 +61,7 @@ Opening a card shows the job's page:
 - Cover letters: "Write cover letter" writes a letter for this job from its resume and job description. Under a letter, "What should change?" takes short feedback (up to ${chars(FEEDBACK_MAX_CHARS)}) about the letter, and "Rewrite" writes it again with that feedback. Each write counts toward the week's cover letters.
 - Contacts: the people linked to this job
 - Activity: a dated history the app writes itself, such as "Moved to Interviewing"; it cannot be typed into
+- Delete this job: removes the job and its activity for good, after a confirmation. Documents and contacts it used stay.
 
 ## Documents
 

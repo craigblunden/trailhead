@@ -2,7 +2,7 @@
 
 import type { Job } from "@/lib/jobs";
 import { invalid, parseId, runAction as run, type ActionResult } from "@/server/action-result";
-import { createJob, listJobs, setJobStage, updateJob } from "@/server/data/jobs";
+import { createJob, deleteJob, listJobs, setJobStage, updateJob } from "@/server/data/jobs";
 import { jobPatchSchema, newJobSchema, parseInput, stageSchema } from "@/server/validation";
 
 /**
@@ -36,4 +36,13 @@ export async function setJobStageAction(id: unknown, stage: unknown): Promise<Ac
   const parsedStage = parseInput(stageSchema, stage);
   if (!parsedStage.ok) return invalid({ stage: "Unknown stage" });
   return run("jobs.setStage", () => setJobStage(job.id, parsedStage.data));
+}
+
+export async function deleteJobAction(id: unknown): Promise<ActionResult<null>> {
+  const job = parseId(id, "job");
+  if (!job.ok) return job.failure;
+  return run("jobs.delete", async () => {
+    await deleteJob(job.id);
+    return null;
+  });
 }

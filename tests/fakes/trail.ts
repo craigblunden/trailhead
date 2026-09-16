@@ -176,6 +176,12 @@ export function createTrail({
     setStage: vi.fn(async (id: string, stage: Stage) =>
       saveJob(movedJob(findJob(id), stage, todayUtc(), () => nextId("entry"))),
     ),
+    remove: vi.fn(async (id: string) => {
+      findJob(id);
+      storedJobs = storedJobs.filter((job) => job.id !== id);
+      for (const link of [...links]) if (link.startsWith(`${id} `)) links.delete(link);
+      return null;
+    }),
   } satisfies JobsClient;
 
   const contactsClient = {

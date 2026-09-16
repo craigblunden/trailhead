@@ -11,10 +11,14 @@ import { createTrail } from "../fakes/trail";
 import { SEED_JOBS } from "../fixtures/jobs";
 import { freezeClock, renderWithJobs, screen, waitFor, within } from "../test-utils";
 
-const navigation = vi.hoisted(() => ({ replace: vi.fn(), pathname: "/board/harvest-lead-product-designer" }));
+const navigation = vi.hoisted(() => ({
+  push: vi.fn(),
+  replace: vi.fn(),
+  pathname: "/board/harvest-lead-product-designer",
+}));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), replace: navigation.replace, prefetch: vi.fn() }),
+  useRouter: () => ({ push: navigation.push, replace: navigation.replace, prefetch: vi.fn() }),
   usePathname: () => navigation.pathname,
   useSelectedLayoutSegment: () => null,
 }));
@@ -56,6 +60,7 @@ async function selectStage(
 beforeEach(() => {
   freezeClock();
   navigation.replace.mockReset();
+  navigation.push.mockReset();
 });
 
 afterEach(() => {
@@ -616,6 +621,101 @@ describe("a refused edit (architecture ticket 01)", () => {
     expect(alert).toHaveTextContent("Enter a whole number of thousands");
     expect(alert).not.toHaveTextContent("Check the highlighted fields");
     expect(update).toHaveBeenLastCalledWith(HARVEST, { salaryMin: 1.5 });
+  });
+});
+
+describe("deleting the job", () => {
+  const deleteButton = () => screen.getByRole("button", { name: "Delete job" });
+  const confirmDialog = () => screen.getByRole("dialog", { name: `Delete ${harvest.role} at ${harvest.company}?` });
+
+  it("DET-20: asks for confirmation before deleting anything", async () => {
+    const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
+
+    await user.click(deleteButton());
+
+    expect(confirmDialog()).toBeInTheDocument();
+    expect(trail.jobs.remove).not.toHaveBeenCalled();
+  });
+
+  it("DET-20: cancelling leaves the job exactly where it was", async () => {
+    const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
+
+    await user.click(deleteButton());
+    await user.click(within(confirmDialog()).getByRole("button", { name: "Keep job" }));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(trail.jobs.remove).not.toHaveBeenCalled();
+    expect(navigation.push).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(harvest.role);
+  });
+
+  it("DET-20: confirming deletes the job and leaves for the board", async () => {
+    const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
+
+    await user.click(deleteButton());
+    await user.click(within(confirmDialog()).getByRole("button", { name: "Delete job" }));
+
+    expect(trail.jobs.remove).toHaveBeenCalledWith(HARVEST);
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith("/board"));
+    expect(trail.jobsNow().map((job) => job.id)).not.toContain(HARVEST);
+  });
+
+  it("DET-20: a delete in flight can't be dismissed — Keep job, Escape, and the close button all do nothing", async () => {
+    const trail = createTrail({ jobs: SEED_JOBS });
+    const send = deferred<void>();
+    // Gates the store's own removal behind `send`, so the fake behaves like a real request that has
+    // not yet answered — rather than a bare stub that would leave the store, and so the eventual
+    // refetch, none the wiser about the delete at all.
+    const remove = vi.fn((id: string) => send.promise.then(() => trail.jobs.remove(id)));
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { trail, client: { ...trail.jobs, remove } });
+
+    await user.click(deleteButton());
+    await user.click(within(confirmDialog()).getByRole("button", { name: "Delete job" }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "Keep job" })).toBeDisabled();
+    await user.click(within(dialog).getByRole("button", { name: "Keep job" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    send.resolve();
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith("/board"));
+  });
+
+  it("DET-20: never flashes 'not on your trail' between the delete landing and leaving for the board", async () => {
+    const trail = createTrail({ jobs: SEED_JOBS });
+    const send = deferred<void>();
+    const remove = vi.fn((id: string) => send.promise.then(() => trail.jobs.remove(id)));
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { trail, client: { ...trail.jobs, remove } });
+
+    await user.click(deleteButton());
+    await user.click(within(confirmDialog()).getByRole("button", { name: "Delete job" }));
+    send.resolve();
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith("/board"));
+
+    // The mocked router doesn't actually navigate away, so whatever renders next is what a real
+    // user would see for the render or two before the route change lands — and it must be a loading
+    // state, not "This job isn't on your trail".
+    expect(screen.queryByRole("heading", { name: /This job isn.t on your trail/ })).toBeNull();
+    expect(screen.getByText("Loading this job…")).toBeInTheDocument();
+  });
+
+  it("DET-20: a refused delete says why, keeps the job, and stays off the board", async () => {
+    const trail = createTrail({ jobs: SEED_JOBS });
+    const remove = vi
+      .fn<(id: string) => Promise<null>>()
+      .mockRejectedValue(new ActionError("failed", "That job wasn't deleted. Check your connection and try again."));
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { trail, client: { ...trail.jobs, remove } });
+
+    await user.click(deleteButton());
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Delete job" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "That job wasn't deleted. Check your connection and try again.",
+    );
+    expect(navigation.push).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(harvest.role);
   });
 });
 

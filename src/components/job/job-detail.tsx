@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { ArrowUpRight, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowUpRight, Sparkles, Trash2 } from "lucide-react";
 
 import { AppHeader } from "@/components/app-header";
 import { BrandLogo } from "@/components/brand-logo";
@@ -23,7 +23,15 @@ import { LoadErrorHint } from "@/components/load-error";
 import { JobLoading } from "@/components/page-loading";
 import { PageMain } from "@/components/page-main";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Excerpt } from "@/components/ui/excerpt";
 import {
   Select,
@@ -51,6 +59,7 @@ export function JobDetail({
     getJob,
     updateJob,
     setStage,
+    removeJob,
     status,
     error,
     dismissError,
@@ -65,14 +74,27 @@ export function JobDetail({
   // Read from the same `jobs` the branch below already agreed on — not a second, later lookup —
   // so the redirect's preview can never disagree with the decision to show it.
   const redirectJob = redirectTo ? getJob(redirectTo) : undefined;
+  // Set the moment a delete is asked for, before the cache can drop the Job: a successful delete
+  // removes it from the list as soon as the server agrees, which would otherwise read as "not on
+  // your trail" for the render or two before the navigation below actually lands.
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (redirectTo) router.replace(`/board/${redirectTo}`);
   }, [redirectTo, router]);
 
+  async function handleDelete() {
+    setDeleting(true);
+    const ok = await removeJob(jobId);
+    if (ok) router.push("/board");
+    else setDeleting(false);
+    return ok;
+  }
+
   // The same outline the navigation showed; here it stays until the client's own fetch answers, or
-  // — for a job clicked open before its add settled — until the redirect above lands.
-  if (!job && (status === "pending" || redirectTo))
+  // — for a job clicked open before its add settled — until the redirect above lands, or a delete
+  // in flight is on its way to the board.
+  if (!job && (status === "pending" || redirectTo || deleting))
     return <JobLoading id={jobId} job={redirectJob} />;
   // The list failed to load, not this one job: say so, with a way to retry, same as the board.
   if (!job && status === "error") return <JobDetailError onRetry={reload} />;
@@ -86,6 +108,8 @@ export function JobDetail({
       dismissError={dismissError}
       onPatch={(patch) => updateJob(job.id, patch)}
       onStage={(stage) => setStage(job.id, stage)}
+      deleting={deleting}
+      onDelete={handleDelete}
     />
   );
 }
@@ -129,6 +153,9 @@ type JobDetailViewProps = {
   dismissError: () => void;
   onPatch: (patch: JobPatch) => Promise<boolean>;
   onStage: (stage: Stage) => void;
+  /** Whether a delete for this Job is on its way — disables the confirmation while it is. */
+  deleting: boolean;
+  onDelete: () => Promise<boolean>;
 };
 
 /**
@@ -212,6 +239,108 @@ function CoverLetterJumpCard({ job }: { job: Job }) {
   );
 }
 
+/**
+ * Removes the Job for good, placed under Activity so it reads as the last thing on the page rather
+ * than a stray control beside the writing. Confirmed the same way a Contact's delete is, except the
+ * dialog stays open and un-dismissable — the close button, Escape, the overlay, and "Keep job" all
+ * go through `deleting` — while the delete is in flight: a stray dismissal can't outrun a delete
+ * that then succeeds anyway. `deleting` comes from the page above, which uses it to hold this Job on
+ * screen through the render or two between the cache dropping it and the navigation landing, rather
+ * than flashing "not on your trail" for a Job the user just chose to remove.
+ */
+function DeleteJobCard({
+  job,
+  deleting,
+  onDelete,
+}: {
+  job: Job;
+  deleting: boolean;
+  onDelete: () => Promise<boolean>;
+}) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const deleteTrigger = useRef<HTMLButtonElement>(null);
+
+  async function handleDelete() {
+    const ok = await onDelete();
+    if (!ok) setConfirmOpen(false);
+  }
+
+  return (
+    <>
+      <Card
+        role="region"
+        aria-labelledby="delete-job-heading"
+        className="ring-destructive/25 [--card-spacing:--spacing(5)]"
+      >
+        <CardHeader>
+          <CardTitle className="text-lg">
+            <h2 id="delete-job-heading">Delete this job</h2>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Removes {job.role} at {job.company} from your board, for good — its activity goes with
+            it. Documents and contacts linked to it are untouched.
+          </p>
+          <Button
+            ref={deleteTrigger}
+            type="button"
+            variant="destructive"
+            className="mt-4 h-9 px-3.5"
+            disabled={deleting}
+            onClick={() => setConfirmOpen(true)}
+          >
+            <Trash2 aria-hidden="true" />
+            Delete job
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={confirmOpen}
+        onOpenChange={(open) => {
+          if (!deleting) setConfirmOpen(open);
+        }}
+      >
+        <DialogContent
+          // Opened without a DialogTrigger, so Radix has nowhere to return focus: send it back to
+          // the button that opened the confirmation.
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            deleteTrigger.current?.focus();
+          }}
+          className="gap-0 p-6 sm:max-w-md"
+        >
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-xl">
+              Delete {job.role} at {job.company}?
+            </DialogTitle>
+            <DialogDescription>This can&rsquo;t be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mx-0 mb-0 gap-2 border-t-0 bg-transparent p-0 pt-2">
+            <Button
+              variant="outline"
+              className="h-10 px-4"
+              disabled={deleting}
+              onClick={() => setConfirmOpen(false)}
+            >
+              Keep job
+            </Button>
+            <Button
+              variant="destructive"
+              className="h-10 px-4"
+              disabled={deleting}
+              onClick={() => void handleDelete()}
+            >
+              {deleting ? "Deleting…" : "Delete job"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 /** Each free-text field is saved by its own button, so a long paste is never saved mid-edit. */
 function JobDetailView({
   job,
@@ -220,6 +349,8 @@ function JobDetailView({
   dismissError,
   onPatch,
   onStage,
+  deleting,
+  onDelete,
 }: JobDetailViewProps) {
   const description = useSavedText(job.description, (value) =>
     onPatch({ description: value }),
@@ -430,6 +561,7 @@ function JobDetailView({
               <div className="min-w-0 space-y-6">
                 <ContactsCard job={job} />
                 <ActivityCard entries={job.activity} />
+                <DeleteJobCard job={job} deleting={deleting} onDelete={onDelete} />
               </div>
             </aside>
           </div>

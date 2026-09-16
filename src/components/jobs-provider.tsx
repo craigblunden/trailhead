@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 import { unwrapping } from "@/components/action-client";
-import { jobCache, type WriteResult } from "@/components/job-cache";
+import { jobCache, type RemoveResult, type WriteResult } from "@/components/job-cache";
 import { contactsCache } from "@/lib/contacts-client";
 import { todayUtc } from "@/lib/dates";
 import type { Job, Stage } from "@/lib/jobs";
@@ -13,6 +13,7 @@ import type { JobPatch, JobsClient, NewJobInput } from "@/lib/jobs-client";
 import { movedJob, newJob, optimisticId } from "@/lib/jobs-rules";
 import {
   createJobAction,
+  deleteJobAction,
   listJobsAction,
   setJobStageAction,
   updateJobAction,
@@ -31,6 +32,8 @@ type JobsContextValue = {
   updateJob: (id: string, patch: JobPatch) => Promise<boolean>;
   /** Moves a Job to a Stage. False when there was nothing to do: no such Job, or already there. */
   setStage: (id: string, stage: Stage) => boolean;
+  /** Deletes a Job for good. Resolves true once the server has agreed, false on a refused delete. */
+  removeJob: (id: string) => Promise<boolean>;
   /** The most recent write failure, already rolled back. Null when there is none. */
   error: string | null;
   dismissError: () => void;
@@ -48,6 +51,7 @@ const defaultClient: JobsClient = {
   add: unwrapping(createJobAction),
   update: unwrapping(updateJobAction),
   setStage: unwrapping(setJobStageAction),
+  remove: unwrapping(deleteJobAction),
 };
 
 /**
@@ -76,7 +80,7 @@ export function JobsProvider({
   const query = useQuery(jobsCache.options(() => client.list()));
   const jobs = useMemo(() => query.data ?? [], [query.data]);
 
-  const report = useCallback((result: WriteResult) => {
+  const report = useCallback((result: WriteResult | RemoveResult) => {
     if (!result.ok) setError(result.message);
   }, []);
 
@@ -131,6 +135,16 @@ export function JobsProvider({
           .then(report);
         return true;
       },
+      removeJob: (id) =>
+        cache
+          .remove(id, {
+            send: () => client.remove(id).then(() => undefined),
+            fallback: "That job wasn't deleted. Check your connection and try again.",
+          })
+          .then((result) => {
+            report(result);
+            return result.ok;
+          }),
       error,
       dismissError: () => setError(null),
       reload: () => void refetch(),

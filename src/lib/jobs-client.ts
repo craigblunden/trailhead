@@ -20,4 +20,5 @@ export type JobsClient = {
   add(input: NewJobInput): Promise<Job>;
   update(id: string, patch: JobPatch): Promise<Job>;
   setStage(id: string, stage: Stage): Promise<Job>;
+  remove(id: string): Promise<unknown>;
 };
