@@ -323,6 +323,81 @@ describe("the contacts list (ticket 14)", () => {
     expect(await screen.findByRole("heading", { name: "No contacts yet" })).toBeInTheDocument();
   });
 
+  describe("searching the list", () => {
+    const people = [
+      dana,
+      priya,
+      { id: "sam", name: "Sam Ortiz", kind: "hiring_manager" as const, agency: "", title: "Design Director" },
+    ];
+    const search = () => screen.getByRole("searchbox", { name: /search contacts/i });
+
+    async function renderPeople() {
+      const view = renderWithJobs(<ContactsShell>detail</ContactsShell>, {
+        trail: createTrail({ contacts: people }),
+      });
+      await screen.findByRole("link", { name: /Dana Whitfield/ });
+      return view;
+    }
+
+    it("CON-S1: shows every contact when the search box is empty", async () => {
+      await renderPeople();
+
+      expect(search()).toHaveValue("");
+      for (const person of people) {
+        expect(screen.getByRole("link", { name: new RegExp(person.name) })).toBeInTheDocument();
+      }
+    });
+
+    it("CON-S1: filters by name, case-insensitively and on part of a word", async () => {
+      const { user } = await renderPeople();
+
+      await user.type(search(), "PRIY");
+
+      expect(screen.getByRole("link", { name: /Priya Raman/ })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /Dana Whitfield/ })).toBeNull();
+      expect(screen.queryByRole("link", { name: /Sam Ortiz/ })).toBeNull();
+    });
+
+    it("CON-S1: filters by agency", async () => {
+      const { user } = await renderPeople();
+
+      await user.type(search(), "northstar");
+
+      expect(screen.getByRole("link", { name: /Dana Whitfield/ })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /Priya Raman/ })).toBeNull();
+    });
+
+    it("CON-S1: filters by title, as the Add a contact dialog does", async () => {
+      const { user } = await renderPeople();
+
+      await user.type(search(), "design director");
+
+      expect(screen.getByRole("link", { name: /Sam Ortiz/ })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /Dana Whitfield/ })).toBeNull();
+    });
+
+    it("CON-S2: explains when nothing matches, and offers to clear the search", async () => {
+      const { user } = await renderPeople();
+
+      await user.type(search(), "zzz-no-such-person");
+
+      expect(screen.getByRole("heading", { name: "No contacts match your search" })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /Dana Whitfield/ })).toBeNull();
+
+      await user.click(screen.getByRole("button", { name: "Clear search" }));
+
+      expect(search()).toHaveValue("");
+      expect(screen.getByRole("link", { name: /Dana Whitfield/ })).toBeInTheDocument();
+    });
+
+    it("CON-S3: leaves the empty-list state alone when there are no contacts at all", async () => {
+      renderWithJobs(<ContactsShell>detail</ContactsShell>, { trail: createTrail() });
+
+      expect(await screen.findByRole("heading", { name: "No contacts yet" })).toBeInTheDocument();
+      expect(screen.queryByRole("searchbox")).toBeNull();
+    });
+  });
+
   it("CON-L4: the list has no structural axe violations", async () => {
     const { container } = renderWithJobs(<ContactsShell>detail</ContactsShell>, { trail: danaTrail() });
     await screen.findByRole("link", { name: /Dana Whitfield/ });

@@ -22,6 +22,7 @@ import {
   CONTACT_LIMITS,
   DEFAULT_CONTACT_KIND,
   kindLine,
+  matchesContact,
   type ContactKind,
   type ContactListItem,
 } from "@/lib/contacts";
@@ -114,13 +115,7 @@ function AddJobForm({
 
   const filled = Object.values(details).filter((value) => value.trim()).length;
   const term = name.trim().toLowerCase();
-  const matches = term
-    ? (contacts.data ?? []).filter((contact) =>
-        [contact.name, contact.agency, contact.title].some((value) =>
-          value.toLowerCase().includes(term),
-        ),
-      )
-    : [];
+  const matches = term ? (contacts.data ?? []).filter((contact) => matchesContact(contact, term)) : [];
   const shown = matches.slice(0, MAX_CONTACT_MATCHES);
 
   /** Choosing one of the user's own replaces everything the new-person fields were for. */

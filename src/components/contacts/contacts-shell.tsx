@@ -1,5 +1,6 @@
 "use client";
 
+import { useId, useState } from "react";
 import Link from "next/link";
 import { useSelectedLayoutSegment } from "next/navigation";
 
@@ -10,7 +11,9 @@ import { BrandLogo } from "@/components/brand-logo";
 import { LoadingTrail } from "@/components/loading-trail";
 import { PageMain } from "@/components/page-main";
 import { Button } from "@/components/ui/button";
-import { kindLine } from "@/lib/contacts";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { kindLine, matchesContact } from "@/lib/contacts";
 import { pluralize } from "@/lib/jobs";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +26,11 @@ import { cn } from "@/lib/utils";
 export function ContactsShell({ children }: { children: React.ReactNode }) {
   const selectedId = useSelectedLayoutSegment();
   const contacts = useContactList();
+  const [query, setQuery] = useState("");
+  const searchId = useId();
+
+  const term = query.trim().toLowerCase();
+  const filteredContacts = (contacts.data ?? []).filter((contact) => matchesContact(contact, term));
 
   return (
     <div className="flex flex-1 flex-col">
@@ -47,6 +55,21 @@ export function ContactsShell({ children }: { children: React.ReactNode }) {
             <AddContact className="xl:col-start-3 xl:row-start-1" />
 
             <section aria-labelledby="contacts-list-heading" className="xl:col-start-1 xl:row-start-1">
+              {contacts.isSuccess && contacts.data.length > 0 && (
+                <div className="mb-3">
+                  <Label htmlFor={searchId} className="sr-only">
+                    Search contacts by name, agency, or title
+                  </Label>
+                  <Input
+                    id={searchId}
+                    type="search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Search by name, agency, or title"
+                    autoComplete="off"
+                  />
+                </div>
+              )}
 
               {contacts.isPending ? (
                 <LoadingTrail>Loading your contacts…</LoadingTrail>
@@ -65,9 +88,19 @@ export function ContactsShell({ children }: { children: React.ReactNode }) {
                     job’s Contacts card.
                   </p>
                 </div>
+              ) : filteredContacts.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center">
+                  <h2 className="text-lg">No contacts match your search</h2>
+                  <p className="mx-auto mt-1 max-w-xs text-sm text-muted-foreground">
+                    Try a different name, agency, or title.
+                  </p>
+                  <Button variant="outline" className="mt-5 h-9 px-3.5" onClick={() => setQuery("")}>
+                    Clear search
+                  </Button>
+                </div>
               ) : (
                 <ul className="space-y-2">
-                  {contacts.data.map((contact) => {
+                  {filteredContacts.map((contact) => {
                     const current = contact.id === selectedId;
                     return (
                       <li key={contact.id}>

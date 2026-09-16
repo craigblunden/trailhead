@@ -62,6 +62,19 @@ export function kindLine(contact: { kind: ContactKind; agency: string }): string
 }
 
 /**
+ * Whether a Contact matches a search term by name, agency, or title. The term is expected trimmed
+ * and lower-cased; an empty one matches everyone.
+ */
+export function matchesContact(
+  contact: { name: string; agency: string; title: string },
+  term: string,
+): boolean {
+  return [contact.name, contact.agency, contact.title].some((value) =>
+    value.toLowerCase().includes(term),
+  );
+}
+
+/**
  * Ticket 13 decided these bounds, enforced by the server's schema and mirrored by the forms. Name and kind are required; everything else is optional and
  * stored blank. Last spoken is set by the user, never derived, and never in the future.
  */

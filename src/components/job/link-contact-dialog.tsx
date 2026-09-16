@@ -16,7 +16,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CONTACT_LIMITS, DEFAULT_CONTACT_KIND, kindLine, type ContactKind } from "@/lib/contacts";
+import {
+  CONTACT_LIMITS,
+  DEFAULT_CONTACT_KIND,
+  kindLine,
+  matchesContact,
+  type ContactKind,
+} from "@/lib/contacts";
 import { pluralize } from "@/lib/jobs";
 
 type LinkContactDialogProps = {
@@ -60,13 +66,7 @@ export function LinkContactDialog({
 
   const term = query.trim().toLowerCase();
   const candidates = (contacts.data ?? []).filter((contact) => !linkedIds.includes(contact.id));
-  const matches = term
-    ? candidates.filter((contact) =>
-        [contact.name, contact.agency, contact.title].some((value) =>
-          value.toLowerCase().includes(term),
-        ),
-      )
-    : candidates;
+  const matches = candidates.filter((contact) => matchesContact(contact, term));
   const shown = matches.slice(0, MAX_RESULTS);
   const exactName = (contacts.data ?? []).some((contact) => contact.name.toLowerCase() === term);
 
