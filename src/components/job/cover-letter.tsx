@@ -231,6 +231,15 @@ export function CoverLetterCard({ job, id }: { job: Job; id?: string }) {
 
           {letter && (
             <div className="mt-4">
+              <div className="mb-2 flex flex-wrap items-center justify-end gap-3">
+                <p role="status" className="text-sm text-muted-foreground">
+                  {copied ? "Copied to your clipboard." : ""}
+                </p>
+                <Button className="h-9 px-3.5 shadow-sm" onClick={() => copy(letter)}>
+                  <Copy aria-hidden="true" />
+                  Copy cover letter
+                </Button>
+              </div>
               <Excerpt
                 expanded={letterShown}
                 onToggle={() => setLetterShown((shown) => !shown)}
@@ -249,15 +258,6 @@ export function CoverLetterCard({ job, id }: { job: Job; id?: string }) {
                   {letter}
                 </div>
               </Excerpt>
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <Button variant="outline" className="h-9 px-3.5" onClick={() => copy(letter)}>
-                  <Copy aria-hidden="true" />
-                  Copy cover letter
-                </Button>
-                <p role="status" className="text-sm text-muted-foreground">
-                  {copied ? "Copied to your clipboard." : ""}
-                </p>
-              </div>
               <p className="mt-2 text-xs text-muted-foreground">Saved with this job. Each write replaces it.</p>
 
               {state.phase === "written" && state.verdict === "material" && (

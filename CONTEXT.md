@@ -125,6 +125,32 @@ week and lasting until that week ends. Nothing else about the Tenant changes: th
 and Contacts are untouched.
 _Avoid_: Ban, Suspension, Block, Lockout
 
+### Interview Simulator
+
+**Interview Simulator**:
+The feature, reached at its own page, where a Tenant rehearses for one Job: a timed set of spoken
+questions pulled from that Job's description and the Tenant's resume Document, answered against the
+clock, then scored. Distinct from the Stage `interviewing`, which is the real thing with the company.
+
+**Attempt**:
+One timed run of the Interview Simulator against one Job — its question set, its Answers, and the
+Scorecard once scored. What a Tenant's weekly Limit counts.
+_Avoid_: Interview (as a bare noun — reserve "Interview" for the Stage and the Simulator's name),
+Session, Rehearsal
+
+**Category**:
+One of the five fixed dimensions an Attempt's questions are drawn from: personal, behavioural,
+stakeholder, technical, design. Every Attempt spans all five regardless of length.
+
+**Answer**:
+The response captured for one question during an Attempt, within that question's time.
+_Avoid_: Response, Transcript (reserve for when the answer is actually spoken and transcribed)
+
+**Scorecard**:
+The result of a completed Attempt: a score and short rationale for each Answer, rolled up per
+Category and into one overall score. What tells the Tenant why the Attempt was marked as it was.
+_Avoid_: Score (alone, for the whole result — a Score is one number on the Scorecard), Report, Review
+
 ### Hearing from users
 
 **App feedback**:
