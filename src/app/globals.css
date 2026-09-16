@@ -131,6 +131,8 @@
   --sidebar-accent-foreground: #2f3529;
   --sidebar-border: #dde1d5;
   --sidebar-ring: #4d6b48;
+
+  --leading-tight: 1;
 }
 
 .dark {
