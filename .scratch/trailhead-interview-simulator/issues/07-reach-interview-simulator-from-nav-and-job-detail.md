@@ -17,3 +17,21 @@ Job's Attempt, skipping the picker.
       the picker entirely.
 - [ ] The Job-picker component is tested with `fetch` mocked, covering search filtering and
       selection.
+
+## Comments
+
+**2026-09-16: the hub and a Job's briefing become one page, "One path".** The owner found the separate
+hub (a bare Job picker) and briefing (explanation beside a set-up card) awkward, and asked for a
+single first page. Three layouts were prototyped on `/interview`: three columns, a single path of
+steps, and list-and-detail. **The owner chose the path (variant B).**
+
+- Question settled: what the Interview Simulator's first page should look like once picking a job
+  and setting up an interview are one flow.
+- Prototype, kept as a primary source and never merged: branch `prototype/interview-first-page-layouts`
+  (commit `e4869ff`). Run it with `npm run dev`, then open `http://localhost:3000/interview?variant=B`.
+- What carries into the real page: one column of steps that open in turn (which job, how you'll
+  rehearse, Go); the picked job collapses to a row with "Change"; a job that can't be rehearsed yet
+  says why ("Needs a resume", "Needs the posting") in the picker rather than only refusing at Go.
+
+This ticket's checkboxes still hold: the picker still searches by role or company over a capped,
+ungrouped list, and a Job's detail page still lands straight on that Job with the picker skipped.

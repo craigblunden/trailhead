@@ -77,15 +77,17 @@ test.describe("interview simulator: a pro Tenant rehearses and is scored", () =>
     await putOnPlan(account.email, "pro");
     const job = await jobReadyToRehearse(page);
 
-    // Straight from the Job's page, skipping the picker (ticket 07), onto a briefing named for the Job.
+    // Straight from the Job's page, skipping the picker (ticket 07): the path opens with this job chosen.
     await page.getByRole("link", { name: "Practice interview" }).click();
-    await expect(page.getByRole("heading", { level: 1, name: job.role })).toBeVisible();
-    await expect(page.getByText(/One clock for the whole interview, and it doesn’t pause/)).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Interview Simulator" })).toBeVisible();
+    await expect(page.getByText(job.role)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Change job" })).toHaveAttribute("href", "/interview");
+    await expect(page.getByText(/doesn’t pause between them/)).toBeVisible();
 
     // The real length choice, and the breakdown that length produces (ticket 05).
     await expect(page.getByRole("button", { name: /^5\s*minutes/ })).toBeEnabled();
     await page.getByRole("button", { name: /^5\s*minutes/ }).click();
-    await expect(page.getByText(/5 questions across all five areas/)).toBeVisible();
+    await expect(page.getByText(/1 personal, 1 behavioural, 1 stakeholder, 1 technical, 1 design/)).toBeVisible();
 
     // Speaking is the default where the browser can transcribe, with the reason beside it (ticket 06).
     await expect(page.getByRole("button", { name: /Speaking/ })).toHaveAttribute("aria-pressed", "true");
@@ -146,7 +148,7 @@ test.describe("interview simulator: a pro Tenant rehearses and is scored", () =>
     await page.goto(job.href);
     await page.getByRole("link", { name: "Practice interview" }).click();
 
-    await expect(page.getByRole("heading", { name: "You have an interview in progress" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Pick up where you left off" })).toBeVisible();
     await page.getByRole("button", { name: "Resume" }).click();
 
     // Resume puts question two straight back up — not inside the one abandoned, and with no second press.
@@ -173,7 +175,7 @@ test.describe("interview simulator: the locked preview (ticket 08)", () => {
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Pro");
 
     // The picker still works for them: the tease is the start screen, not a wall before it.
-    await page.getByRole("searchbox", { name: /Which job/ }).fill("Fernwood");
+    await page.getByRole("searchbox", { name: "Search your jobs by role or company" }).fill("Fernwood");
     await page.getByRole("list", { name: "Matching jobs" }).getByRole("link").first().click();
 
     await expect(page.getByText(/Interview Simulator is a Pro feature/)).toBeVisible();
@@ -181,7 +183,7 @@ test.describe("interview simulator: the locked preview (ticket 08)", () => {
     for (const minutes of [5, 10, 30]) {
       await expect(page.getByRole("button", { name: new RegExp(`^${minutes}\\s*minutes`) })).toBeDisabled();
     }
-    await expect(page.getByText("Personal")).toBeVisible();
+    await expect(page.getByText(/1 personal, 1 behavioural/)).toBeVisible();
     // Not a disabled start button: no start action at all.
     await expect(page.getByRole("button", { name: "Go" })).toHaveCount(0);
     await expectNoAxeViolations(page);

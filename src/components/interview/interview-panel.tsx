@@ -1,24 +1,33 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft } from "lucide-react";
 
 import { AppHeader } from "@/components/app-header";
 import { BrandLogo } from "@/components/brand-logo";
 import { AttemptRun } from "@/components/interview/attempt-run";
-import { Briefing, SetupCard } from "@/components/interview/briefing";
 import { interviewClient, type InterviewClient } from "@/components/interview/interview-client";
+import {
+  JobPicker,
+  Path,
+  PickedJob,
+  RehearsalChoices,
+  Step,
+  type PathJob,
+} from "@/components/interview/interview-path";
 import { Scorecard } from "@/components/interview/scorecard";
 import { useSpeechSupported } from "@/components/interview/use-speech";
+import { LoadingTrail } from "@/components/loading-trail";
 import { PageMain } from "@/components/page-main";
+import { PlanBlaze } from "@/components/plan-mark";
 import { Button } from "@/components/ui/button";
+import { formatResetDay } from "@/lib/dates";
 import {
   INTERVIEW_FAILURES,
   canStartAttempt,
   formatClock,
   isComplete,
   isScored,
+  questionCount,
   remainingSeconds,
   type Attempt,
   type AttemptLength,
@@ -26,31 +35,31 @@ import {
   type InterviewQuotaStatus,
   type Scorecard as ScorecardData,
 } from "@/lib/interview";
-import type { Job } from "@/lib/jobs";
+import { pluralize } from "@/lib/jobs";
 import { limitsOf, type Plan } from "@/lib/plans";
 
 /**
- * One Job's Interview Simulator page: the briefing, the interview itself, and the Scorecard, in the
- * one place that knows which of them the Tenant is looking at.
+ * The Interview Simulator: one path from choosing a job to Go, the interview itself, and the
+ * Scorecard (interview simulator tickets 02–08).
  *
- * Which it is comes from the Attempt the server handed down, never from a flag this component keeps:
- * no Attempt is the briefing, an unfinished one offers Resume (and Start over, if there is quota for
- * it), a finished and unscored one offers scoring, and a scored one is the Scorecard. So a reload
- * mid-rehearsal lands exactly where the Tenant was — which is the whole of ticket 04 on this side.
+ * `/interview` renders it with no job, so the path opens on step one; `/interview/<job>` renders it
+ * with that job picked, so step one is done and the path goes on from there. The URL is the choice of
+ * job — a reload, the back button, and the Job page's own link all land where the Tenant was.
  *
- * While the interview runs, the page drops everything but the question, the clock, and the answer:
- * no briefing, no back link, no side card. That focus is the point of the page.
+ * Past step one, what the path offers comes from the job's Attempt as the server handed it down,
+ * never from a flag kept here: no Attempt is the set-up and Go; an unfinished one is Resume (and Start
+ * over, with quota left); a finished, unscored one is scoring; a scored one is its Scorecard. While an
+ * interview runs, the path gives way to the question, the clock, and the answer, and nothing else.
  */
 
-type Phase = "briefing" | "running" | "scored";
-
 export type InterviewPanelProps = {
-  job: Pick<Job, "id" | "company" | "role">;
+  /** The chosen job, or null on `/interview` where none is chosen yet. */
+  job: PathJob | null;
   plan: Plan;
-  /** The Tenant's newest Attempt for this Job, as the server holds it. Null when they have none. */
+  /** The Tenant's newest Attempt for the chosen job, as the server holds it. Null when there is none. */
   attempt: Attempt | null;
   quota: InterviewQuotaStatus | null;
-  /** False when this deployment has no Anthropic key: the page says so instead of offering Go. */
+  /** False when this deployment has no Anthropic key: the path says so instead of offering Go. */
   available: boolean;
   /** Replaced in component tests. */
   client?: InterviewClient;
@@ -75,22 +84,23 @@ export function InterviewPanel({
   // Chosen once and kept across questions: a Tenant who opens the transcript on the first question
   // shouldn't have to open it again on every one after.
   const [transcriptShown, setTranscriptShown] = useState(false);
-  const [failure, setFailure] = useState<string | null>(available ? null : INTERVIEW_FAILURES.unavailable);
+  const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [scorecard, setScorecard] = useState<ScorecardData | undefined>(undefined);
   // An unfinished Attempt on arrival waits for Resume; a new one started here runs at once.
   const [running, setRunning] = useState(false);
 
   const unfinished = attempt !== null && !attempt.completedAt && !isComplete(attempt);
-  const finished = attempt !== null && (attempt.completedAt !== null || isComplete(attempt));
-  const phase: Phase = attempt && isScored(attempt) ? "scored" : unfinished && running ? "running" : "briefing";
+  const finished = attempt !== null && !unfinished;
   // Speaking is the default wherever the browser can transcribe; typing is offered where it cannot.
   const effectiveMode: InputMode = speechSupported ? mode : "type";
+  const outOfAttempts = quota?.remaining === 0;
 
-  async function start(reset: boolean) {
+  async function start(reset: boolean, startLength: AttemptLength) {
+    if (!job) return;
     setBusy(true);
     setFailure(null);
-    const answer = await client.start(job.id, length, reset);
+    const answer = await client.start(job.id, startLength, reset);
     setBusy(false);
     if (answer.ok) {
       setAttempt(answer.attempt);
@@ -136,9 +146,7 @@ export function InterviewPanel({
     setFailure(outcome.message);
   }
 
-  const outOfAttempts = quota?.remaining === 0;
-
-  if (phase === "running" && attempt) {
+  if (job && attempt && running && unfinished) {
     return (
       <div className="flex flex-1 flex-col">
         <AppHeader leading={<BrandLogo href="/board" />} />
@@ -159,81 +167,181 @@ export function InterviewPanel({
     );
   }
 
+  const ready = job?.readiness === "ready";
+
   return (
     <div className="flex flex-1 flex-col">
       <AppHeader leading={<BrandLogo href="/board" />} />
       <PageMain>
-        <Button asChild variant="ghost" className="-ml-2 h-8 px-2 text-sm">
-          <Link href="/interview">
-            <ArrowLeft aria-hidden="true" className="size-4" />
+        <div className="mx-auto max-w-2xl">
+          <h1 className="flex flex-wrap items-center gap-x-3 gap-y-1 text-3xl tracking-tight">
             Interview Simulator
-          </Link>
-        </Button>
+            {locked && (
+              <span className="flex items-center gap-1.5 rounded-full border border-primary/30 px-2 py-0.5 font-sans text-xs font-medium text-primary">
+                <PlanBlaze plan="pro" />
+                Pro
+              </span>
+            )}
+          </h1>
+          <p className="mt-1 text-muted-foreground">
+            Three steps to a rehearsal: a job, how long, and Go. The clock starts with your first question and
+            doesn’t pause between them.
+          </p>
 
-        <h1 className="mt-2 text-3xl tracking-tight text-balance sm:text-4xl">{job.role}</h1>
-        <p className="mt-1 max-w-prose text-muted-foreground">
-          {phase === "scored"
-            ? `How your rehearsal for ${job.company} went.`
-            : `Rehearse for your interview at ${job.company}, with questions drawn from this job’s posting and your resume.`}
-        </p>
+          <Path>
+            <Step number={1} title="Which job?" done={job !== null} open>
+              {job ? <PickedJob job={job} /> : <JobPicker />}
+            </Step>
 
-        <div className="mt-8">
-          {phase === "scored" && attempt && (
-            <div className="max-w-4xl space-y-6">
-              <Scorecard attempt={attempt} scorecard={scorecard} />
-              <RehearseAgain
-                onStart={() => {
-                  setAttempt(null);
-                  setScorecard(undefined);
-                  setRunning(false);
-                }}
-                outOfAttempts={outOfAttempts}
-              />
-            </div>
-          )}
-
-          {phase === "briefing" && finished && !isScored(attempt!) && (
-            <ScoreIt onScore={score} busy={busy} failure={failure} />
-          )}
-
-          {phase === "briefing" && !finished && (
-            <Briefing length={unfinished ? attempt!.length : length} speechSupported={speechSupported}>
-              {unfinished ? (
-                <ResumeCard
+            {job && unfinished ? (
+              <Step number={2} title="Pick up where you left off" open last>
+                <ResumeStep
                   attempt={attempt!}
                   onResume={() => setRunning(true)}
-                  onStartOver={() => start(true)}
+                  onStartOver={() => start(true, attempt!.length)}
                   outOfAttempts={outOfAttempts}
                   busy={busy}
                   failure={failure}
                 />
-              ) : (
-                <SetupCard
-                  locked={locked}
-                  plan={plan}
-                  lengths={lengths}
-                  length={length}
-                  onLengthChange={setLength}
-                  mode={effectiveMode}
-                  onModeChange={setMode}
-                  speechSupported={speechSupported}
-                  quota={quota}
-                  // No Go at all when locked: the preview cannot be clicked into a real Attempt.
-                  onGo={locked || !available ? undefined : () => start(false)}
-                  preparing={busy}
-                  failure={failure}
-                />
-              )}
-            </Briefing>
-          )}
+              </Step>
+            ) : job && finished && !isScored(attempt!) ? (
+              <Step number={2} title="That’s the interview" open last>
+                <ScoreStep onScore={score} busy={busy} failure={failure} />
+              </Step>
+            ) : job && finished ? (
+              <Step number={2} title="How it went" open last>
+                <div className="space-y-6">
+                  <Scorecard attempt={attempt!} scorecard={scorecard} />
+                  {outOfAttempts ? (
+                    <p className="text-sm text-muted-foreground">
+                      You’ve used this week’s interviews. This scorecard stays here for as long as you want it.
+                    </p>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-10 px-5"
+                      onClick={() => {
+                        setAttempt(null);
+                        setScorecard(undefined);
+                        setRunning(false);
+                      }}
+                    >
+                      Rehearse this job again
+                    </Button>
+                  )}
+                </div>
+              </Step>
+            ) : (
+              <>
+                {/* Locked, the set-up opens without a job: the preview of what Pro unlocks is the point of
+                    the page for these Plans, and there is no Go to reach whatever is chosen (ticket 08). */}
+                <Step number={2} title="How do you want to rehearse?" done={ready && !locked} open={ready || locked}>
+                  <RehearsalChoices
+                    locked={locked}
+                    lengths={lengths}
+                    length={length}
+                    onLengthChange={setLength}
+                    mode={effectiveMode}
+                    onModeChange={setMode}
+                    speechSupported={speechSupported}
+                  />
+                </Step>
+                <Step number={3} title="Ready when you are" open={ready || locked} last>
+                  <GoStep
+                    locked={locked}
+                    available={available}
+                    length={length}
+                    quota={quota}
+                    busy={busy}
+                    failure={failure}
+                    onGo={() => start(false, length)}
+                  />
+                </Step>
+              </>
+            )}
+          </Path>
         </div>
       </PageMain>
     </div>
   );
 }
 
+/**
+ * Go, or why there is no Go. Locked, a Pro note stands where it would be — no disabled button to
+ * click into (ticket 08). With nothing left this week, when more arrive; without a key, that the
+ * simulator isn't available here. While the questions are written, the wait, and what happens next.
+ */
+function GoStep({
+  locked,
+  available,
+  length,
+  quota,
+  busy,
+  failure,
+  onGo,
+}: {
+  locked: boolean;
+  available: boolean;
+  length: AttemptLength;
+  quota: InterviewQuotaStatus | null;
+  busy: boolean;
+  failure: string | null;
+  onGo: () => void;
+}) {
+  if (locked) {
+    return (
+      <p className="max-w-sm rounded-md bg-primary/5 p-3 text-sm ring-1 ring-primary/20">
+        The Interview Simulator is a Pro feature. This is the real set-up, so you can see what it does — it just
+        isn’t yours to start yet.
+      </p>
+    );
+  }
+  if (!available) {
+    return (
+      <p role="alert" className="max-w-sm rounded-md border border-destructive/40 px-3 py-2 text-sm">
+        {INTERVIEW_FAILURES.unavailable}
+      </p>
+    );
+  }
+  if (busy) {
+    return (
+      <div className="max-w-sm space-y-2">
+        <LoadingTrail>Writing your questions…</LoadingTrail>
+        <p className="text-sm text-muted-foreground">
+          This usually takes 10 to 25 seconds. Your first question appears straight after, with the clock running.
+        </p>
+      </div>
+    );
+  }
+
+  const outOfAttempts = quota?.remaining === 0;
+  return (
+    <div className="max-w-sm">
+      {failure && (
+        <p role="alert" className="mb-3 rounded-md border border-destructive/40 px-3 py-2 text-sm">
+          {failure}
+        </p>
+      )}
+      <Button type="button" className="h-12 w-full text-lg font-semibold" disabled={outOfAttempts} onClick={onGo}>
+        Go
+      </Button>
+      <p className="mt-2 text-center text-sm text-muted-foreground">
+        {outOfAttempts && quota
+          ? `You’ve used this week’s interviews. More on ${formatResetDay(quota.resetsOn)}.`
+          : `${pluralize(questionCount(length), "question")} in ${length} minutes. The clock starts with the first.`}
+      </p>
+      {quota && quota.remaining !== "unlimited" && !outOfAttempts && (
+        <p className="mt-1 text-center text-sm text-muted-foreground">
+          {pluralize(quota.remaining, "interview")} left this week.
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** An Attempt left unfinished: pick it up where it was, or spend another on a fresh one. */
-function ResumeCard({
+function ResumeStep({
   attempt,
   onResume,
   onStartOver,
@@ -250,50 +358,41 @@ function ResumeCard({
 }) {
   const answered = attempt.questions.filter((question) => question.answer).length;
   return (
-    <section aria-labelledby="resume-heading" className="rounded-lg bg-card p-5 shadow-sm ring-1 ring-foreground/10">
-      <h2 id="resume-heading" className="text-xl">
-        You have an interview in progress
-      </h2>
-      <p className="mt-2 text-sm text-muted-foreground">
+    <div className="max-w-sm space-y-3">
+      <p className="text-sm text-muted-foreground">
         {answered} of {attempt.questions.length} answered, with {formatClock(remainingSeconds(attempt))} left.
         Resume puts your next question up with the clock running.
       </p>
       {failure && (
-        <p role="alert" className="mt-4 rounded-md border border-destructive/40 px-3 py-2 text-sm">
+        <p role="alert" className="rounded-md border border-destructive/40 px-3 py-2 text-sm">
           {failure}
         </p>
       )}
-      <Button type="button" className="mt-5 h-12 w-full text-lg font-semibold" onClick={onResume}>
+      <Button type="button" className="h-12 w-full text-lg font-semibold" onClick={onResume}>
         Resume
       </Button>
       {/* With nothing left this week, starting over is not offered at all: abandoning an Attempt can
           never be a way around the Limit. */}
       {outOfAttempts ? (
-        <p className="mt-3 text-sm text-muted-foreground">
-          You’ve used this week’s interviews, so this is the one to finish.
-        </p>
+        <p className="text-sm text-muted-foreground">You’ve used this week’s interviews, so this is the one to finish.</p>
+      ) : busy ? (
+        <LoadingTrail>Writing your questions…</LoadingTrail>
       ) : (
-        <Button type="button" variant="ghost" className="mt-2 h-auto w-full py-2 whitespace-normal" disabled={busy} onClick={onStartOver}>
-          {busy ? "Starting a new one…" : "Start over, using another of this week’s interviews"}
+        <Button type="button" variant="ghost" className="h-auto w-full py-2 whitespace-normal" onClick={onStartOver}>
+          Start over, using another of this week’s interviews
         </Button>
       )}
-    </section>
+    </div>
   );
 }
 
 /** Every question answered, or the clock ran out: what is left is the Scorecard. */
-function ScoreIt({ onScore, busy, failure }: { onScore: () => void; busy: boolean; failure: string | null }) {
+function ScoreStep({ onScore, busy, failure }: { onScore: () => void; busy: boolean; failure: string | null }) {
   return (
-    <section
-      aria-labelledby="done-heading"
-      className="max-w-xl space-y-3 rounded-lg bg-card p-6 shadow-sm ring-1 ring-foreground/10"
-    >
-      <h2 id="done-heading" className="text-2xl">
-        That’s the interview
-      </h2>
+    <div className="max-w-md space-y-3">
       <p className="text-muted-foreground">
-        Scoring reads every answer you gave and marks it against what this role asks for. It takes a few
-        seconds, and it doesn’t use another of this week’s interviews.
+        Scoring reads every answer you gave and marks it against what this role asks for. It takes a few seconds,
+        and it doesn’t use another of this week’s interviews.
       </p>
       {failure && (
         <p role="alert" className="rounded-md border border-destructive/40 px-3 py-2 text-sm">
@@ -303,21 +402,6 @@ function ScoreIt({ onScore, busy, failure }: { onScore: () => void; busy: boolea
       <Button type="button" className="h-11 px-6 text-base" disabled={busy} onClick={onScore}>
         {busy ? "Scoring your answers…" : "Score my interview"}
       </Button>
-    </section>
-  );
-}
-
-function RehearseAgain({ onStart, outOfAttempts }: { onStart: () => void; outOfAttempts: boolean }) {
-  if (outOfAttempts) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        You’ve used this week’s interviews. This scorecard stays here for as long as you want it.
-      </p>
-    );
-  }
-  return (
-    <Button type="button" variant="outline" className="h-10 px-5" onClick={onStart}>
-      Rehearse this job again
-    </Button>
+    </div>
   );
 }

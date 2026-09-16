@@ -1,4 +1,5 @@
 import { nextWeekStart } from "@/lib/dates";
+import type { Job } from "@/lib/jobs";
 import type { Limit, Plan } from "@/lib/plans";
 
 /**
@@ -209,6 +210,25 @@ export const INTERVIEW_PLAN: Plan = "pro";
 export function canStartAttempt(plan: Plan): boolean {
   return plan === INTERVIEW_PLAN;
 }
+
+/**
+ * Whether questions can be written for a Job yet — the same two things the server refuses a start
+ * for (`no-resume`, `no-description`), read from the Job the page already holds. The picker says so
+ * on each row, so a Tenant learns a job isn't ready before choosing it rather than at Go.
+ */
+export type Readiness = "ready" | "no-resume" | "no-description";
+
+export function readinessOf(job: Pick<Job, "resume" | "description">): Readiness {
+  if (!job.resume) return "no-resume";
+  if (!job.description.trim()) return "no-description";
+  return "ready";
+}
+
+/** A not-ready Job's short label in the picker. The full reason is `INTERVIEW_FAILURES[readiness]`. */
+export const NOT_READY_LABEL: Record<Exclude<Readiness, "ready">, string> = {
+  "no-resume": "Needs a resume",
+  "no-description": "Needs the posting",
+};
 
 /** This week's Attempts, as the start screen shows them before the Tenant spends one. */
 export type InterviewQuotaStatus = {

@@ -2,8 +2,8 @@ import { act } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
 
-import { InterviewHub } from "@/components/interview/interview-hub";
 import { InterviewPanel } from "@/components/interview/interview-panel";
+import type { PathJob } from "@/components/interview/interview-path";
 import type { InterviewClient } from "@/components/interview/interview-client";
 import {
   CATEGORIES,
@@ -16,6 +16,7 @@ import {
   type Category,
   type InterviewQuotaStatus,
 } from "@/lib/interview";
+import type { Job } from "@/lib/jobs";
 import type { Plan } from "@/lib/plans";
 import { SEED_JOBS } from "../fixtures/jobs";
 import { renderWithJobs, screen, userEvent, waitFor, within } from "../test-utils";
@@ -34,7 +35,17 @@ vi.mock("next/navigation", () => ({
 
 const AXE_OPTIONS = { rules: { "color-contrast": { enabled: false } } } as const;
 
-const job = SEED_JOBS.find((candidate) => candidate.id === "fernwood-product-designer-growth")!;
+const fixtureJob: Job = SEED_JOBS.find((candidate) => candidate.id === "fernwood-product-designer-growth")!;
+
+/** The chosen job, as the page hands it to the path. Ready unless a test says otherwise. */
+const job: PathJob = {
+  id: fixtureJob.id,
+  company: fixtureJob.company,
+  role: fixtureJob.role,
+  accent: fixtureJob.accent,
+  stage: fixtureJob.stage,
+  readiness: "ready",
+};
 
 /** The seam the page takes to the Route Handlers. Cast at the render site, so each keeps its `Mock` type. */
 const client = vi.hoisted(() => ({
@@ -146,6 +157,8 @@ function hear(text: string) {
 
 function renderPanel({
   plan = "pro" as Plan,
+  job: chosen = job as PathJob | null,
+  jobs = SEED_JOBS as Job[],
   attempt = null as Attempt | null,
   remaining = 9,
   available = true,
@@ -154,13 +167,14 @@ function renderPanel({
   setSpeechSupport(speech);
   return renderWithJobs(
     <InterviewPanel
-      job={{ id: job.id, company: job.company, role: job.role }}
+      job={chosen}
       plan={plan}
       attempt={attempt}
       quota={quota(remaining)}
       available={available}
       client={client as unknown as InterviewClient}
     />,
+    { initialJobs: jobs },
   );
 }
 
@@ -179,61 +193,92 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("the Job picker (ticket 07)", () => {
-  it("IV-U1: searches by role or company, and each result links to that Job's interview", async () => {
-    const { user } = renderWithJobs(<InterviewHub plan="pro" />);
-    const box = screen.getByRole("searchbox", { name: /Which job/ });
+describe("step one: which job (ticket 07)", () => {
+  const board = [
+    { ...fixtureJob, id: "ready-1", company: "Fernwood", role: "Product Designer, Growth" },
+    { ...fixtureJob, id: "no-resume-1", company: "Harvest", role: "Senior UX Researcher", resume: null },
+    { ...fixtureJob, id: "no-posting-1", company: "Meridian Labs", role: "Design Systems Lead", description: "  " },
+  ];
 
-    await user.type(box, "fernwood");
+  it("IV-U1: searches by role or company, and each result is a link to that job's path", async () => {
+    const { user } = renderPanel({ job: null, jobs: board });
+    const box = screen.getByRole("searchbox", { name: "Search your jobs by role or company" });
 
-    const rows = within(screen.getByRole("list", { name: "Matching jobs" })).getAllByRole("link");
-    expect(rows.length).toBeGreaterThan(0);
-    for (const row of rows) expect(row).toHaveTextContent(/Fernwood/i);
-    expect(rows[0]).toHaveAttribute("href", expect.stringMatching(/^\/interview\//));
+    await user.type(box, "harvest");
+    const byCompany = within(screen.getByRole("list", { name: "Matching jobs" })).getAllByRole("link");
+    expect(byCompany).toHaveLength(1);
+    expect(byCompany[0]).toHaveAttribute("href", "/interview/no-resume-1");
 
     await user.clear(box);
-    await user.type(box, "designer");
+    await user.type(box, "design");
     const byRole = within(screen.getByRole("list", { name: "Matching jobs" })).getAllByRole("link");
-    expect(byRole.length).toBeGreaterThan(0);
-    for (const row of byRole) expect(row).toHaveTextContent(/designer/i);
+    expect(byRole.map((row) => row.textContent)).toEqual([
+      expect.stringContaining("Product Designer, Growth"),
+      expect.stringContaining("Design Systems Lead"),
+    ]);
   });
 
-  it("IV-U2: a search that matches nothing says so, and offers no rows to click", async () => {
-    const { user } = renderWithJobs(<InterviewHub plan="pro" />);
+  it("IV-U2: a search that matches nothing says so, and offers no rows", async () => {
+    const { user } = renderPanel({ job: null, jobs: board });
 
-    await user.type(screen.getByRole("searchbox", { name: /Which job/ }), "zzzzz");
+    await user.type(screen.getByRole("searchbox"), "zzzzz");
 
     expect(screen.getByRole("status")).toHaveTextContent("No matching jobs.");
     expect(screen.queryByRole("list", { name: "Matching jobs" })).not.toBeInTheDocument();
   });
 
-  it("IV-U3: the hub is a flat searchable list, not the board's grouped columns, and is capped", () => {
-    renderWithJobs(<InterviewHub plan="pro" />);
+  it("IV-U3: says which jobs can't be rehearsed yet, and why, before one is chosen", () => {
+    renderPanel({ job: null, jobs: board });
 
-    expect(screen.getAllByRole("list", { name: "Matching jobs" })).toHaveLength(1);
-    expect(within(screen.getByRole("list", { name: "Matching jobs" })).getAllByRole("link").length).toBeLessThanOrEqual(8);
+    const rows = within(screen.getByRole("list", { name: "Matching jobs" })).getAllByRole("link");
+    expect(rows[0]).not.toHaveTextContent(/Needs/);
+    expect(rows[1]).toHaveTextContent("Needs a resume");
+    expect(rows[2]).toHaveTextContent("Needs the posting");
   });
 
-  it("IV-U4: every Plan reaches the hub; only the Plans that cannot start one see it marked Pro", () => {
-    const { unmount } = renderWithJobs(<InterviewHub plan="free" />);
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Pro");
-    unmount();
+  it("IV-U4: the list is short and ungrouped, and says how many more there are", () => {
+    const many = Array.from({ length: 9 }, (_, index) => ({ ...fixtureJob, id: `job-${index}`, role: `Role ${index}` }));
+    renderPanel({ job: null, jobs: many });
 
-    renderWithJobs(<InterviewHub plan="pro" />);
-    expect(screen.getByRole("heading", { level: 1 })).not.toHaveTextContent("Pro");
+    expect(within(screen.getByRole("list", { name: "Matching jobs" })).getAllByRole("link")).toHaveLength(6);
+    expect(screen.getByRole("status")).toHaveTextContent("Showing 6 of 9 jobs. Type to narrow it down.");
+  });
+
+  it("IV-U5: with no job chosen, the next steps are named but closed — there is no Go yet", () => {
+    renderPanel({ job: null, jobs: board });
+
+    expect(screen.getByRole("heading", { level: 2, name: "How do you want to rehearse?" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Ready when you are" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /minutes/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Go" })).not.toBeInTheDocument();
+  });
+
+  it("IV-U6: a chosen job is shown as done, with a way back to choose another", () => {
+    renderPanel();
+
+    expect(screen.getByText(job.role)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Change job" })).toHaveAttribute("href", "/interview");
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+  });
+
+  it("IV-U7: a chosen job that can't be rehearsed says why, links to fixing it, and keeps the rest closed", () => {
+    renderPanel({ job: { ...job, readiness: "no-resume" } });
+
+    expect(screen.getByText(INTERVIEW_FAILURES["no-resume"])).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open this job" })).toHaveAttribute("href", `/board/${job.id}`);
+    expect(screen.queryByRole("button", { name: "Go" })).not.toBeInTheDocument();
   });
 });
 
-describe("the briefing (tickets 05, 06)", () => {
-  it("IV-U5: says before Go that the clock doesn't pause between questions", () => {
+describe("steps two and three: set up and Go (tickets 05, 06)", () => {
+  it("IV-U8: says up front that the clock doesn't pause between questions", () => {
     renderPanel();
 
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(job.role);
-    expect(screen.getByRole("heading", { name: "How it works" })).toBeInTheDocument();
-    expect(screen.getByText(/One clock for the whole interview, and it doesn’t pause/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Interview Simulator");
+    expect(screen.getByText(/doesn’t pause between them/)).toBeInTheDocument();
   });
 
-  it("IV-U6: offers 5, 10, and 30 minutes to a pro Tenant, and Go sends the chosen one", async () => {
+  it("IV-U9: offers 5, 10, and 30 minutes to a pro Tenant, and Go sends the chosen one", async () => {
     const { user } = renderPanel();
     client.start.mockResolvedValue({ ok: true, attempt: attemptOf({ length: 30 }), quota: quota(8) });
 
@@ -244,21 +289,17 @@ describe("the briefing (tickets 05, 06)", () => {
     expect(client.start).toHaveBeenCalledWith(job.id, 30, false);
   });
 
-  it("IV-U7: each length shows its own Category breakdown, always across all five areas", async () => {
+  it("IV-U10: each length says what it asks across all five areas", async () => {
     const { user } = renderPanel();
-    const counts = () =>
-      CATEGORIES.map((category) =>
-        within(screen.getByText(CATEGORY_LABEL[category]).closest("li")!).getByText(/question/).textContent,
-      );
 
-    expect(counts()).toEqual(CATEGORIES.map(() => "1 question"));
+    expect(screen.getByText(/1 personal, 1 behavioural, 1 stakeholder, 1 technical, 1 design/)).toBeInTheDocument();
     await user.click(lengthButton(10));
-    expect(counts()).toEqual(CATEGORIES.map(() => "2 questions"));
+    expect(screen.getByText(/2 personal, 2 behavioural, 2 stakeholder, 2 technical, 2 design/)).toBeInTheDocument();
     await user.click(lengthButton(30));
-    expect(counts()).toEqual(["2 questions", "3 questions", "3 questions", "4 questions", "3 questions"]);
+    expect(screen.getByText(/2 personal, 3 behavioural, 3 stakeholder, 4 technical, 3 design/)).toBeInTheDocument();
   });
 
-  it("IV-U8: speaking is the default where the browser can transcribe, with the reason shown", () => {
+  it("IV-U11: speaking is the default where the browser can transcribe, with the reason shown", () => {
     renderPanel({ speech: true });
 
     expect(screen.getByRole("button", { name: /Speaking/ })).toHaveAttribute("aria-pressed", "true");
@@ -266,14 +307,14 @@ describe("the briefing (tickets 05, 06)", () => {
     expect(screen.getByText(SPEAK_RECOMMENDED)).toBeInTheDocument();
   });
 
-  it("IV-U9: a browser without speech recognition is offered typing only, with a note saying why", () => {
+  it("IV-U12: a browser without speech recognition is offered typing only, with a note saying why", () => {
     renderPanel({ speech: false });
 
     expect(screen.queryByRole("button", { name: /Speaking/ })).not.toBeInTheDocument();
     expect(screen.getByText(SPEAK_UNSUPPORTED)).toBeInTheDocument();
   });
 
-  it("IV-U10: what is left this week is shown, and nothing left stops Go", () => {
+  it("IV-U13: what is left this week is shown, and nothing left stops Go", () => {
     const { unmount } = renderPanel({ remaining: 3 });
     expect(screen.getByText("3 interviews left this week.")).toBeInTheDocument();
     unmount();
@@ -283,7 +324,7 @@ describe("the briefing (tickets 05, 06)", () => {
     expect(go()).toBeDisabled();
   });
 
-  it("IV-U11: while the questions are written, the card says the clock starts with the first", async () => {
+  it("IV-U14: while the questions are written, the step says the clock starts straight after", async () => {
     const { user } = renderPanel();
     let finish!: (value: unknown) => void;
     client.start.mockReturnValue(new Promise((resolve) => (finish = resolve)));
@@ -291,12 +332,12 @@ describe("the briefing (tickets 05, 06)", () => {
     await user.click(go());
 
     expect(screen.getByRole("status")).toHaveTextContent("Writing your questions…");
-    expect(screen.getByText(/the clock starts with it/)).toBeInTheDocument();
+    expect(screen.getByText(/with the clock running/)).toBeInTheDocument();
     expect(screen.queryByRole("timer")).not.toBeInTheDocument();
     await act(async () => finish({ ok: true, attempt: attemptOf(), quota: quota(8) }));
   });
 
-  it("IV-U12: a refusal is shown in the page's own words, and nothing starts", async () => {
+  it("IV-U15: a refusal is shown in the page's own words, and nothing starts", async () => {
     const { user } = renderPanel();
     client.start.mockResolvedValue({ ok: false, error: "no-resume", message: INTERVIEW_FAILURES["no-resume"], refunded: false });
 
@@ -309,12 +350,13 @@ describe("the briefing (tickets 05, 06)", () => {
 
 describe("the locked preview (ticket 08)", () => {
   it.each(["free", "basic"] as const)(
-    "IV-U13: a %s Tenant sees the real set-up, locked, with no Go and no quota promised",
+    "IV-U16: a %s Tenant sees the real set-up, locked, with no Go and no quota promised",
     (plan) => {
       renderPanel({ plan });
 
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Pro");
       for (const minutes of [5, 10, 30]) expect(lengthButton(minutes)).toBeDisabled();
-      for (const category of CATEGORIES) expect(screen.getByText(CATEGORY_LABEL[category])).toBeInTheDocument();
+      expect(screen.getByText(/1 personal, 1 behavioural/)).toBeInTheDocument();
       expect(screen.getByText(/Interview Simulator is a Pro feature/)).toBeInTheDocument();
       // Not a disabled Go — no Go at all.
       expect(screen.queryByRole("button", { name: "Go" })).not.toBeInTheDocument();
@@ -323,7 +365,21 @@ describe("the locked preview (ticket 08)", () => {
     },
   );
 
-  it("IV-U14: the locked preview has no accessibility violations", async () => {
+  it("IV-U17: locked, the set-up is shown before a job is chosen too — the preview is the point", () => {
+    renderPanel({ plan: "free", job: null });
+
+    for (const minutes of [5, 10, 30]) expect(lengthButton(minutes)).toBeDisabled();
+    expect(screen.getByText(/Interview Simulator is a Pro feature/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Go" })).not.toBeInTheDocument();
+  });
+
+  it("IV-U18: a pro Tenant's path carries no Pro mark", () => {
+    renderPanel();
+
+    expect(screen.getByRole("heading", { level: 1 })).not.toHaveTextContent("Pro");
+  });
+
+  it("IV-U19: the locked preview has no accessibility violations", async () => {
     const { container } = renderPanel({ plan: "basic" });
 
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
@@ -332,7 +388,8 @@ describe("the locked preview (ticket 08)", () => {
 
 describe("the interview runs without a pause (ticket 02)", () => {
   it("IV-U15: Go puts the first question up with its clock already running — no second press", async () => {
-    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: true });
+    // Only the test moves the clock: real time leaking in makes exact seconds flaky on a busy machine.
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
     const { user } = renderPanel({ speech: false });
     client.start.mockResolvedValue({ ok: true, attempt: attemptOf(), quota: quota(8) });
 
@@ -346,7 +403,8 @@ describe("the interview runs without a pause (ticket 02)", () => {
   });
 
   it("IV-U16: submitting puts the next question up with the clock still running, and sends what the first cost", async () => {
-    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: true });
+    // Only the test moves the clock: real time leaking in makes exact seconds flaky on a busy machine.
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
     const typing = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const attempt = attemptOf();
     renderPanel({ attempt, speech: false });
@@ -370,7 +428,8 @@ describe("the interview runs without a pause (ticket 02)", () => {
   });
 
   it("IV-U17: the clock stands still while an answer is on its way to the server", async () => {
-    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: true });
+    // Only the test moves the clock: real time leaking in makes exact seconds flaky on a busy machine.
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
     const typing = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderPanel({ attempt: attemptOf(), speech: false });
     client.answer.mockReturnValue(new Promise(() => {}));
@@ -407,7 +466,8 @@ describe("the interview runs without a pause (ticket 02)", () => {
   });
 
   it("IV-U20: the countdown reaching zero ends the Attempt, and what was typed is never sent", async () => {
-    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: true });
+    // Only the test moves the clock: real time leaking in makes exact seconds flaky on a busy machine.
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
     const typing = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const nearlyOut: Attempt = { ...attemptOf(), activeSeconds: 299 };
     renderPanel({ attempt: nearlyOut, speech: false });
@@ -422,7 +482,8 @@ describe("the interview runs without a pause (ticket 02)", () => {
   });
 
   it("IV-U21: a failed submission keeps the answer and the seconds it cost, so a retry resumes rather than starts over", async () => {
-    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: true });
+    // Only the test moves the clock: real time leaking in makes exact seconds flaky on a busy machine.
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
     const typing = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderPanel({ attempt: attemptOf(), speech: false });
     client.answer.mockResolvedValueOnce({ ok: false, error: "failed", message: INTERVIEW_FAILURES.failed });
