@@ -44,7 +44,8 @@ export function PageLoading() {
   if (pathname.startsWith("/board/")) return <JobLoading id={pathname.slice("/board/".length)} />;
   if (pathname.startsWith("/contacts")) return <ContactsLoading selectedId={contactIdIn(pathname)} />;
   if (pathname.startsWith("/documents")) return <DocumentsLoading />;
-  if (pathname.startsWith("/interview")) return <InterviewLoading />;
+  if (pathname === "/interview") return <InterviewHubLoading />;
+  if (pathname.startsWith("/interview/")) return <InterviewBriefingLoading id={pathname.slice("/interview/".length)} />;
   if (pathname.startsWith("/account")) return <AccountLoading />;
   // A section this file does not know yet: say so plainly rather than draw another page's outline.
   return <SectionLoading />;
@@ -606,17 +607,12 @@ function AccountLoading() {
   );
 }
 
-/**
- * `/interview` and `/interview/<job>`: the hub's picker and a Job's start screen share this outline
- * — a title, a line, a search box or a length row, and the space the rest fills. Which of the two is
- * arriving is not worth two outlines: the page's own heading is the same either way, and everything
- * below it is a bar that becomes either.
- */
-function InterviewLoading() {
+/** `/interview`: the Job picker — a search box over a short list of rows. */
+function InterviewHubLoading() {
   return (
     <div className="flex flex-1 flex-col">
       <AppHeader leading={<BrandLogo href="/board" />} loading />
-      <PageWait>Loading interview practice…</PageWait>
+      <PageWait>Loading the Interview Simulator…</PageWait>
 
       <PageMain>
         <SectionTitle>Interview Simulator</SectionTitle>
@@ -638,6 +634,81 @@ function InterviewLoading() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </PageMain>
+    </div>
+  );
+}
+
+/**
+ * `/interview/<job>`: the briefing — how it works and the Category breakdown, with the set-up card
+ * beside it in the Documents page's grid. The Job's role is written at once when the board already
+ * holds it, as the Job page's own outline does; otherwise it is a bar.
+ */
+function InterviewBriefingLoading({ id }: { id: string }) {
+  const job = useQueryClient()
+    .getQueryData<Job[]>(jobsCache.key)
+    ?.find((candidate) => candidate.id === id);
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <AppHeader leading={<BrandLogo href="/board" />} loading />
+      <PageWait>Loading your interview…</PageWait>
+
+      <PageMain>
+        <Button asChild variant="ghost" className="-ml-2 h-8 px-2 text-sm">
+          <Link href="/interview">
+            <ArrowLeft aria-hidden="true" className="size-4" />
+            Interview Simulator
+          </Link>
+        </Button>
+        {job ? (
+          <p aria-hidden="true" className="mt-2 font-heading text-3xl tracking-tight text-balance sm:text-4xl">
+            {job.role}
+          </p>
+        ) : (
+          <Bar className="mt-3 h-9 w-2/3 max-w-md" />
+        )}
+        <Bar className="mt-3 h-4 w-full max-w-lg" />
+
+        <div className="mt-8 grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <GhostCard className="lg:col-start-2 lg:row-start-1">
+            <p aria-hidden="true" className="font-heading text-xl">
+              Your interview
+            </p>
+            <Bar className="mt-5 h-14 w-full rounded-md" />
+            <Bar className="mt-5 h-10 w-full rounded-md" />
+            <Bar className="mt-6 h-12 w-full rounded-md" />
+          </GhostCard>
+
+          <div className="min-w-0 space-y-8 lg:col-start-1 lg:row-start-1">
+            <div>
+              <p aria-hidden="true" className="font-heading text-xl">
+                How it works
+              </p>
+              <div className="mt-4 max-w-prose space-y-4">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex gap-3">
+                    <Bar className="size-8 shrink-0 rounded-full" />
+                    <div className="flex-1 space-y-2 pt-1">
+                      <Bar className="h-3.5 w-full" />
+                      <Bar className="h-3.5 w-4/5" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p aria-hidden="true" className="font-heading text-xl">
+                What you’ll be asked
+              </p>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <Bar key={i} className="h-16 w-full rounded-lg" />
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </PageMain>

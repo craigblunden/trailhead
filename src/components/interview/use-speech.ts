@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 /**
  * Speaking an Answer (interview simulator ticket 06). The browser's own speech recognition does the
@@ -25,6 +25,9 @@ type SpeechRecognitionLike = {
   onresult: ((event: SpeechRecognitionEventLike) => void) | null;
   onerror: ((event: { error?: string }) => void) | null;
   onend: (() => void) | null;
+  /** The recogniser detected speech — not just sound — and stopped detecting it. */
+  onspeechstart: (() => void) | null;
+  onspeechend: (() => void) | null;
 };
 
 type SpeechRecognitionEventLike = {
@@ -64,9 +67,19 @@ export function useSpeechSupported(): boolean {
 
 export type Speech = {
   listening: boolean;
+  /**
+   * The recogniser is detecting speech right now. Read from the API's own `speechstart` and
+   * `speechend` events rather than a level meter: measuring loudness would mean opening a second
+   * microphone stream alongside the recogniser, which is exactly the handling of raw audio this
+   * feature promises not to do.
+   */
+  hearing: boolean;
   /** Everything recognised so far this question, final results only. */
   transcript: string;
-  /** What is being said right now, not yet settled. Shown greyed, never submitted on its own. */
+  /**
+   * What is being said right now, not yet settled. Kept through `stop()` rather than cleared, so the
+   * last sentence spoken before Submit is sent too instead of being lost to the recogniser's lag.
+   */
   interim: string;
   /** Set when recognition stopped for a reason worth telling the Tenant about — a refused mic, say. */
   error: string | null;
@@ -76,6 +89,14 @@ export type Speech = {
   reset: () => void;
 };
 
+/** Stops lasting less than this count as the recogniser failing to start, not the Tenant pausing. */
+const QUICK_END_MS = 1_000;
+
+/** This many quick stops in a row and the page stops restarting it, rather than spin. */
+const QUICK_ENDS_BEFORE_GIVING_UP = 3;
+
+const STALLED = "The microphone keeps stopping, so this answer can’t be heard. Type it instead.";
+
 const ERRORS: Record<string, string> = {
   "not-allowed": "This browser won’t let the page use your microphone. Allow it, or type your answer instead.",
   "service-not-allowed": "This browser won’t let the page use your microphone. Allow it, or type your answer instead.",
@@ -83,74 +104,149 @@ const ERRORS: Record<string, string> = {
   network: "Speech recognition needs a connection and couldn’t reach it. You can type your answer instead.",
 };
 
+/** What a running recogniser reaches back into: the hook's refs and state setters. */
+type Recogniser = {
+  recognition: React.RefObject<SpeechRecognitionLike | null>;
+  /**
+   * Whether the page wants the microphone on. Browsers end continuous recognition on their own after a
+   * stretch of silence; while this is true, `run` starts it again straight from the `end` event, so a
+   * Tenant pausing to think never comes back to a dead microphone. It follows the recogniser's own
+   * events rather than React's renders: a recogniser that starts and ends within one render would
+   * otherwise never be restarted at all.
+   */
+  wanted: React.RefObject<boolean>;
+  /**
+   * Ends in a row that came less than a second after a start. Restarting on every end is what keeps a
+   * pause from killing the microphone — but a browser that ends it immediately, every time, would turn
+   * that into a tight loop. After a few quick ends in a row, `run` gives up and says so.
+   */
+  quickEnds: React.RefObject<number>;
+  setListening: (listening: boolean) => void;
+  setHearing: (hearing: boolean) => void;
+  setTranscript: React.Dispatch<React.SetStateAction<string>>;
+  setInterim: (interim: string) => void;
+  setError: (error: string | null) => void;
+};
+
+/** Stops wanting the microphone, and shows it off — with the reason, when there is one to tell. */
+function giveUp(r: Recogniser, message: string | null) {
+  r.wanted.current = false;
+  r.recognition.current = null;
+  if (message) r.setError(message);
+  r.setListening(false);
+  r.setHearing(false);
+}
+
+/** One recogniser, wired up and started. Starts another when the browser ends it, while still wanted. */
+function run(r: Recogniser) {
+  const Recognition = constructorFor();
+  if (!Recognition || !r.wanted.current) return;
+  // One recogniser at a time: every handler below ignores events from one that has been replaced, so
+  // an old instance's late `end` can never mark the new one as not listening.
+  r.recognition.current?.abort();
+  const instance = new Recognition();
+  const isLive = () => r.recognition.current === instance;
+  const startedAt = Date.now();
+  instance.lang = typeof navigator !== "undefined" ? navigator.language || "en-US" : "en-US";
+  // An interview answer runs for a minute with pauses in it; without `continuous` the browser stops at
+  // the first silence and the Tenant loses the rest of what they say.
+  instance.continuous = true;
+  instance.interimResults = true;
+  instance.onresult = (event) => {
+    if (!isLive()) return;
+    let settled = "";
+    let pending = "";
+    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      const result = event.results[index];
+      const text = result[0]?.transcript ?? "";
+      if (result.isFinal) settled += text;
+      else pending += text;
+    }
+    if (settled) r.setTranscript((so) => `${so}${so && !so.endsWith(" ") ? " " : ""}${settled.trim()}`);
+    r.setInterim(pending);
+  };
+  instance.onerror = (event) => {
+    if (!isLive()) return;
+    // "no-speech" and "aborted" are ordinary: the Tenant paused, or the page stopped it. Anything with
+    // a message is a reason the Tenant needs to hear — and a reason not to restart.
+    const message = event.error ? ERRORS[event.error] : undefined;
+    if (message) giveUp(r, message);
+  };
+  instance.onspeechstart = () => isLive() && r.setHearing(true);
+  instance.onspeechend = () => isLive() && r.setHearing(false);
+  instance.onend = () => {
+    if (!isLive()) return;
+    r.setHearing(false);
+    r.quickEnds.current = Date.now() - startedAt < QUICK_END_MS ? r.quickEnds.current + 1 : 0;
+    if (r.quickEnds.current >= QUICK_ENDS_BEFORE_GIVING_UP) return giveUp(r, STALLED);
+    // Still wanted: start again, staying "listening" throughout, so the soundwave doesn't flicker off
+    // and on through every thinking pause.
+    if (r.wanted.current) return run(r);
+    r.recognition.current = null;
+    r.setListening(false);
+  };
+  r.recognition.current = instance;
+  try {
+    instance.start();
+    r.setListening(true);
+  } catch {
+    // Refused outright: not listening is the honest state to show.
+    giveUp(r, null);
+  }
+}
+
 export function useSpeech(): Speech {
   const recognition = useRef<SpeechRecognitionLike | null>(null);
+  const wanted = useRef(false);
+  const quickEnds = useRef(0);
   const [listening, setListening] = useState(false);
+  const [hearing, setHearing] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [interim, setInterim] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  // One recogniser for the life of the component, torn down on unmount — so navigating away, or the
-  // countdown ending the Attempt, always stops the microphone.
+  const recogniser = useMemo<Recogniser>(
+    () => ({ recognition, wanted, quickEnds, setListening, setHearing, setTranscript, setInterim, setError }),
+    [],
+  );
+
+  // Torn down on unmount — so navigating away, or the countdown ending the Attempt, always stops the
+  // microphone.
   useEffect(() => {
     return () => {
+      wanted.current = false;
       recognition.current?.abort();
       recognition.current = null;
     };
   }, []);
 
   const start = useCallback(() => {
-    const Recognition = constructorFor();
-    if (!Recognition) return;
+    if (wanted.current) return;
+    wanted.current = true;
+    quickEnds.current = 0;
     setError(null);
-    const instance = new Recognition();
-    instance.lang = typeof navigator !== "undefined" ? navigator.language || "en-US" : "en-US";
-    // An interview answer runs for a minute with pauses in it; without `continuous` the browser
-    // stops at the first silence and the Tenant loses the rest of what they say.
-    instance.continuous = true;
-    instance.interimResults = true;
-    instance.onresult = (event) => {
-      let settled = "";
-      let pending = "";
-      for (let index = event.resultIndex; index < event.results.length; index += 1) {
-        const result = event.results[index];
-        const text = result[0]?.transcript ?? "";
-        if (result.isFinal) settled += text;
-        else pending += text;
-      }
-      if (settled) setTranscript((current) => `${current}${current && !current.endsWith(" ") ? " " : ""}${settled.trim()}`);
-      setInterim(pending);
-    };
-    instance.onerror = (event) => {
-      // "no-speech" and "aborted" are ordinary: the Tenant paused, or we stopped it ourselves.
-      const message = event.error ? ERRORS[event.error] : undefined;
-      if (message) setError(message);
-    };
-    instance.onend = () => setListening(false);
-    recognition.current = instance;
-    try {
-      instance.start();
-      setListening(true);
-    } catch {
-      // Already started, or refused outright: not listening is the honest state to show.
-      setListening(false);
-    }
-  }, []);
+    run(recogniser);
+  }, [recogniser]);
 
   const stop = useCallback(() => {
+    wanted.current = false;
+    // Stopped rather than aborted, so a phrase the recogniser was still settling can arrive.
     recognition.current?.stop();
     setListening(false);
-    setInterim("");
+    setHearing(false);
   }, []);
 
   const reset = useCallback(() => {
+    wanted.current = false;
+    quickEnds.current = 0;
     recognition.current?.abort();
     recognition.current = null;
     setListening(false);
+    setHearing(false);
     setTranscript("");
     setInterim("");
     setError(null);
   }, []);
 
-  return { listening, transcript, interim, error, start, stop, reset };
+  return { listening, hearing, transcript, interim, error, start, stop, reset };
 }

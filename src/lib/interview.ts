@@ -12,7 +12,8 @@ import type { Limit, Plan } from "@/lib/plans";
  *
  * The timing model is **active-time accounted, not wall-clock**: an Attempt carries the seconds it
  * has actually been answered for, so a Tenant who closes the tab does not watch their budget drain
- * while they are away. The pause between questions is untimed.
+ * while they are away. There is no pause between questions: each one's clock starts the moment it is
+ * on screen, the way a real interviewer moves straight to the next question.
  */
 
 /** The five fixed dimensions an Attempt's questions are drawn from. Every Attempt spans all five. */

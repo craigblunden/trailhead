@@ -60,7 +60,8 @@ describe("/llms.txt", () => {
     expect(text).toContain("5, 10, or 30 minutes");
     expect(text).toContain("personal, behavioural, stakeholder, technical, and design");
     expect(text).toMatch(/No audio is recorded, uploaded, or stored/);
-    expect(text).toMatch(/the pause to collect your thoughts is untimed/);
+    expect(text).toMatch(/doesn't pause between questions/);
+    expect(text).toMatch(/starts the moment the previous answer is submitted/);
     // No Limit numbers: "10 a week" would go stale quietly.
     expect(text).not.toMatch(/d+ interviews a week/);
   });

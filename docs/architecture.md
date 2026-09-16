@@ -246,12 +246,16 @@ to a status, and the same four test seams. What differs is worth saying:
   a delivered question set never refunds. Scoring spends nothing: the Attempt was counted when it
   started, so a scoring failure is always safe to retry.
 - **The clock is active-time accounted, not a deadline.** An Attempt stores the seconds it has
-  actually been answered for, and each Answer's request carries what that question cost. So closing
-  the tab drains nothing, the untimed pause between questions really is untimed, and returning
-  resumes on the question that was reached — never inside the one abandoned mid-way, because an
-  Answer is only ever recorded whole.
+  actually been answered for, and each Answer's request carries what that question cost — including
+  any submissions of it that failed, so a retry can't hand time back. There is no pause between
+  questions: Go puts the first up with its clock running, and each submission puts the next one up
+  the same way; the clock stands still only while an Answer is on its way to the server. Closing the
+  tab drains nothing, and returning resumes on the question that was reached — never inside the one
+  abandoned mid-way, because an Answer is only ever recorded whole.
 - **No audio anywhere.** A spoken Answer is transcribed by the browser's own speech recognition;
-  only the text is sent. There is no recorder in the client and no audio column in the schema.
+  only the text is sent. There is no recorder in the client and no audio column in the schema. The
+  soundwave follows the recogniser's own `speechstart`/`speechend` events rather than a level meter,
+  which would have meant opening a second microphone stream.
 - **Gated on the Plan this phase, not a Limit** (ADR-0005): free and basic see the real start screen
   locked, and their recorded Limits are not yet enforced.
 

@@ -109,6 +109,12 @@
   --hiker: #e08a4f;
   --trail-path: #c8a86b;
 
+  /* The Interview Simulator's notepad: a ruled page, blue rules and a red margin, the way a paper
+     notepad reads — the margin taking the hiker's jacket red, lightened, so it belongs to the scene. */
+  --notepad: #fffcef;
+  --notepad-rule: #cfdcea;
+  --notepad-margin: #e8a893;
+
   /* Pipeline stages — hue carries the stage, but never alone: every use
      is paired with the stage name in text. */
   --stage-interested: #7b93b0;
@@ -157,6 +163,10 @@
   --sky: #1f2630;
   --meadow: #1d2620;
   --basecamp: #1a1e19;
+
+  --notepad: #262b24;
+  --notepad-rule: #394652;
+  --notepad-margin: #7a4a3c;
 
   --sidebar: #232821;
   --sidebar-foreground: #eaeee4;
@@ -229,8 +239,70 @@
 }
 [data-scene="board"] [data-scene-part="board"],
 [data-scene="contacts"] [data-scene-part="contacts"],
-[data-scene="documents"] [data-scene-part="documents"] {
+[data-scene="documents"] [data-scene-part="documents"],
+[data-scene="interview"] [data-scene-part="interview"] {
   opacity: 1;
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * The Interview Simulator.
+ *
+ * The notepad is a ruled page. One rule per line of text, drawn at the foot of each line box so the
+ * words sit on it, plus a margin line; `local` attachment makes the paper scroll with what is written
+ * on it rather than the words sliding over a fixed grid.
+ * ---------------------------------------------------------------------------------------------- */
+@utility notepad-paper {
+  --line: 1.75rem;
+  --gutter: 2.75rem;
+  background-color: var(--notepad);
+  background-image:
+    linear-gradient(
+      90deg,
+      transparent calc(var(--gutter) - 0.75rem),
+      var(--notepad-margin) calc(var(--gutter) - 0.75rem),
+      var(--notepad-margin) calc(var(--gutter) - 0.75rem + 1.5px),
+      transparent calc(var(--gutter) - 0.75rem + 1.5px)
+    ),
+    linear-gradient(transparent calc(var(--line) - 1px), var(--notepad-rule) calc(var(--line) - 1px));
+  background-size:
+    100% 100%,
+    100% var(--line);
+  background-position:
+    0 0,
+    0 0.75rem;
+  background-attachment: local;
+  line-height: var(--line);
+  padding: 0.75rem 1rem var(--line) var(--gutter);
+}
+
+/*
+ * The microphone's state, as five bars. Off, they lie flat and still. Listening, they breathe low and
+ * slow — the page is waiting on the Tenant. Hearing, they move fully — the recogniser has picked up
+ * speech. Each bar reads its own reach from a custom property, so one keyframe serves both states.
+ */
+.soundwave-bar {
+  /* Each bar's share of the reach, set per bar by the component, so the peak is a wave, not a wall. */
+  --shape: 1;
+  transform-origin: center;
+  transform: scaleY(0.2);
+}
+[data-mic="listening"] .soundwave-bar {
+  --reach: 0.45;
+  animation: soundwave 1.6s ease-in-out infinite;
+}
+[data-mic="hearing"] .soundwave-bar {
+  --reach: 1;
+  animation: soundwave 0.85s ease-in-out infinite;
+}
+
+@keyframes soundwave {
+  0%,
+  100% {
+    transform: scaleY(0.2);
+  }
+  50% {
+    transform: scaleY(max(0.2, calc(var(--reach) * var(--shape))));
+  }
 }
 
 /*
@@ -325,6 +397,15 @@
 @media (prefers-reduced-motion: reduce) {
   .loading-trail-path {
     animation: none;
+  }
+  /* Still bars, drawn at a height per state, so the state stays visible without the motion. The words
+     beside the bars carry it too. */
+  [data-mic] .soundwave-bar {
+    animation: none;
+  }
+  [data-mic="listening"] .soundwave-bar,
+  [data-mic="hearing"] .soundwave-bar {
+    transform: scaleY(max(0.2, calc(var(--reach) * var(--shape))));
   }
   [data-scene-part],
   [data-summit-part] {

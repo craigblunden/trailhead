@@ -2,13 +2,15 @@
 
 import { usePathname } from "next/navigation";
 
-export type SceneSection = "board" | "contacts" | "documents";
+export type SceneSection = "board" | "contacts" | "documents" | "interview";
 
 /** The section whose foreground the scene shows on this URL; null where the page draws no scene. */
 export function sceneSectionFor(pathname: string): SceneSection | null {
   if (pathname === "/board") return "board";
   if (pathname === "/contacts" || pathname.startsWith("/contacts/")) return "contacts";
   if (pathname === "/documents") return "documents";
+  // The hub and every Job’s interview share one foreground: the owl hears every rehearsal.
+  if (pathname === "/interview" || pathname.startsWith("/interview/")) return "interview";
   // A Job's page draws its own scene, for its Stage, in its header (see `SummitHeaderFrame`).
   return null;
 }

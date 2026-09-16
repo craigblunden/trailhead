@@ -21,8 +21,11 @@ describe("which foreground the scene shows", () => {
     ["/contacts", "contacts"],
     ["/contacts/c1", "contacts"],
     ["/documents", "documents"],
+    ["/interview", "interview"],
+    ["/interview/job-1", "interview"],
     ["/board/job-1", null],
     ["/contactsheet", null],
+    ["/interviews", null],
   ])("on %s it is %s", (path, section) => {
     expect(sceneSectionFor(path)).toBe(section);
   });
@@ -59,7 +62,7 @@ describe("the scene across navigations", () => {
 
     const svg = container.querySelector("svg");
     expect(svg).toHaveAttribute("aria-hidden", "true");
-    for (const section of ["board", "contacts", "documents"]) {
+    for (const section of ["board", "contacts", "documents", "interview"]) {
       expect(container.querySelector(`[data-scene-part="${section}"]`)).not.toBeNull();
     }
   });

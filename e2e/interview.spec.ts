@@ -51,18 +51,20 @@ async function jobReadyToRehearse(page: Page) {
 }
 
 /**
- * Answers the question on screen, through the untimed pause before it. `dwellMs` holds the question
- * open for that long first — the clock counts whole seconds, and Playwright types faster than one,
- * so a test that wants to see time actually spent has to spend some.
+ * Answers the question on screen. There is nothing to press to begin it — its clock is already
+ * running. `dwellMs` holds the question open that long first: the clock counts whole seconds, and
+ * Playwright types faster than one, so a test that wants to see time actually spent has to spend some.
  */
 async function answerOne(page: Page, text: string, dwellMs = 0) {
-  await page.getByRole("button", { name: /^(Start answering|Next question)$/ }).click();
   // Chromium opens in speaking mode with no speech service behind it, so take the typed path.
-  const switchToTyping = page.getByRole("button", { name: /Type this answer instead/ });
+  // Typing carries across questions once chosen, so wait for whichever this question shows.
+  const switchToTyping = page.getByRole("button", { name: "Type instead" });
+  const notepad = page.getByRole("textbox", { name: /Your answer to/ });
+  await expect(notepad.or(switchToTyping)).toBeVisible();
   if (await switchToTyping.isVisible()) await switchToTyping.click();
-  await page.getByRole("textbox", { name: "Your answer" }).fill(text);
+  await notepad.fill(text);
   if (dwellMs > 0) await page.waitForTimeout(dwellMs);
-  await page.getByRole("button", { name: "Submit answer" }).click();
+  await page.getByRole("button", { name: /^Submit (final )?answer$/ }).click();
 }
 
 test.describe("interview simulator: a pro Tenant rehearses and is scored", () => {
@@ -73,28 +75,30 @@ test.describe("interview simulator: a pro Tenant rehearses and is scored", () =>
     test.setTimeout(180_000);
     const account = await signUpAndVerify(page);
     await putOnPlan(account.email, "pro");
-    await jobReadyToRehearse(page);
+    const job = await jobReadyToRehearse(page);
 
-    // Straight from the Job's page, skipping the picker (ticket 07).
+    // Straight from the Job's page, skipping the picker (ticket 07), onto a briefing named for the Job.
     await page.getByRole("link", { name: "Practice interview" }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "Interview Simulator" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: job.role })).toBeVisible();
+    await expect(page.getByText(/One clock for the whole interview, and it doesn’t pause/)).toBeVisible();
 
     // The real length choice, and the breakdown that length produces (ticket 05).
-    await expect(page.getByRole("button", { name: /^5 minutes/ })).toBeEnabled();
-    await page.getByRole("button", { name: /^5 minutes/ }).click();
-    await expect(page.getByText("5 questions across all five areas")).toBeVisible();
+    await expect(page.getByRole("button", { name: /^5\s*minutes/ })).toBeEnabled();
+    await page.getByRole("button", { name: /^5\s*minutes/ }).click();
+    await expect(page.getByText(/5 questions across all five areas/)).toBeVisible();
 
     // Speaking is the default where the browser can transcribe, with the reason beside it (ticket 06).
-    await expect(page.getByRole("button", { name: /Speak my answers/ })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: /Speaking/ })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByText(/no audio is recorded, uploaded, or stored/i)).toBeVisible();
 
-    await page.getByRole("button", { name: "Start interview" }).click();
+    await page.getByRole("button", { name: "Go" }).click();
 
-    // One countdown for the whole Attempt, not one per question, and it waits on the pause.
+    // Go puts the first question up with its one countdown for the whole Attempt already running.
     const clock = page.getByRole("timer");
-    await expect(clock).toHaveText("5:00 left", { timeout: 60_000 });
+    await expect(clock).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText(/Question 1 of 5/)).toBeVisible();
-    await expect(page.getByText(/the clock is stopped/)).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("personal question");
+    await expect(clock).not.toHaveText("5:00 left", { timeout: 5_000 });
 
     for (let index = 1; index <= 5; index += 1) {
       await expect(page.getByText(new RegExp(`Question ${index} of 5`))).toBeVisible();
@@ -132,19 +136,20 @@ test.describe("interview simulator: a pro Tenant rehearses and is scored", () =>
     const job = await jobReadyToRehearse(page);
 
     await page.getByRole("link", { name: "Practice interview" }).click();
-    await page.getByRole("button", { name: "Start interview" }).click();
+    await page.getByRole("button", { name: "Go" }).click();
     await expect(page.getByRole("timer")).toBeVisible({ timeout: 60_000 });
     await answerOne(page, "The one answer I finished before the phone rang.", 3_000);
     await expect(page.getByText(/Question 2 of 5/)).toBeVisible();
 
-    // The tab closes mid-question two. Nothing was recorded for it, and no time drains while away.
+    // The tab closes mid-question two, its clock running. Nothing was recorded for it — neither its
+    // answer nor its time — and nothing drains while away.
     await page.goto(job.href);
     await page.getByRole("link", { name: "Practice interview" }).click();
 
     await expect(page.getByRole("heading", { name: "You have an interview in progress" })).toBeVisible();
     await page.getByRole("button", { name: "Resume" }).click();
 
-    // The same question set, resumed at question two — not inside the one that was abandoned.
+    // Resume puts question two straight back up — not inside the one abandoned, and with no second press.
     await expect(page.getByText(/Question 2 of 5/)).toBeVisible();
     // The budget is what was left when they walked away — the seconds that first answer took are
     // gone, and nothing drained in between.
@@ -171,20 +176,20 @@ test.describe("interview simulator: the locked preview (ticket 08)", () => {
     await page.getByRole("searchbox", { name: /Which job/ }).fill("Fernwood");
     await page.getByRole("list", { name: "Matching jobs" }).getByRole("link").first().click();
 
-    await expect(page.getByText(/interview simulator is a Pro feature/i)).toBeVisible();
+    await expect(page.getByText(/Interview Simulator is a Pro feature/)).toBeVisible();
     // The real screen: every length, and the real Category breakdown — all of it refused.
     for (const minutes of [5, 10, 30]) {
-      await expect(page.getByRole("button", { name: new RegExp(`^${minutes} minutes`) })).toBeDisabled();
+      await expect(page.getByRole("button", { name: new RegExp(`^${minutes}\\s*minutes`) })).toBeDisabled();
     }
     await expect(page.getByText("Personal")).toBeVisible();
     // Not a disabled start button: no start action at all.
-    await expect(page.getByRole("button", { name: "Start interview" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Go" })).toHaveCount(0);
     await expectNoAxeViolations(page);
 
     // The same locked screen from the Job's own page, so the tease does not depend on the way in.
     await page.goto(job.href);
     await page.getByRole("link", { name: "Practice interview" }).click();
-    await expect(page.getByText(/interview simulator is a Pro feature/i)).toBeVisible();
-    await expect(page.getByRole("button", { name: "Start interview" })).toHaveCount(0);
+    await expect(page.getByText(/Interview Simulator is a Pro feature/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Go" })).toHaveCount(0);
   });
 });

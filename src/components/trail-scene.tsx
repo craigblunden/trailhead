@@ -164,6 +164,75 @@ function NoticeBoard({ x, baseY }: { x: number; baseY: number }) {
 }
 
 /**
+ * The Interview Simulator's interviewer: an owl on a stump, clipboard under one wing, hearing the hiker
+ * out. Drawn in the scene's flat shapes and palette, so it belongs to the same trail.
+ */
+function OwlInterviewer({ x, baseY }: { x: number; baseY: number }) {
+  const stumpTop = baseY - 30;
+  const cy = stumpTop - 19;
+  return (
+    <g>
+      {/* The stump, with its cut face. */}
+      <path
+        d={`M${x - 22} ${baseY} L${x - 17} ${stumpTop} L${x + 17} ${stumpTop} L${x + 22} ${baseY} Z`}
+        fill="var(--trunk)"
+      />
+      <ellipse cx={x} cy={stumpTop} rx={17} ry={4.5} fill="#b08658" />
+      <ellipse cx={x} cy={stumpTop} rx={9} ry={2.2} fill="none" stroke="#8a6a4a" strokeWidth={1.2} />
+
+      {/* Ear tufts, body, and the lighter chest. */}
+      <path d={`M${x - 12} ${cy - 16} L${x - 9} ${cy - 25} L${x - 4} ${cy - 17} Z`} fill="#6b4a2e" />
+      <path d={`M${x + 12} ${cy - 16} L${x + 9} ${cy - 25} L${x + 4} ${cy - 17} Z`} fill="#6b4a2e" />
+      <ellipse cx={x} cy={cy} rx={14} ry={19} fill="#7d5a3a" />
+      <ellipse cx={x} cy={cy + 6} rx={8.5} ry={11} fill="#d9bf95" />
+      {[-3, 2, 7].map((dy) => (
+        <path
+          key={dy}
+          d={`M${x - 4} ${cy + dy + 6} q2 2 4 0 q2 2 4 0`}
+          fill="none"
+          stroke="#b0936a"
+          strokeWidth={1}
+          strokeLinecap="round"
+        />
+      ))}
+
+      {/* The face: two wide eyes turned toward the hiker, and a beak. */}
+      <circle cx={x - 5.5} cy={cy - 8} r={5.2} fill="var(--snow)" />
+      <circle cx={x + 5.5} cy={cy - 8} r={5.2} fill="var(--snow)" />
+      <circle cx={x - 7} cy={cy - 8} r={2.4} fill="#22261f" />
+      <circle cx={x + 4} cy={cy - 8} r={2.4} fill="#22261f" />
+      <path d={`M${x - 2} ${cy - 4} L${x + 2} ${cy - 4} L${x} ${cy} Z`} fill="#e0a052" />
+
+      {/* A clipboard tucked under the far wing: it's taking notes. */}
+      <g transform={`rotate(10 ${x + 15} ${cy + 4})`}>
+        <rect x={x + 9} y={cy - 6} width={13} height={17} rx={1.5} fill="#b08658" />
+        <rect x={x + 10.5} y={cy - 3.5} width={10} height={13} fill="var(--snow)" />
+        {[0, 3.5, 7].map((dy) => (
+          <rect key={dy} x={x + 12} y={cy + dy} width={7} height={1.1} fill="#c9cfc0" />
+        ))}
+        <rect x={x + 13} y={cy - 7.5} width={5} height={3} rx={0.8} fill="#6b4a2e" />
+      </g>
+      <ellipse cx={x + 11} cy={cy + 3} rx={5} ry={10} fill="#6b4a2e" />
+    </g>
+  );
+}
+
+/** A speech bubble over a speaker's head: the hiker is answering out loud. */
+function SpeechBubble({ x, y }: { x: number; y: number }) {
+  return (
+    <g>
+      <path
+        d={`M${x - 22} ${y - 14} h44 a6 6 0 0 1 6 6 v14 a6 6 0 0 1 -6 6 h-30 l-8 8 l1 -8 h-7 a6 6 0 0 1 -6 -6 v-14 a6 6 0 0 1 6 -6 Z`}
+        fill="var(--snow)"
+      />
+      {[-12, 0, 12].map((dx) => (
+        <circle key={dx} cx={x + dx} cy={y + 1} r={2.8} fill="var(--peak-near)" />
+      ))}
+    </g>
+  );
+}
+
+/**
  * The view box starts below y=0 so the band stays shallow without clipping the
  * peaks, and scaling to width keeps the whole scene visible at any size.
  */
@@ -257,6 +326,14 @@ export function TrailScene({ variant = "hero", className }: TrailSceneProps) {
           <g data-scene-part="documents">
             <NoticeBoard x={960} baseY={346} />
             <Hiker x={880} baseY={344} />
+          </g>
+
+          {/* Interview Simulator: a hiker rehearsing out loud to an owl taking notes on a stump. Still,
+              on purpose — nothing at the foot of the page should move while a clock is running. */}
+          <g data-scene-part="interview">
+            <Hiker x={760} baseY={344} />
+            <SpeechBubble x={790} y={262} />
+            <OwlInterviewer x={858} baseY={346} />
           </g>
         </>
       )}

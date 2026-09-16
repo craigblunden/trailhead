@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
 
 import { InterviewHub } from "@/components/interview/interview-hub";
@@ -10,7 +11,6 @@ import {
   INTERVIEW_FAILURES,
   SPEAK_RECOMMENDED,
   SPEAK_UNSUPPORTED,
-  attemptSeconds,
   type Attempt,
   type AttemptLength,
   type Category,
@@ -22,8 +22,8 @@ import { renderWithJobs, screen, userEvent, waitFor, within } from "../test-util
 
 /**
  * The Interview Simulator's screens (interview simulator tickets 02–08), against a faked client —
- * the seam the page takes to the Route Handlers. Everything else is real: the phase the page is in
- * comes from the Attempt it was handed, exactly as it does in the app.
+ * the seam the page takes to the Route Handlers — and a faked speech recogniser. Everything else is
+ * real: the phase the page is in comes from the Attempt it was handed, exactly as it does in the app.
  */
 
 vi.mock("next/navigation", () => ({
@@ -36,8 +36,7 @@ const AXE_OPTIONS = { rules: { "color-contrast": { enabled: false } } } as const
 
 const job = SEED_JOBS.find((candidate) => candidate.id === "fernwood-product-designer-growth")!;
 
-/** The seam the page takes to the Route Handlers, faked. Cast at the render site, so each mock
- *  keeps its own `Mock` type here. */
+/** The seam the page takes to the Route Handlers. Cast at the render site, so each keeps its `Mock` type. */
 const client = vi.hoisted(() => ({
   start: vi.fn(),
   answer: vi.fn(),
@@ -59,8 +58,7 @@ function attemptOf({
   length = 5,
   answered = 0,
   scored = false,
-  completedAt = null,
-}: { length?: AttemptLength; answered?: number; scored?: boolean; completedAt?: string | null } = {}): Attempt {
+}: { length?: AttemptLength; answered?: number; scored?: boolean } = {}): Attempt {
   const questions = CATEGORIES.map((category, order) => ({
     id: `q${order}`,
     category: category as Category,
@@ -81,10 +79,69 @@ function attemptOf({
     jobId: job.id,
     length,
     activeSeconds: answered * 20,
-    completedAt: scored || answered === questions.length ? (completedAt ?? "2026-09-16T10:00:00.000Z") : completedAt,
+    completedAt: scored || answered === questions.length ? "2026-09-16T10:00:00.000Z" : null,
     overallScore: scored ? 70 : null,
     questions,
   };
+}
+
+/**
+ * A stand-in for the browser's speech recogniser. Every instance the page makes is kept, so a test
+ * can play the part of the browser: hear speech, return a transcript, end on its own.
+ */
+type FakeRecognition = {
+  started: boolean;
+  onresult: ((event: unknown) => void) | null;
+  onend: (() => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+  onspeechstart: (() => void) | null;
+  onspeechend: (() => void) | null;
+};
+
+let recognisers: FakeRecognition[] = [];
+/** When set, the fake ends the moment it starts — a browser that won't keep a microphone open. */
+let endsAtOnce = false;
+
+function setSpeechSupport(supported: boolean) {
+  const holder = window as unknown as { SpeechRecognition?: unknown };
+  if (!supported) {
+    delete holder.SpeechRecognition;
+    return;
+  }
+  holder.SpeechRecognition = class implements FakeRecognition {
+    lang = "";
+    continuous = false;
+    interimResults = false;
+    started = false;
+    onresult: FakeRecognition["onresult"] = null;
+    onend: FakeRecognition["onend"] = null;
+    onerror: FakeRecognition["onerror"] = null;
+    onspeechstart: FakeRecognition["onspeechstart"] = null;
+    onspeechend: FakeRecognition["onspeechend"] = null;
+    constructor() {
+      recognisers.push(this);
+    }
+    start() {
+      this.started = true;
+      if (endsAtOnce) queueMicrotask(() => this.onend?.());
+    }
+    stop() {
+      this.started = false;
+      this.onend?.();
+    }
+    abort() {
+      this.started = false;
+    }
+  };
+}
+
+const latestRecogniser = () => recognisers[recognisers.length - 1];
+
+/** Plays the browser settling on some words. */
+function hear(text: string) {
+  act(() => {
+    latestRecogniser().onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: text }], { isFinal: true })] });
+  });
 }
 
 function renderPanel({
@@ -107,34 +164,19 @@ function renderPanel({
   );
 }
 
-/** Stands in for the browser's speech recognition, so the feature-detection branch is testable. */
-function setSpeechSupport(supported: boolean) {
-  const holder = window as unknown as { SpeechRecognition?: unknown };
-  if (!supported) {
-    delete holder.SpeechRecognition;
-    return;
-  }
-  holder.SpeechRecognition = class {
-    lang = "";
-    continuous = false;
-    interimResults = false;
-    onresult: ((event: unknown) => void) | null = null;
-    onerror: ((event: unknown) => void) | null = null;
-    onend: (() => void) | null = null;
-    start() {}
-    stop() {
-      this.onend?.();
-    }
-    abort() {}
-  };
-}
-
-const startButton = () => screen.getByRole("button", { name: "Start interview" });
-const lengthButton = (minutes: number) => screen.getByRole("button", { name: new RegExp(`^${minutes} minutes`) });
+const go = () => screen.getByRole("button", { name: "Go" });
+const lengthButton = (minutes: number) => screen.getByRole("button", { name: new RegExp(`^${minutes}\\s*minutes`) });
+const submitButton = () => screen.getByRole("button", { name: /^Submit (final )?answer$/ });
 
 beforeEach(() => {
   for (const mock of Object.values(client)) mock.mockReset();
+  recognisers = [];
+  endsAtOnce = false;
   setSpeechSupport(true);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("the Job picker (ticket 07)", () => {
@@ -144,13 +186,11 @@ describe("the Job picker (ticket 07)", () => {
 
     await user.type(box, "fernwood");
 
-    const list = screen.getByRole("list", { name: "Matching jobs" });
-    const rows = within(list).getAllByRole("link");
+    const rows = within(screen.getByRole("list", { name: "Matching jobs" })).getAllByRole("link");
     expect(rows.length).toBeGreaterThan(0);
     for (const row of rows) expect(row).toHaveTextContent(/Fernwood/i);
     expect(rows[0]).toHaveAttribute("href", expect.stringMatching(/^\/interview\//));
 
-    // The same box finds a role rather than a company: every row now matches on the role.
     await user.clear(box);
     await user.type(box, "designer");
     const byRole = within(screen.getByRole("list", { name: "Matching jobs" })).getAllByRole("link");
@@ -167,13 +207,11 @@ describe("the Job picker (ticket 07)", () => {
     expect(screen.queryByRole("list", { name: "Matching jobs" })).not.toBeInTheDocument();
   });
 
-  it("IV-U3: the hub is a flat searchable list, not the board's grouped columns, and is capped", async () => {
+  it("IV-U3: the hub is a flat searchable list, not the board's grouped columns, and is capped", () => {
     renderWithJobs(<InterviewHub plan="pro" />);
 
-    // One list, ungrouped: no Stage headings, no column per Stage.
     expect(screen.getAllByRole("list", { name: "Matching jobs" })).toHaveLength(1);
-    const shown = within(screen.getByRole("list", { name: "Matching jobs" })).getAllByRole("link");
-    expect(shown.length).toBeLessThanOrEqual(8);
+    expect(within(screen.getByRole("list", { name: "Matching jobs" })).getAllByRole("link").length).toBeLessThanOrEqual(8);
   });
 
   it("IV-U4: every Plan reaches the hub; only the Plans that cannot start one see it marked Pro", () => {
@@ -186,73 +224,83 @@ describe("the Job picker (ticket 07)", () => {
   });
 });
 
-describe("the start screen (tickets 05, 06)", () => {
-  it("IV-U5: offers 5, 10, and 30 minutes to a pro Tenant, and starting sends the chosen one", async () => {
+describe("the briefing (tickets 05, 06)", () => {
+  it("IV-U5: says before Go that the clock doesn't pause between questions", () => {
+    renderPanel();
+
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(job.role);
+    expect(screen.getByRole("heading", { name: "How it works" })).toBeInTheDocument();
+    expect(screen.getByText(/One clock for the whole interview, and it doesn’t pause/)).toBeInTheDocument();
+  });
+
+  it("IV-U6: offers 5, 10, and 30 minutes to a pro Tenant, and Go sends the chosen one", async () => {
     const { user } = renderPanel();
     client.start.mockResolvedValue({ ok: true, attempt: attemptOf({ length: 30 }), quota: quota(8) });
 
     for (const minutes of [5, 10, 30]) expect(lengthButton(minutes)).toBeEnabled();
-
     await user.click(lengthButton(30));
-    await user.click(startButton());
+    await user.click(go());
 
     expect(client.start).toHaveBeenCalledWith(job.id, 30, false);
   });
 
-  it("IV-U6: each length shows its own Category breakdown, always across all five areas", async () => {
+  it("IV-U7: each length shows its own Category breakdown, always across all five areas", async () => {
     const { user } = renderPanel();
-
-    const counts = (): string[] =>
-      CATEGORIES.map((category) => {
-        const item = screen.getByText(CATEGORY_LABEL[category]).closest("li")!;
-        return within(item).getByText(/question/).textContent ?? "";
-      });
+    const counts = () =>
+      CATEGORIES.map((category) =>
+        within(screen.getByText(CATEGORY_LABEL[category]).closest("li")!).getByText(/question/).textContent,
+      );
 
     expect(counts()).toEqual(CATEGORIES.map(() => "1 question"));
-
     await user.click(lengthButton(10));
     expect(counts()).toEqual(CATEGORIES.map(() => "2 questions"));
-
     await user.click(lengthButton(30));
-    // The 30-minute mix is uneven but still spans all five.
     expect(counts()).toEqual(["2 questions", "3 questions", "3 questions", "4 questions", "3 questions"]);
   });
 
-  it("IV-U7: speaking is the default where the browser can transcribe, with the reason shown", () => {
+  it("IV-U8: speaking is the default where the browser can transcribe, with the reason shown", () => {
     renderPanel({ speech: true });
 
-    expect(screen.getByRole("button", { name: /Speak my answers/ })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: /Type my answers/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: /Speaking/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /Typing/ })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByText(SPEAK_RECOMMENDED)).toBeInTheDocument();
   });
 
-  it("IV-U8: a browser without speech recognition is offered typing only, with a note saying why", () => {
+  it("IV-U9: a browser without speech recognition is offered typing only, with a note saying why", () => {
     renderPanel({ speech: false });
 
-    expect(screen.queryByRole("button", { name: /Speak my answers/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Speaking/ })).not.toBeInTheDocument();
     expect(screen.getByText(SPEAK_UNSUPPORTED)).toBeInTheDocument();
   });
 
-  it("IV-U9: what is left this week is shown, and nothing left stops the start", async () => {
+  it("IV-U10: what is left this week is shown, and nothing left stops Go", () => {
     const { unmount } = renderPanel({ remaining: 3 });
     expect(screen.getByText("3 interviews left this week.")).toBeInTheDocument();
     unmount();
 
     renderPanel({ remaining: 0 });
     expect(screen.getByText(/You’ve used this week’s interviews/)).toBeInTheDocument();
-    expect(startButton()).toBeDisabled();
+    expect(go()).toBeDisabled();
   });
 
-  it("IV-U10: a refusal from the server is shown in the page's own words, and nothing starts", async () => {
+  it("IV-U11: while the questions are written, the card says the clock starts with the first", async () => {
     const { user } = renderPanel();
-    client.start.mockResolvedValue({
-      ok: false,
-      error: "no-resume",
-      message: INTERVIEW_FAILURES["no-resume"],
-      refunded: false,
-    });
+    let finish!: (value: unknown) => void;
+    client.start.mockReturnValue(new Promise((resolve) => (finish = resolve)));
 
-    await user.click(startButton());
+    await user.click(go());
+
+    expect(screen.getByRole("status")).toHaveTextContent("Writing your questions…");
+    expect(screen.getByText(/the clock starts with it/)).toBeInTheDocument();
+    expect(screen.queryByRole("timer")).not.toBeInTheDocument();
+    await act(async () => finish({ ok: true, attempt: attemptOf(), quota: quota(8) }));
+  });
+
+  it("IV-U12: a refusal is shown in the page's own words, and nothing starts", async () => {
+    const { user } = renderPanel();
+    client.start.mockResolvedValue({ ok: false, error: "no-resume", message: INTERVIEW_FAILURES["no-resume"], refunded: false });
+
+    await user.click(go());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(INTERVIEW_FAILURES["no-resume"]);
     expect(screen.queryByRole("timer")).not.toBeInTheDocument();
@@ -261,232 +309,241 @@ describe("the start screen (tickets 05, 06)", () => {
 
 describe("the locked preview (ticket 08)", () => {
   it.each(["free", "basic"] as const)(
-    "IV-U11: a %s Tenant sees the real start screen, locked, with no way into a real Attempt",
-    async (plan) => {
+    "IV-U13: a %s Tenant sees the real set-up, locked, with no Go and no quota promised",
+    (plan) => {
       renderPanel({ plan });
 
-      // The real screen: every length, and the real Category breakdown.
       for (const minutes of [5, 10, 30]) expect(lengthButton(minutes)).toBeDisabled();
       for (const category of CATEGORIES) expect(screen.getByText(CATEGORY_LABEL[category])).toBeInTheDocument();
-      expect(screen.getByText(/interview simulator is a Pro feature/i)).toBeInTheDocument();
-
-      // Not a disabled start button — no start action at all.
-      expect(screen.queryByRole("button", { name: /Start interview/ })).not.toBeInTheDocument();
-      expect(client.start).not.toHaveBeenCalled();
+      expect(screen.getByText(/Interview Simulator is a Pro feature/)).toBeInTheDocument();
+      // Not a disabled Go — no Go at all.
+      expect(screen.queryByRole("button", { name: "Go" })).not.toBeInTheDocument();
+      // Their real remaining count is not something they can spend, so it isn't shown.
+      expect(screen.queryByText(/interviews? left this week/)).not.toBeInTheDocument();
     },
   );
 
-  it("IV-U12: the locked state cannot be clicked into a start: every control refuses", async () => {
-    const { user } = renderPanel({ plan: "free" });
-
-    await user.click(lengthButton(30));
-    await user.click(screen.getByText(CATEGORY_LABEL.technical));
-
-    expect(client.start).not.toHaveBeenCalled();
-    expect(screen.queryByRole("button", { name: /Start interview/ })).not.toBeInTheDocument();
-  });
-
-  it("IV-U13: the locked preview has no accessibility violations", async () => {
+  it("IV-U14: the locked preview has no accessibility violations", async () => {
     const { container } = renderPanel({ plan: "basic" });
 
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
   });
 });
 
-describe("answering an Attempt (ticket 02)", () => {
-  it("IV-U14: the countdown is stopped between questions and runs once answering begins", async () => {
+describe("the interview runs without a pause (ticket 02)", () => {
+  it("IV-U15: Go puts the first question up with its clock already running — no second press", async () => {
     vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: true });
-    try {
-      const attempt = attemptOf();
-      const { user } = renderPanel({ attempt });
-      await user.click(screen.getByRole("button", { name: "Resume" }));
+    const { user } = renderPanel({ speech: false });
+    client.start.mockResolvedValue({ ok: true, attempt: attemptOf(), quota: quota(8) });
 
-      const clock = () => screen.getByRole("timer").textContent;
-      const full = `${attemptSeconds(5) / 60}:00 left`;
-      expect(clock()).toBe(full);
+    await user.click(go());
 
-      // The pause is untimed: ten seconds of it move nothing.
-      await vi.advanceTimersByTimeAsync(10_000);
-      expect(clock()).toBe(full);
-
-      await user.click(screen.getByRole("button", { name: "Start answering" }));
-      await vi.advanceTimersByTimeAsync(10_000);
-      expect(clock()).toBe("4:50 left");
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(await screen.findByRole("heading", { level: 1, name: "A personal question?" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Start answering/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("timer")).toHaveTextContent("5:00 left");
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
+    expect(screen.getByRole("timer")).toHaveTextContent("4:50 left");
   });
 
-  it("IV-U15: typing and submitting sends the transcript, the question, and the seconds it took", async () => {
+  it("IV-U16: submitting puts the next question up with the clock still running, and sends what the first cost", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: true });
+    const typing = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const attempt = attemptOf();
-    const { user } = renderPanel({ attempt, speech: false });
-    client.answer.mockResolvedValue({ ok: true, attempt: attemptOf({ answered: 1 }) });
+    renderPanel({ attempt, speech: false });
+    client.answer.mockResolvedValue({ ok: true, attempt: { ...attemptOf({ answered: 1 }), id: attempt.id } });
 
-    await user.click(screen.getByRole("button", { name: "Resume" }));
-    await user.click(screen.getByRole("button", { name: "Start answering" }));
-    await user.type(screen.getByRole("textbox", { name: "Your answer" }), "I led the reporting redesign.");
-    await user.click(screen.getByRole("button", { name: "Submit answer" }));
+    await typing.click(screen.getByRole("button", { name: "Resume" }));
+    await typing.type(screen.getByRole("textbox"), "I led the reporting redesign.");
+    await act(() => vi.advanceTimersByTimeAsync(20_000));
+    await typing.click(submitButton());
 
-    await waitFor(() => expect(client.answer).toHaveBeenCalled());
-    expect(client.answer).toHaveBeenCalledWith(
-      attempt.id,
-      expect.objectContaining({ questionId: "q0", transcript: "I led the reporting redesign." }),
-    );
-    expect(client.answer.mock.calls[0][1].elapsedSeconds).toBeGreaterThanOrEqual(0);
+    expect(client.answer).toHaveBeenCalledWith(attempt.id, {
+      questionId: "q0",
+      transcript: "I led the reporting redesign.",
+      elapsedSeconds: 20,
+    });
+    // The next question is up at once — there is nothing to press to begin it — and its clock runs.
+    expect(await screen.findByRole("heading", { level: 1, name: "A behavioural question?" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox")).toHaveValue("");
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    expect(screen.getByRole("timer")).toHaveTextContent("4:35 left");
   });
 
-  it("IV-U16: an empty answer cannot be submitted", async () => {
+  it("IV-U17: the clock stands still while an answer is on its way to the server", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: true });
+    const typing = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderPanel({ attempt: attemptOf(), speech: false });
+    client.answer.mockReturnValue(new Promise(() => {}));
+
+    await typing.click(screen.getByRole("button", { name: "Resume" }));
+    await typing.type(screen.getByRole("textbox"), "An answer.");
+    await typing.click(submitButton());
+    const atSubmit = screen.getByRole("timer").textContent;
+    await act(() => vi.advanceTimersByTimeAsync(15_000));
+
+    expect(screen.getByRole("button", { name: "Saving your answer…" })).toBeDisabled();
+    expect(screen.getByRole("timer").textContent).toBe(atSubmit);
+  });
+
+  it("IV-U18: an empty answer cannot be submitted", async () => {
     const { user } = renderPanel({ attempt: attemptOf(), speech: false });
 
     await user.click(screen.getByRole("button", { name: "Resume" }));
-    await user.click(screen.getByRole("button", { name: "Start answering" }));
 
-    expect(screen.getByRole("button", { name: "Submit answer" })).toBeDisabled();
-    expect(client.answer).not.toHaveBeenCalled();
+    expect(submitButton()).toBeDisabled();
   });
 
-  it("IV-U17: answering the last question reaches completion, and the page offers scoring rather than another question", async () => {
-    const nearlyDone = attemptOf({ answered: 4 });
-    const { user } = renderPanel({ attempt: nearlyDone, speech: false });
+  it("IV-U19: the last question says so, and answering it reaches scoring rather than another question", async () => {
+    const { user } = renderPanel({ attempt: attemptOf({ answered: 4 }), speech: false });
     client.answer.mockResolvedValue({ ok: true, attempt: attemptOf({ answered: 5 }) });
 
     await user.click(screen.getByRole("button", { name: "Resume" }));
-    // Four already answered, so the pause offers the next question rather than the first.
-    await user.click(screen.getByRole("button", { name: "Next question" }));
-    await user.type(screen.getByRole("textbox", { name: "Your answer" }), "The last one.");
-    await user.click(screen.getByRole("button", { name: "Submit answer" }));
+    expect(screen.getByText("This is the last question.")).toBeInTheDocument();
+    await user.type(screen.getByRole("textbox"), "The last one.");
+    await user.click(screen.getByRole("button", { name: "Submit final answer" }));
 
     expect(await screen.findByRole("button", { name: "Score my interview" })).toBeInTheDocument();
     expect(screen.queryByRole("timer")).not.toBeInTheDocument();
   });
 
-  it("IV-U18: the countdown reaching zero ends the Attempt, and what was typed is never sent", async () => {
+  it("IV-U20: the countdown reaching zero ends the Attempt, and what was typed is never sent", async () => {
     vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: true });
-    try {
-      // One second left on the budget.
-      const nearlyOut: Attempt = { ...attemptOf(), activeSeconds: attemptSeconds(5) - 1 };
-      const { user } = renderPanel({ attempt: nearlyOut, speech: false });
-      client.timeUp.mockResolvedValue({ ok: true, attempt: { ...nearlyOut, completedAt: "2026-09-16T10:00:00.000Z" } });
+    const typing = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const nearlyOut: Attempt = { ...attemptOf(), activeSeconds: 299 };
+    renderPanel({ attempt: nearlyOut, speech: false });
+    client.timeUp.mockResolvedValue({ ok: true, attempt: { ...nearlyOut, completedAt: "2026-09-16T10:00:00.000Z" } });
 
-      await user.click(screen.getByRole("button", { name: "Resume" }));
-      await user.click(screen.getByRole("button", { name: "Start answering" }));
-      await user.type(screen.getByRole("textbox", { name: "Your answer" }), "Half an answ");
-      await vi.advanceTimersByTimeAsync(2_000);
+    await typing.click(screen.getByRole("button", { name: "Resume" }));
+    await typing.type(screen.getByRole("textbox"), "Half an answ");
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
 
-      await waitFor(() => expect(client.timeUp).toHaveBeenCalledWith(nearlyOut.id));
-      // Nothing half-typed was recorded, and no question was force-submitted.
-      expect(client.answer).not.toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-    }
+    await waitFor(() => expect(client.timeUp).toHaveBeenCalledWith(nearlyOut.id));
+    expect(client.answer).not.toHaveBeenCalled();
   });
 
-  it("IV-U19: a failed submission says so and leaves the Tenant on the same question", async () => {
-    const { user } = renderPanel({ attempt: attemptOf(), speech: false });
-    client.answer.mockResolvedValue({ ok: false, error: "failed", message: INTERVIEW_FAILURES.failed });
+  it("IV-U21: a failed submission keeps the answer and the seconds it cost, so a retry resumes rather than starts over", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: true });
+    const typing = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderPanel({ attempt: attemptOf(), speech: false });
+    client.answer.mockResolvedValueOnce({ ok: false, error: "failed", message: INTERVIEW_FAILURES.failed });
 
-    await user.click(screen.getByRole("button", { name: "Resume" }));
-    await user.click(screen.getByRole("button", { name: "Start answering" }));
-    await user.type(screen.getByRole("textbox", { name: "Your answer" }), "An answer.");
-    await user.click(screen.getByRole("button", { name: "Submit answer" }));
+    await typing.click(screen.getByRole("button", { name: "Resume" }));
+    await typing.type(screen.getByRole("textbox"), "An answer.");
+    await act(() => vi.advanceTimersByTimeAsync(20_000));
+    await typing.click(submitButton());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(INTERVIEW_FAILURES.failed);
-    expect(screen.getByRole("timer")).toBeInTheDocument();
-  });
+    expect(screen.getByRole("textbox")).toHaveValue("An answer.");
+    expect(screen.getByRole("timer")).toHaveTextContent("4:40 left");
 
-  /**
-   * The server only banks an Answer's time when the Answer lands. So a failed submission has to
-   * carry its seconds into the retry — otherwise retrying a question would hand the time back, and
-   * a Tenant whose connection kept dropping would rehearse against a clock that never moved.
-   */
-  it("IV-U20: a retry after a failed submission keeps the seconds the first try spent", async () => {
-    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: true });
-    try {
-      const { user } = renderPanel({ attempt: attemptOf(), speech: false });
-      const act = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      client.answer.mockResolvedValue({ ok: false, error: "failed", message: INTERVIEW_FAILURES.failed });
-
-      await act.click(screen.getByRole("button", { name: "Resume" }));
-      await act.click(screen.getByRole("button", { name: "Start answering" }));
-      await act.type(screen.getByRole("textbox", { name: "Your answer" }), "An answer.");
-      await vi.advanceTimersByTimeAsync(20_000);
-      await act.click(screen.getByRole("button", { name: "Submit answer" }));
-      await screen.findByRole("alert");
-
-      // Twenty seconds gone, and still gone when the question is opened again.
-      expect(screen.getByRole("timer")).toHaveTextContent("4:40 left");
-      await act.click(screen.getByRole("button", { name: "Start answering" }));
-      expect(screen.getByRole("timer")).toHaveTextContent("4:40 left");
-      // And what they already typed is still there to resend, rather than having to be retyped.
-      expect(screen.getByRole("textbox", { name: "Your answer" })).toHaveValue("An answer.");
-
-      // The retry tells the server everything this question has cost, not just this try.
-      client.answer.mockResolvedValue({ ok: true, attempt: attemptOf({ answered: 1 }) });
-      await vi.advanceTimersByTimeAsync(5_000);
-      await act.click(screen.getByRole("button", { name: "Submit answer" }));
-
-      await waitFor(() => expect(client.answer).toHaveBeenCalledTimes(2));
-      expect(client.answer.mock.calls[1][1].elapsedSeconds).toBe(25);
-      void user;
-    } finally {
-      vi.useRealTimers();
-    }
+    client.answer.mockResolvedValueOnce({ ok: true, attempt: attemptOf({ answered: 1 }) });
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    await typing.click(submitButton());
+    await waitFor(() => expect(client.answer).toHaveBeenCalledTimes(2));
+    expect(client.answer.mock.calls[1][1].elapsedSeconds).toBe(25);
   });
 });
 
 describe("speaking an answer (ticket 06)", () => {
-  it("IV-U21: with speech supported, answering listens rather than showing a box — and no audio is touched", async () => {
+  it("IV-U22: the transcript is hidden by default while speaking, and opens as a ruled notepad", async () => {
     const { user } = renderPanel({ attempt: attemptOf(), speech: true });
 
     await user.click(screen.getByRole("button", { name: "Resume" }));
-    await user.click(screen.getByRole("button", { name: "Start answering" }));
+    hear("I led the reporting redesign.");
 
-    expect(screen.getByText(/Listening/)).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "Your answer" })).not.toBeInTheDocument();
-    // The page never reaches for the microphone itself: the browser transcribes, and only text
-    // is ever held. There is no recorder to have started.
+    const toggle = screen.getByRole("button", { name: "Show transcript" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("I led the reporting redesign.")).not.toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(screen.getByRole("button", { name: "Hide transcript" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("I led the reporting redesign.")).toHaveClass("notepad-paper");
+  });
+
+  it("IV-U23: the soundwave says whether the microphone is listening or hearing speech", async () => {
+    const { user } = renderPanel({ attempt: attemptOf(), speech: true });
+
+    await user.click(screen.getByRole("button", { name: "Resume" }));
+    const wave = () => document.querySelector("[data-mic]")!;
+
+    expect(wave()).toHaveAttribute("data-mic", "listening");
+    expect(screen.getByText("Listening. Say your answer out loud.")).toBeInTheDocument();
+
+    act(() => latestRecogniser().onspeechstart?.());
+    expect(wave()).toHaveAttribute("data-mic", "hearing");
+    expect(screen.getByText("Hearing you")).toBeInTheDocument();
+
+    act(() => latestRecogniser().onspeechend?.());
+    expect(wave()).toHaveAttribute("data-mic", "listening");
+  });
+
+  it("IV-U24: a spoken answer goes to the same transcript field a typed one does — and no audio is touched", async () => {
+    const attempt = attemptOf();
+    const { user } = renderPanel({ attempt, speech: true });
+    client.answer.mockResolvedValue({ ok: true, attempt: { ...attemptOf({ answered: 1 }), id: attempt.id } });
+
+    await user.click(screen.getByRole("button", { name: "Resume" }));
+    hear("I led the reporting redesign.");
+    await user.click(submitButton());
+
+    expect(client.answer.mock.calls[0][1]).toMatchObject({ transcript: "I led the reporting redesign." });
     expect((window as unknown as { MediaRecorder?: unknown }).MediaRecorder).toBeUndefined();
   });
 
-  it("IV-U22: the Tenant can switch to typing mid-question, and the typed answer goes to the same field", async () => {
-    const attempt = attemptOf();
-    const { user } = renderPanel({ attempt, speech: true });
-    client.answer.mockResolvedValue({ ok: true, attempt: attemptOf({ answered: 1 }) });
+  it("IV-U25: switching to typing carries what was said onto the notepad, and turns the microphone off", async () => {
+    const { user } = renderPanel({ attempt: attemptOf(), speech: true });
 
     await user.click(screen.getByRole("button", { name: "Resume" }));
-    await user.click(screen.getByRole("button", { name: "Start answering" }));
-    await user.click(screen.getByRole("button", { name: /Type this answer instead/ }));
+    hear("I led the redesign.");
+    await user.click(screen.getByRole("button", { name: /Type instead/ }));
 
-    const box = screen.getByRole("textbox", { name: "Your answer" });
-    await user.type(box, "Typed instead.");
-    await user.click(screen.getByRole("button", { name: "Submit answer" }));
+    expect(screen.getByRole("textbox")).toHaveValue("I led the redesign.");
+    expect(document.querySelector("[data-mic]")).toBeNull();
+    expect(recognisers.every((recogniser) => !recogniser.started)).toBe(true);
+  });
 
-    await waitFor(() => expect(client.answer).toHaveBeenCalled());
-    // The same `transcript` field either way: scoring cannot tell which mode produced it.
-    expect(client.answer.mock.calls[0][1]).toMatchObject({ transcript: "Typed instead." });
+  it("IV-U26: a browser that ends recognition on its own is restarted, so a thinking pause doesn't kill the microphone", async () => {
+    const { user } = renderPanel({ attempt: attemptOf(), speech: true });
+
+    await user.click(screen.getByRole("button", { name: "Resume" }));
+    const first = latestRecogniser();
+    // A long silence: the browser ends recognition itself, well after it started.
+    vi.useFakeTimers({ toFake: ["Date"], shouldAdvanceTime: true });
+    vi.setSystemTime(Date.now() + 10_000);
+    act(() => first.onend?.());
+
+    await waitFor(() => expect(latestRecogniser()).not.toBe(first));
+    expect(latestRecogniser().started).toBe(true);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("IV-U27: a microphone that stops the moment it starts gives up and says so, rather than spin", async () => {
+    endsAtOnce = true;
+    const { user } = renderPanel({ attempt: attemptOf(), speech: true });
+
+    await user.click(screen.getByRole("button", { name: "Resume" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/microphone keeps stopping/);
+    const made = recognisers.length;
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+    expect(recognisers.length).toBe(made);
+    expect(made).toBeLessThanOrEqual(4);
   });
 });
 
-describe("resuming or resetting (ticket 04)", () => {
-  it("IV-U22: an unfinished Attempt offers Resume, and resumes on the question that was not answered", async () => {
-    const { user } = renderPanel({ attempt: attemptOf({ answered: 2 }) });
+describe("resuming or starting over (ticket 04)", () => {
+  it("IV-U28: an unfinished Attempt says where it got to, and Resume puts the next question up with its clock running", async () => {
+    const { user } = renderPanel({ attempt: attemptOf({ answered: 2 }), speech: false });
 
+    expect(screen.getByText(/2 of 5 answered, with 4:20 left/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Resume" }));
 
-    expect(screen.getByText("A stakeholder question?")).toBeInTheDocument();
-    expect(screen.getByText(/Question 3 of 5/)).toBeInTheDocument();
-  });
-
-  it("IV-U23: the remaining budget is what was left, not the whole length", async () => {
-    // Two answers at 20 seconds each already banked against a five-minute budget.
-    const { user } = renderPanel({ attempt: attemptOf({ answered: 2 }) });
-
-    await user.click(screen.getByRole("button", { name: "Resume" }));
-
+    expect(screen.getByRole("heading", { level: 1, name: "A stakeholder question?" })).toBeInTheDocument();
+    expect(screen.getByText("Question 3 of 5")).toBeInTheDocument();
     expect(screen.getByRole("timer")).toHaveTextContent("4:20 left");
   });
 
-  it("IV-U24: with Attempts left, resetting is offered and starts a fresh one", async () => {
+  it("IV-U29: with Attempts left, starting over is offered and starts a fresh one", async () => {
     const { user } = renderPanel({ attempt: attemptOf({ answered: 1 }), remaining: 4 });
     client.start.mockResolvedValue({ ok: true, attempt: attemptOf(), quota: quota(3) });
 
@@ -495,7 +552,7 @@ describe("resuming or resetting (ticket 04)", () => {
     expect(client.start).toHaveBeenCalledWith(job.id, 5, true);
   });
 
-  it("IV-U25: with no Attempts left, only resuming is offered — reset is not there to click", () => {
+  it("IV-U30: with no Attempts left, only resuming is offered", () => {
     renderPanel({ attempt: attemptOf({ answered: 1 }), remaining: 0 });
 
     expect(screen.getByRole("button", { name: "Resume" })).toBeInTheDocument();
@@ -505,39 +562,30 @@ describe("resuming or resetting (ticket 04)", () => {
 });
 
 describe("the Scorecard (ticket 03)", () => {
-  it("IV-U26: scoring a completed Attempt shows every Answer's score and rationale, by Category, with each rollup and the overall", async () => {
+  it("IV-U31: scoring shows every Answer's score and rationale, by Category, with each rollup and the overall", async () => {
     const complete = attemptOf({ answered: 5 });
-    const scored = attemptOf({ scored: true });
     const { user } = renderPanel({ attempt: complete });
     client.score.mockResolvedValue({
       ok: true,
-      attempt: scored,
+      attempt: attemptOf({ scored: true }),
       scorecard: {
         overall: 70,
-        categories: CATEGORIES.map((category, index) => ({
-          category: category as Category,
-          score: 60 + index * 5,
-          questions: 1,
-        })),
+        categories: CATEGORIES.map((category, index) => ({ category: category as Category, score: 60 + index * 5, questions: 1 })),
       },
     });
 
     await user.click(screen.getByRole("button", { name: "Score my interview" }));
 
-    // The overall sits under its own heading, so it is not one number among the Category rollups.
-    const overall = (await screen.findByText("Overall")).closest("div")!;
-    expect(overall).toHaveTextContent("70");
+    expect((await screen.findByText("Overall")).closest("div")).toHaveTextContent("70");
     expect(client.score).toHaveBeenCalledWith(complete.id);
-
     for (const [index, category] of CATEGORIES.entries()) {
       const section = screen.getByRole("region", { name: CATEGORY_LABEL[category] });
-      // The Category's own rollup, and the Answer's score and rationale under it.
       expect(section).toHaveTextContent(`${60 + index * 5} / 100`);
       expect(section).toHaveTextContent(`Because of the ${category} thing.`);
     }
   });
 
-  it("IV-U27: an Attempt already scored opens on its Scorecard, with no scoring to do again", () => {
+  it("IV-U32: an Attempt already scored opens on its Scorecard, with no scoring to do again", () => {
     renderPanel({ attempt: attemptOf({ scored: true }) });
 
     expect(screen.getByText("Overall")).toBeInTheDocument();
@@ -545,7 +593,7 @@ describe("the Scorecard (ticket 03)", () => {
     expect(screen.queryByRole("timer")).not.toBeInTheDocument();
   });
 
-  it("IV-U28: a scoring failure says so and leaves the Attempt scorable again", async () => {
+  it("IV-U33: a scoring failure says so and leaves the Attempt scorable again", async () => {
     const { user } = renderPanel({ attempt: attemptOf({ answered: 5 }) });
     client.score.mockResolvedValue({ ok: false, error: "failed", message: INTERVIEW_FAILURES.failed });
 
@@ -555,18 +603,27 @@ describe("the Scorecard (ticket 03)", () => {
     expect(screen.getByRole("button", { name: "Score my interview" })).toBeEnabled();
   });
 
-  it("IV-U29: the Scorecard has no accessibility violations", async () => {
-    const { container } = renderPanel({ attempt: attemptOf({ scored: true }) });
+  it("IV-U34: the Scorecard, the briefing, and the running interview have no accessibility violations", async () => {
+    const scored = renderPanel({ attempt: attemptOf({ scored: true }) });
+    expect(await axe(scored.container, AXE_OPTIONS)).toHaveNoViolations();
+    scored.unmount();
 
-    expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
+    const briefing = renderPanel();
+    expect(await axe(briefing.container, AXE_OPTIONS)).toHaveNoViolations();
+    briefing.unmount();
+
+    const running = renderPanel({ attempt: attemptOf({ answered: 1 }), speech: true });
+    await running.user.click(screen.getByRole("button", { name: "Resume" }));
+    await running.user.click(screen.getByRole("button", { name: "Show transcript" }));
+    expect(await axe(running.container, AXE_OPTIONS)).toHaveNoViolations();
   });
 });
 
 describe("a deployment with no key", () => {
-  it("IV-U30: says the simulator is unavailable rather than offering a start that cannot work", () => {
+  it("IV-U35: says the simulator is unavailable rather than offering a Go that cannot work", () => {
     renderPanel({ available: false });
 
     expect(screen.getByRole("alert")).toHaveTextContent(INTERVIEW_FAILURES.unavailable);
-    expect(screen.queryByRole("button", { name: "Start interview" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Go" })).not.toBeInTheDocument();
   });
 });
