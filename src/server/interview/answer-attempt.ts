@@ -48,11 +48,22 @@ export type AnswerOutcome =
  */
 export async function answerQuestion(
   attemptId: string,
-  { questionId, transcript, elapsedSeconds }: { questionId: string; transcript: string; elapsedSeconds: number },
+  {
+    questionId,
+    transcript,
+    elapsedSeconds,
+  }: { questionId: string; transcript: string; elapsedSeconds: number },
 ): Promise<AnswerOutcome> {
   const { userId: tenant } = await requireSession();
   try {
-    return { ok: true, attempt: await recordAnswer(attemptId, { questionId, transcript, elapsedSeconds }) };
+    return {
+      ok: true,
+      attempt: await recordAnswer(attemptId, {
+        questionId,
+        transcript,
+        elapsedSeconds,
+      }),
+    };
   } catch (error) {
     return failure(error, { tenant, operation: "interview.answer" });
   }
@@ -134,6 +145,7 @@ export async function scoreAttempt(
     );
     return { ok: true, attempt: stored, scorecard };
   } catch (error) {
+    console.log(error);
     return failure(error, { tenant, operation: "interview.score" });
   }
 }
@@ -143,7 +155,8 @@ function failure(
   error: unknown,
   { tenant, operation }: { tenant: string; operation: string },
 ): { ok: false; reason: InterviewFailure; unexpected?: true } {
-  if (error instanceof UnauthenticatedError || error instanceof NotFoundError) throw error;
+  if (error instanceof UnauthenticatedError || error instanceof NotFoundError)
+    throw error;
   if (error instanceof RuleError && error.code in INTERVIEW_FAILURES) {
     return { ok: false, reason: error.code as InterviewFailure };
   }
