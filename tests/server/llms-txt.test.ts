@@ -42,7 +42,7 @@ describe("/llms.txt", () => {
     for (const heading of [
       "## The board",
       "## A job's page",
-      "## Interview practice",
+      "## Interview Simulator",
       "## Documents",
       "## Contacts",
     ]) {

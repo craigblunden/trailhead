@@ -22,7 +22,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const session = await getOptionalSession();
   if (!session) return reply(401, unauthenticated);
 
-  const attempt = parseId((await params).id, "interview");
+  const attempt = parseId((await params).id, "attempt");
   if (!attempt.ok) return reply(404, notFound);
 
   try {

@@ -77,7 +77,7 @@ test.describe("interview simulator: a pro Tenant rehearses and is scored", () =>
 
     // Straight from the Job's page, skipping the picker (ticket 07).
     await page.getByRole("link", { name: "Practice interview" }).click();
-    await expect(page.getByRole("heading", { level: 1, name: "Interview practice" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Interview Simulator" })).toBeVisible();
 
     // The real length choice, and the breakdown that length produces (ticket 05).
     await expect(page.getByRole("button", { name: /^5 minutes/ })).toBeEnabled();

@@ -18,7 +18,7 @@ import {
 } from "@/lib/interview";
 import type { Plan } from "@/lib/plans";
 import { SEED_JOBS } from "../fixtures/jobs";
-import { renderWithJobs, screen, waitFor, within } from "../test-utils";
+import { renderWithJobs, screen, userEvent, waitFor, within } from "../test-utils";
 
 /**
  * The Interview Simulator's screens (interview simulator tickets 02–08), against a faked client —
@@ -393,10 +393,49 @@ describe("answering an Attempt (ticket 02)", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(INTERVIEW_FAILURES.failed);
     expect(screen.getByRole("timer")).toBeInTheDocument();
   });
+
+  /**
+   * The server only banks an Answer's time when the Answer lands. So a failed submission has to
+   * carry its seconds into the retry — otherwise retrying a question would hand the time back, and
+   * a Tenant whose connection kept dropping would rehearse against a clock that never moved.
+   */
+  it("IV-U20: a retry after a failed submission keeps the seconds the first try spent", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: true });
+    try {
+      const { user } = renderPanel({ attempt: attemptOf(), speech: false });
+      const act = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      client.answer.mockResolvedValue({ ok: false, error: "failed", message: INTERVIEW_FAILURES.failed });
+
+      await act.click(screen.getByRole("button", { name: "Resume" }));
+      await act.click(screen.getByRole("button", { name: "Start answering" }));
+      await act.type(screen.getByRole("textbox", { name: "Your answer" }), "An answer.");
+      await vi.advanceTimersByTimeAsync(20_000);
+      await act.click(screen.getByRole("button", { name: "Submit answer" }));
+      await screen.findByRole("alert");
+
+      // Twenty seconds gone, and still gone when the question is opened again.
+      expect(screen.getByRole("timer")).toHaveTextContent("4:40 left");
+      await act.click(screen.getByRole("button", { name: "Start answering" }));
+      expect(screen.getByRole("timer")).toHaveTextContent("4:40 left");
+      // And what they already typed is still there to resend, rather than having to be retyped.
+      expect(screen.getByRole("textbox", { name: "Your answer" })).toHaveValue("An answer.");
+
+      // The retry tells the server everything this question has cost, not just this try.
+      client.answer.mockResolvedValue({ ok: true, attempt: attemptOf({ answered: 1 }) });
+      await vi.advanceTimersByTimeAsync(5_000);
+      await act.click(screen.getByRole("button", { name: "Submit answer" }));
+
+      await waitFor(() => expect(client.answer).toHaveBeenCalledTimes(2));
+      expect(client.answer.mock.calls[1][1].elapsedSeconds).toBe(25);
+      void user;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("speaking an answer (ticket 06)", () => {
-  it("IV-U20: with speech supported, answering listens rather than showing a box — and no audio is touched", async () => {
+  it("IV-U21: with speech supported, answering listens rather than showing a box — and no audio is touched", async () => {
     const { user } = renderPanel({ attempt: attemptOf(), speech: true });
 
     await user.click(screen.getByRole("button", { name: "Resume" }));
@@ -409,7 +448,7 @@ describe("speaking an answer (ticket 06)", () => {
     expect((window as unknown as { MediaRecorder?: unknown }).MediaRecorder).toBeUndefined();
   });
 
-  it("IV-U21: the Tenant can switch to typing mid-question, and the typed answer goes to the same field", async () => {
+  it("IV-U22: the Tenant can switch to typing mid-question, and the typed answer goes to the same field", async () => {
     const attempt = attemptOf();
     const { user } = renderPanel({ attempt, speech: true });
     client.answer.mockResolvedValue({ ok: true, attempt: attemptOf({ answered: 1 }) });

@@ -3,9 +3,11 @@ import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import { weekStartOf } from "@/lib/dates";
 import {
+  ATTEMPT_LENGTHS,
   INTERVIEW_FAILURES,
   attemptSeconds,
   interviewQuotaStatus,
+  isAttemptLength,
   type Attempt,
   type AttemptLength,
   type InterviewQuotaStatus,
@@ -13,6 +15,7 @@ import {
 import { limitsOf } from "@/lib/plans";
 import { requireSession } from "@/server/auth/session";
 import type { GeneratedQuestion } from "@/server/interview/claude";
+import type { InterviewContext } from "@/server/interview/prompt";
 import { toAttemptDto, toDateColumn } from "@/server/db/mappers";
 import { withTenant, type Tenant, type TenantClient } from "@/server/db/tenant";
 
@@ -44,6 +47,9 @@ import { planOf } from "./plans";
 
 const WEEK = /^\d{4}-\d{2}-\d{2}$/;
 
+/** The whole countdown for a stored length, tolerating a column that somehow holds another number. */
+const budgetOf = (length: number) => attemptSeconds(isAttemptLength(length) ? length : ATTEMPT_LENGTHS[0]);
+
 /** The Tenant's Attempts-per-week Limit, from inside the transaction that counts against it. */
 const interviewsPerWeek = async (tenant: Tenant) => limitsOf(await planOf(tenant)).interviewsPerWeek;
 
@@ -69,13 +75,11 @@ export async function interviewQuota(now: Date = new Date()): Promise<InterviewQ
   return interviewQuotaStatus(used, weekStart, limit);
 }
 
-/** What an Attempt's questions are generated from. */
-export type InterviewSources = {
-  company: string;
-  role: string;
-  description: string;
-  resumeText: string;
-};
+/**
+ * What an Attempt's questions are generated from, and what the scorer is given as context. One type
+ * shared with the prompts rather than two that must be kept in step.
+ */
+export type InterviewSources = InterviewContext;
 
 /**
  * What the questions are drawn from: the Job's company, role, and description, and its attached
@@ -193,7 +197,10 @@ export async function latestAttempt(jobId: string): Promise<Attempt | null> {
   return row ? toAttemptDto(row) : null;
 }
 
-/** One Attempt of the Tenant's, by id. A missing and a foreign Attempt are the same `NotFoundError`. */
+/**
+ * One Attempt of the Tenant's, by id. A missing Attempt and another Tenant's are the same
+ * `no-attempt` refusal — a distinguishable answer would confirm that the row exists.
+ */
 export async function getAttempt(attemptId: string): Promise<Attempt> {
   const { userId } = await requireSession();
   const row = await withTenant(userId, (tx) =>
@@ -272,7 +279,7 @@ export async function completeAttempt(attemptId: string, now: Date = new Date())
     if (attempt.completedAt) return attempt;
     return tx.attempt.update({
       where: { id: attempt.id, userId },
-      data: { completedAt: now, activeSeconds: attemptSeconds(toAttemptDto(attempt).length) },
+      data: { completedAt: now, activeSeconds: budgetOf(attempt.length) },
       include: ATTEMPT_INCLUDE,
     });
   });

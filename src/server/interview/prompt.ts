@@ -7,7 +7,7 @@ import {
   type AttemptLength,
   type Category,
 } from "@/lib/interview";
-import { stripInvisible } from "@/lib/invisible";
+import { fence } from "@/server/fence";
 
 /**
  * The two Interview Simulator prompts — generating a question set, and scoring the Answers given to
@@ -33,18 +33,19 @@ import { stripInvisible } from "@/lib/invisible";
  * into a shape or a score it would not otherwise give.
  */
 
-/** Every input arrives stripped of invisible characters, inside a tag it cannot close. */
-function fence(tag: string, text: string): string {
-  return `<${tag}>\n${stripInvisible(text).trim().replaceAll(`</${tag}>`, `<\\/${tag}>`)}\n</${tag}>`;
-}
-
-export type QuestionInputs = {
+/**
+ * What both prompts need to know about the Job and the Tenant. The same four fields the data layer
+ * reads as `InterviewSources`, so they travel as one thing rather than four that must be kept in
+ * step: the generator adds a length to them, the scorer adds the Answers.
+ */
+export type InterviewContext = {
   company: string;
   role: string;
   description: string;
   resumeText: string;
-  length: AttemptLength;
 };
+
+export type QuestionInputs = InterviewContext & { length: AttemptLength };
 
 export const QUESTIONS_SYSTEM = `You prepare a mock interview for one job seeker, for one specific role, from that role's posting and the applicant's resume. The questions are what a thoughtful interviewer at that company would actually ask this applicant — not a generic bank of questions with the company's name pasted in.
 
@@ -90,11 +91,7 @@ export function buildQuestionsPrompt(inputs: QuestionInputs): { system: string; 
   return { system: QUESTIONS_SYSTEM, user };
 }
 
-export type ScoreInputs = {
-  company: string;
-  role: string;
-  description: string;
-  resumeText: string;
+export type ScoreInputs = InterviewContext & {
   answers: { category: Category; question: string; transcript: string }[];
 };
 

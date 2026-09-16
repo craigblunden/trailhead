@@ -59,14 +59,14 @@ Opening a card shows the job's page:
 - Rejection letter: shown only while the job is Rejected, with the description folded away above it ("Show description" opens it). Paste the message the company sent, up to ${chars(JOB_LIMITS.rejectionLetter)}, kept for reference.
 - Application kit: the resume and cover letter sent with this job, each chosen from the user's Documents
 - Cover letters: "Write cover letter" writes a letter for this job from its resume and job description. Under a letter, "What should change?" takes short feedback (up to ${chars(FEEDBACK_MAX_CHARS)}) about the letter, and "Rewrite" writes it again with that feedback. Each write counts toward the week's cover letters.
-- Practice interview: opens this job's interview simulator, described below
+- Practice interview: opens this job's Interview Simulator, described below
 - Contacts: the people linked to this job
 - Activity: a dated history the app writes itself, such as "Moved to Interviewing"; it cannot be typed into
 - Delete this job: removes the job and its activity for good, after a confirmation. Documents and contacts it used stay.
 
-## Interview practice
+## Interview Simulator
 
-The Interview practice page rehearses for one job. Pick the job from its searchable list, or open it from that job's own page.
+The Interview Simulator page rehearses for one job. Pick the job from its searchable list, or open it from that job's own page.
 
 - Choose how long to rehearse for: 5, 10, or 30 minutes. Longer means more questions, not longer questions.
 - The questions are written from that job's description and the user's attached resume, so both must be on the job first. They cover five areas every time, whatever the length: personal, behavioural, stakeholder, technical, and design.
@@ -102,7 +102,7 @@ The rest is filled in on the Contact's own page:
 
 ## Optional
 
-- Account page: who the user is signed in as, their plan, and deleting the account for good. Each plan sets how many Documents can be held, how many cover letters can be written a week, and how many practice interviews can be started a week.
+- Account page: who the user is signed in as, their plan, and deleting the account for good. Each plan sets how many Documents can be held, how many cover letters can be written a week, and how many Interview Simulator interviews can be started a week.
 `;
 
 export function GET() {

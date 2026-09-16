@@ -8,7 +8,7 @@ import { listJobs } from "@/server/data/jobs";
 import { currentPlan } from "@/server/data/plans";
 import { prefetchJobs } from "@/server/prefetch";
 
-export const metadata: Metadata = { title: "Interview practice" };
+export const metadata: Metadata = { title: "Interview Simulator" };
 
 /**
  * The Interview Simulator's hub: which Job to rehearse for. Every Plan may open it — a Tenant not on

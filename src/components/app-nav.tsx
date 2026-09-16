@@ -14,7 +14,7 @@ export const PRIMARY_NAV = [
   { href: "/documents", label: "Documents" },
   // Shown to every Plan (interview simulator ticket 08): a Tenant not on `pro` sees it marked as a
   // Pro feature and reaches the real start screen, locked, rather than finding nothing there.
-  { href: "/interview", label: "Interview", pro: true },
+  { href: "/interview", label: "Interview Simulator", pro: true },
 ] as const;
 
 /**

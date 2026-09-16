@@ -37,7 +37,7 @@ describe("UserMenu", () => {
       "Your trail",
       "Contacts",
       "Documents",
-      "Interview practicePro",
+      "Interview SimulatorPro",
       "Account",
       "Sign out",
     ]);
@@ -52,14 +52,14 @@ describe("UserMenu", () => {
   it("carries interview practice, marked as Pro only for the Plans that cannot use it", async () => {
     for (const plan of ["free", "basic"] as const) {
       const menu = await openMenu(plan);
-      const item = within(menu).getByRole("menuitem", { name: /Interview practice/ });
+      const item = within(menu).getByRole("menuitem", { name: /Interview Simulator/ });
       expect(item).toHaveAttribute("href", "/interview");
       expect(item).toHaveTextContent("Pro");
       cleanup();
     }
 
     const pro = await openMenu("pro");
-    expect(within(pro).getByRole("menuitem", { name: "Interview practice" })).toHaveAttribute(
+    expect(within(pro).getByRole("menuitem", { name: "Interview Simulator" })).toHaveAttribute(
       "href",
       "/interview",
     );

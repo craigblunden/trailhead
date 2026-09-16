@@ -153,7 +153,10 @@ export function StartScreen({
             {starting ? "Setting up your interview…" : "Start interview"}
           </Button>
         )}
-        {quota && <QuotaLine quota={quota} />}
+        {/* Never locked: this effort ships the preview for free and basic, not their real
+            entitlements, and "1 interview left this week" under "this is a Pro feature" would
+            promise one they cannot spend. */}
+        {quota && !locked && <QuotaLine quota={quota} />}
       </div>
     </div>
   );

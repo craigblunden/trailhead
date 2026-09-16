@@ -10,7 +10,7 @@ import { getJob } from "@/server/data/jobs";
 import { interviewAvailable } from "@/server/interview/claude";
 import { currentPlan } from "@/server/data/plans";
 
-export const metadata: Metadata = { title: "Interview practice" };
+export const metadata: Metadata = { title: "Interview Simulator" };
 
 /**
  * One Job's Interview Simulator. The Attempt is read on the server and handed down, so a Tenant who

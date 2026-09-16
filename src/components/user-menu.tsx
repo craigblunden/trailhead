@@ -69,7 +69,7 @@ export function UserMenu({ name, email, plan, signOut }: UserMenuProps) {
             Interview Simulator too — marked, for the Plans that cannot start one yet. */}
         <DropdownMenuItem asChild>
           <Link href="/interview" className="justify-between">
-            Interview practice
+            Interview Simulator
             {!canStartAttempt(plan) && (
               <span className="flex items-center gap-1 text-[0.6875rem] font-medium text-primary">
                 <PlanBlaze plan="pro" />

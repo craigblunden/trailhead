@@ -40,9 +40,7 @@ async function send<T extends { ok: boolean }>(url: string, body?: unknown): Pro
 
 export const interviewClient = {
   start: (jobId: string, length: AttemptLength, reset = false): Promise<StartAttemptResponse> =>
-    send(`/api/jobs/${encodeURIComponent(jobId)}/interview`, { length, reset } satisfies StartAttemptRequest & {
-      reset: boolean;
-    }),
+    send(`/api/jobs/${encodeURIComponent(jobId)}/interview`, { length, reset } satisfies StartAttemptRequest),
 
   answer: (
     attemptId: string,

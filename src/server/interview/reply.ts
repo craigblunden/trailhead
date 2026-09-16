@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 
-import { INTERVIEW_FAILURES, type InterviewFailure } from "@/lib/interview";
+import {
+  INTERVIEW_FAILURES,
+  type InterviewFailure,
+  type RecordAnswerResponse,
+  type ScoreAttemptResponse,
+  type StartAttemptResponse,
+} from "@/lib/interview";
 import { ACTION_MESSAGES } from "@/server/action-result";
 import { NotFoundError } from "@/server/data/errors";
 
@@ -31,7 +37,14 @@ export const INTERVIEW_STATUS: Record<InterviewFailure, number> = {
   "bad-answer": 400,
 };
 
-export const reply = (status: number, body: unknown) => NextResponse.json(body, { status });
+/**
+ * Every interview reply is one of the three routes' response types — never a bare object. That is
+ * what makes a handler that forgets a field, or invents one, fail the typecheck rather than answer
+ * 200 with a shape the page cannot read.
+ */
+type InterviewResponse = StartAttemptResponse | RecordAnswerResponse | ScoreAttemptResponse;
+
+export const reply = (status: number, body: InterviewResponse) => NextResponse.json(body, { status });
 
 export const unauthenticated = {
   ok: false,

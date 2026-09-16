@@ -196,10 +196,11 @@ export function scoreBand(score: number): "strong" | "solid" | "developing" | "w
  * The Plan the Interview Simulator actually runs on this phase. Free and Basic see the same screens
  * as a locked preview (interview simulator ticket 08), and the start route refuses them.
  *
- * Deliberately a Plan check rather than ADR-0003's shape — a Limit of 0 gating the feature. Their
- * real Limits are already recorded in `PLAN_LIMITS` (1 and 3 Attempts a week), and enforcing those
- * is a later effort the spec puts out of scope; a Limit of 0 would state something untrue about what
- * those Plans are meant to get. When that effort lands, this predicate goes and the Limit is the gate.
+ * Deliberately a Plan check rather than ADR-0003's shape — a Limit of 0 gating the feature — because
+ * their real Limits are already recorded in `PLAN_LIMITS` (1 and 3 Attempts a week) and a 0 would
+ * state something untrue about what those Plans are meant to get. **ADR-0005** records the departure
+ * and what ends it: when entitlements land, this predicate goes and the reservation's Limit is the
+ * whole gate.
  */
 export const INTERVIEW_PLAN: Plan = "pro";
 
@@ -261,7 +262,15 @@ export type InterviewFailure = keyof typeof INTERVIEW_FAILURES;
 export const REFUNDED_INTERVIEW_FAILURES: readonly InterviewFailure[] = ["failed", "timed-out", "truncated"];
 
 /** What the start route accepts as its JSON body. */
-export type StartAttemptRequest = { length: AttemptLength };
+export type StartAttemptRequest = {
+  length: AttemptLength;
+  /**
+   * True to abandon an unfinished Attempt for this Job and spend another of the week's on a fresh
+   * one. False — the default — resumes rather than replaces, so a start request can never silently
+   * cost a Tenant an Attempt they still had in progress.
+   */
+  reset: boolean;
+};
 
 /** What the record-Answer route accepts as its JSON body. */
 export type RecordAnswerRequest = {
@@ -278,6 +287,11 @@ type InterviewError = {
   quota?: InterviewQuotaStatus;
   /** True only when an Attempt was reserved and then given back. */
   refunded?: boolean;
+  /**
+   * The unfinished Attempt an `in-progress` refusal is about, so the page can offer to resume it
+   * without a second round trip. Absent on every other failure.
+   */
+  attempt?: Attempt;
 };
 
 /** What the start route returns. */

@@ -68,7 +68,13 @@ export function AttemptRun({
   /** The budget as the server holds it, less whatever this question has already burned. */
   const banked = remainingSeconds(attempt);
   const [spent, setSpent] = useState(0);
-  const left = Math.max(banked - spent, 0);
+  /**
+   * Seconds this question already consumed on an attempt to submit that failed. The server only
+   * banks an Answer's time when the Answer lands, so without this a failed submission would hand the
+   * Tenant those seconds back — retry the question enough times and the countdown never moves.
+   */
+  const [spentOnFailedTries, setSpentOnFailedTries] = useState(0);
+  const left = Math.max(banked - spentOnFailedTries - spent, 0);
   const answered = attempt.questions.filter((candidate) => candidate.answer).length;
 
   // The countdown, ticking only while a question is open. A pause stops it outright rather than
@@ -97,32 +103,43 @@ export function AttemptRun({
 
   function begin() {
     setFailure(null);
-    setTyped("");
-    speech.reset();
     setSpent(0);
+    // Retrying a question whose submission failed keeps what was already said or typed — the Tenant
+    // answered it once, and making them answer again because the network dropped is its own penalty.
+    // A question being opened for the first time starts empty.
+    if (spentOnFailedTries === 0) {
+      setTyped("");
+      speech.reset();
+    }
     setPhase({ kind: "answering", startedAt: Date.now() });
     if (mode === "speak" && speechSupported) speech.start();
   }
 
   async function submit() {
     if (phase.kind !== "answering") return;
-    const elapsedSeconds = Math.max(Math.round((Date.now() - phase.startedAt) / 1_000), 0);
+    const thisTry = Math.max(Math.round((Date.now() - phase.startedAt) / 1_000), 0);
     speech.stop();
     setPhase({ kind: "submitting" });
     const message = await onAnswer({
       questionId: question!.id,
+      // Everything this question has cost, including tries that failed before this one: the server
+      // adds what it is sent, and has no other way to learn about time it never heard about.
+      elapsedSeconds: thisTry + spentOnFailedTries,
       transcript: submittable.slice(0, TRANSCRIPT_MAX_CHARS),
-      elapsedSeconds,
     });
     setFailure(message);
-    // Whether it landed or not, the clock stops here: a failed submission must not keep burning
-    // time the Tenant can't answer in. On success the parent hands down the next question.
+    // Either way the clock stops here — a failed submission must not keep burning time the Tenant
+    // cannot answer in. What it cost is kept, so a retry resumes rather than starts the question over.
     setSpent(0);
     setPhase({ kind: "paused" });
-    if (!message) {
-      setTyped("");
-      speech.reset();
+    if (message) {
+      setSpentOnFailedTries((current) => current + thisTry);
+      return;
     }
+    // Landed: the server now holds this question's time, and the next one starts from zero.
+    setSpentOnFailedTries(0);
+    setTyped("");
+    speech.reset();
   }
 
   const answering = phase.kind === "answering";

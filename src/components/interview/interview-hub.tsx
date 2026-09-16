@@ -53,7 +53,7 @@ export function InterviewHub({ plan }: { plan: Plan }) {
       <AppHeader leading={<BrandLogo href="/board" />} />
       <PageMain>
         <h1 className="flex flex-wrap items-center gap-x-3 gap-y-1 text-3xl tracking-tight">
-          Interview practice
+          Interview Simulator
           {locked && (
             <span className="flex items-center gap-1.5 rounded-full border border-primary/30 px-2 py-0.5 text-xs font-medium text-primary">
               <PlanBlaze plan="pro" />

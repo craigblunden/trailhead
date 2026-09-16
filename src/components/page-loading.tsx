@@ -619,7 +619,7 @@ function InterviewLoading() {
       <PageWait>Loading interview practice…</PageWait>
 
       <PageMain>
-        <SectionTitle>Interview practice</SectionTitle>
+        <SectionTitle>Interview Simulator</SectionTitle>
         <SectionLede>
           Rehearse for one job against questions written from its posting and your own resume, answered
           out loud and against the clock, then scored.

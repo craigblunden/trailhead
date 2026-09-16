@@ -1,4 +1,4 @@
-import { stripInvisible } from "@/lib/invisible";
+import { fence } from "@/server/fence";
 
 /**
  * What the cover-letter prompt receives — decided in ticket 18 and assembled here, and only here,
@@ -101,11 +101,6 @@ Answer with one JSON object and nothing else, with three fields:
   - "none" otherwise.
   - When both the feedback and the material carry directions, "feedback" wins.
 - "set_aside": true when the feedback asked for a claim the resume does not support — a title, a figure, a skill, a span of experience — and you declined it, keeping the claim the size the resume makes it. Otherwise false. Setting a request aside is not a "feedback" verdict: it is an honest letter.`;
-
-/** Every input arrives stripped of invisible characters (feedback issue 02), inside a tag it cannot close. */
-function fence(tag: string, text: string): string {
-  return `<${tag}>\n${stripInvisible(text).trim().replaceAll(`</${tag}>`, `<\\/${tag}>`)}\n</${tag}>`;
-}
 
 export function buildCoverLetterPrompt(inputs: CoverLetterInputs): { system: string; user: string } {
   const parts = [

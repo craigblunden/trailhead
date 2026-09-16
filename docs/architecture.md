@@ -1,10 +1,11 @@
 # Architecture
 
 Trailhead is one Next.js application deployed to Vercel, backed by one Supabase project (Postgres,
-Auth, Storage), with a single outbound AI call to the Anthropic API and one outbound mail call to
-Resend, which carries App feedback to the owner. There is no queue, no worker, and no second
-service: generation, document ingestion, and that mail run in-request, and `pg_cron` runs a
-janitor with two jobs.
+Auth, Storage), with outbound AI calls to the Anthropic API — one to write a cover letter, one to
+prepare an Interview Simulator Attempt's questions, one to score its Answers — and one outbound mail
+call to Resend, which carries App feedback to the owner. There is no queue, no worker, and no second
+service: generation, interviews, document ingestion, and that mail run in-request, and `pg_cron` runs
+a janitor with two jobs.
 
 The terms below are the glossary's (`CONTEXT.md`): a **Job**, a **Contact**, a **Document**, a
 **Tenant**.
@@ -19,7 +20,7 @@ flowchart LR
     proxy["proxy.ts<br/>optimistic redirects only"]
     pages["Server Components<br/>pages + TanStack prefetch"]
     actions["Server Actions<br/>validate → data layer"]
-    route["Route Handler<br/>POST /api/jobs/[id]/cover-letter"]
+    route["Route Handlers<br/>cover letter · interview<br/>start, answer, score"]
     dal["Data access layer<br/>requireSession · withTenant"]
     ingest["Ingestion<br/>unpdf · mammoth"]
   end
@@ -38,7 +39,7 @@ flowchart LR
 
   browser -->|"pages, navigation"| proxy --> pages
   browser -->|"Server Action POSTs"| actions
-  browser -->|"fetch: write a cover letter"| route
+  browser -->|"fetch: cover letter, interview"| route
   browser -->|"sign in, OAuth, session cookie"| auth
   browser -->|"PUT file bytes via signed upload URL"| storage
 
@@ -91,7 +92,7 @@ flowchart TB
   statement sets `app.tenant_id` transaction-locally; forced RLS policies on every table compare each
   row's `userId` to it, and a query outside a tenant transaction sees nothing. Write checks also
   refuse references to another tenant's rows (a Job's resume, a Contact link).
-- **Nothing internal reaches a browser.** Actions and the Route Handler translate typed domain errors
+- **Nothing internal reaches a browser.** Actions and the Route Handlers translate typed domain errors
   (`NotFoundError`, `RuleError`, and `AccountDeletionError`, whose message depends on the step that
   failed) into written messages; everything else is logged as one JSON line
   (operation, tenant, error name and message) and the user gets a generic failure.
@@ -227,6 +228,33 @@ the letter; the verdict rides on the same call as the letter, so detection never
 model call. Two Flags in a quota week place a **Hold** on letters until Monday; it is derived from
 the week's row, never stored, and lifted early only by the migrator (`docs/provisioning.md`).
 
+## The Interview Simulator
+
+Rehearsing for one Job (`CONTEXT.md`: an **Attempt**, its **Categories**, its **Answers**, its
+**Scorecard**) reuses the cover letter's shape rather than inventing a second one — a server-only
+Anthropic module, an orchestration layer that owns the quota, Route Handlers that only map an outcome
+to a status, and the same four test seams. What differs is worth saying:
+
+- **Two calls, not one.** Starting an Attempt generates its question set from the Job's description
+  and the Tenant's resume; scoring sends those questions and their Answers back for a mark and a
+  rationale each. Both are non-streaming and JSON-schema-constrained, and an answer that does not fit
+  the schema — a score off the scale, a Category mix short of one dimension — is malformed rather than
+  a result. That is what stops an Answer from talking the scorer into a Scorecard it may not give.
+- **A quota of its own.** `InterviewQuota` is a separate table from `GenerationQuota`, not a column on
+  it: that one's Flag and Hold semantics are specific to cover-letter Feedback abuse and mean nothing
+  here. An Attempt is reserved before generation and given back only if generation fails — abandoning
+  a delivered question set never refunds. Scoring spends nothing: the Attempt was counted when it
+  started, so a scoring failure is always safe to retry.
+- **The clock is active-time accounted, not a deadline.** An Attempt stores the seconds it has
+  actually been answered for, and each Answer's request carries what that question cost. So closing
+  the tab drains nothing, the untimed pause between questions really is untimed, and returning
+  resumes on the question that was reached — never inside the one abandoned mid-way, because an
+  Answer is only ever recorded whole.
+- **No audio anywhere.** A spoken Answer is transcribed by the browser's own speech recognition;
+  only the text is sent. There is no recorder in the client and no audio column in the schema.
+- **Gated on the Plan this phase, not a Limit** (ADR-0005): free and basic see the real start screen
+  locked, and their recorded Limits are not yet enforced.
+
 ## The data model
 
 ```mermaid
@@ -236,6 +264,8 @@ erDiagram
   Contact ||--o{ JobContact : ""
   Document |o--o{ Job : "resume of"
   Document |o--o{ Job : "cover letter of"
+  Job ||--o{ Attempt : "rehearsed for"
+  Attempt ||--o{ AttemptQuestion : "asks"
 
   Job {
     string id
@@ -286,13 +316,39 @@ erDiagram
     uuid userId
     enum plan
   }
+  Attempt {
+    string id
+    uuid userId
+    string jobId
+    int length
+    int activeSeconds
+    timestamp completedAt
+    int overallScore
+  }
+  AttemptQuestion {
+    string id
+    uuid userId
+    string attemptId
+    enum category
+    int order
+    string text
+    string transcript
+    int score
+    string rationale
+  }
+  InterviewQuota {
+    uuid userId
+    date weekStart
+    int used
+  }
 ```
 
 Every table carries its own `userId`, so every policy tests a column rather than reaching through a
 parent. Users themselves live in Supabase's `auth` schema, which Prisma does not model.
 
 `UserPlan` is the one table the application role can read but not write (ADR-0001): a Tenant's
-Plan decides its Limits — Documents held, cover letters per week — and is set by
+Plan decides its Limits — Documents held, cover letters per week, Interview Simulator Attempts per
+week — and is set by
 `npm run db:plan`, as the migrator. No row means the free Plan. The numbers each Plan allows are
 code, in `src/lib/plans.ts`, and the two sites that enforce them read the Plan inside the same
 transaction as the count it guards.

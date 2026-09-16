@@ -97,8 +97,8 @@ export function InterviewPanel({
     }
     if (answer.quota) setQuota(answer.quota);
     // An Attempt already in progress is not a failure to report: it is the thing to resume.
-    if (answer.error === "in-progress" && "attempt" in answer && answer.attempt) {
-      setAttempt(answer.attempt as Attempt);
+    if (answer.error === "in-progress" && answer.attempt) {
+      setAttempt(answer.attempt);
       return;
     }
     setFailure(answer.message);
@@ -148,7 +148,7 @@ export function InterviewPanel({
           </Link>
         </Button>
 
-        <h1 className="mt-2 text-3xl tracking-tight">Interview practice</h1>
+        <h1 className="mt-2 text-3xl tracking-tight">Interview Simulator</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {job.role} at {job.company}
         </p>
