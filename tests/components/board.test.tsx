@@ -122,6 +122,105 @@ describe("active application count", () => {
   });
 });
 
+describe("searching the board", () => {
+  function search() {
+    return screen.getByRole("searchbox", { name: /search jobs/i });
+  }
+
+  it("SEARCH-1: shows every job when the search box is empty", () => {
+    renderWithJobs(<BoardView />);
+
+    for (const job of SEED_JOBS) {
+      expect(screen.getByRole("link", { name: job.role })).toBeInTheDocument();
+    }
+  });
+
+  it("SEARCH-1: filters cards by role", async () => {
+    const { user } = renderWithJobs(<BoardView />);
+
+    await user.type(search(), "Staff UX Designer");
+
+    expect(screen.getByRole("link", { name: "Staff UX Designer" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Product Designer, Growth" })).toBeNull();
+  });
+
+  it("SEARCH-1: filters cards by company", async () => {
+    const { user } = renderWithJobs(<BoardView />);
+
+    await user.type(search(), "Fernwood");
+
+    expect(screen.getByRole("link", { name: "Product Designer, Growth" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Staff UX Designer" })).toBeNull();
+  });
+
+  it("SEARCH-1: matches case-insensitively and on a partial word", async () => {
+    const { user } = renderWithJobs(<BoardView />);
+
+    await user.type(search(), "cobalt");
+
+    expect(screen.getByRole("link", { name: "Staff UX Designer" })).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
+  });
+
+  it("SEARCH-1: matches role across every job that shares those words", async () => {
+    const { user } = renderWithJobs(<BoardView />);
+
+    await user.type(search(), "product designer");
+
+    const matches = [
+      "Senior Product Designer",
+      "Product Designer, Growth",
+      "Lead Product Designer",
+      "Product Designer II",
+      "Product Designer",
+    ];
+    for (const role of matches) {
+      expect(screen.getByRole("link", { name: role })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole("link", { name: "Staff UX Designer" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Senior UX Designer" })).toBeNull();
+  });
+
+  it("SEARCH-1: tells a stage with no matches apart from a stage with no jobs", async () => {
+    const { user } = renderWithJobs(<BoardView />);
+
+    await user.type(search(), "Fernwood");
+
+    // Fernwood's own job is Applied; every other stage has real jobs that just don't match.
+    expect(
+      within(column("interested")).getByText("No matches in this stage."),
+    ).toBeInTheDocument();
+    expect(
+      within(column("applied")).queryByText(/no matches|nothing at this stage/i),
+    ).toBeNull();
+  });
+
+  it("SEARCH-2: explains when nothing matches, and offers to clear the search", async () => {
+    const { user } = renderWithJobs(<BoardView />);
+
+    await user.type(search(), "zzz-no-such-role");
+
+    expect(
+      screen.getByRole("heading", { name: "No jobs match your search" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("listitem")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Clear search" }));
+
+    expect(search()).toHaveValue("");
+    expect(screen.getByRole("link", { name: "Staff UX Designer" })).toBeInTheDocument();
+  });
+
+  it("SEARCH-3: leaves the empty-board state alone when there are no jobs at all", () => {
+    renderWithJobs(<BoardView />, { initialJobs: [] });
+
+    expect(screen.queryByRole("searchbox")).toBeNull();
+    expect(
+      screen.getByRole("heading", { name: "No roles on the board yet" }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("job card", () => {
   const job = SEED_JOBS.find((j) => j.id === "fernwood-product-designer-growth")!;
 

@@ -12,9 +12,11 @@ type BoardColumnProps = {
   jobs: Job[];
   /** Move a Job to a Stage: this one, when a card is dropped here, or the one its menu chose. */
   onMove: (jobId: string, stage: Stage) => void;
+  /** True while a search term is narrowing `jobs`, so an empty column reads as "no matches" rather than "no jobs". */
+  searching?: boolean;
 };
 
-export function BoardColumn({ stage, jobs, onMove }: BoardColumnProps) {
+export function BoardColumn({ stage, jobs, onMove, searching = false }: BoardColumnProps) {
   const headingId = `stage-${stage}`;
   const { label, dot } = STAGE_META[stage];
   const [over, setOver] = useState(false);
@@ -85,7 +87,7 @@ export function BoardColumn({ stage, jobs, onMove }: BoardColumnProps) {
 
       {jobs.length === 0 ? (
         <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-          Nothing at this stage yet.
+          {searching ? "No matches in this stage." : "Nothing at this stage yet."}
         </p>
       ) : (
         <ul className="flex flex-col gap-3 p-3">

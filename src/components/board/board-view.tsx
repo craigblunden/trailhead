@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 
 import { AddJobDialog } from "@/components/board/add-job-dialog";
@@ -12,6 +12,8 @@ import { LoadErrorHint } from "@/components/load-error";
 import { LoadingTrail } from "@/components/loading-trail";
 import { PageMain } from "@/components/page-main";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   ACTIVE_STAGES,
   STAGES,
@@ -25,6 +27,8 @@ import {
 export function BoardView() {
   const { jobs, status, error, dismissError, reload, getJob, setStage } = useJobs();
   const [addOpen, setAddOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const searchId = useId();
   // What the last move from the board did, for the live region: a card that is dragged or sent
   // to another column leaves the place the user was looking or listening. Counted, so the same
   // move made twice is announced twice — an unchanged string would never reach the DOM. Said as
@@ -49,13 +53,26 @@ export function BoardView() {
     setAddOpen(true);
   }
 
+  const term = query.trim().toLowerCase();
+  const filteredJobs = useMemo(
+    () =>
+      term
+        ? jobs.filter(
+            (job) =>
+              job.role.toLowerCase().includes(term) ||
+              job.company.toLowerCase().includes(term),
+          )
+        : jobs,
+    [jobs, term],
+  );
+
   const byStage = useMemo(() => {
     const grouped = Object.fromEntries(
       STAGES.map((stage) => [stage, [] as Job[]]),
     ) as Record<Stage, Job[]>;
-    for (const job of jobs) grouped[job.stage].push(job);
+    for (const job of filteredJobs) grouped[job.stage].push(job);
     return grouped;
-  }, [jobs]);
+  }, [filteredJobs]);
 
   const activeCount = jobs.filter((job) =>
     ACTIVE_STAGES.includes(job.stage),
@@ -79,6 +96,22 @@ export function BoardView() {
             Add job
           </Button>
         </div>
+
+        {status === "success" && jobs.length > 0 && (
+          <div className="mt-4 max-w-xs space-y-1.5">
+            <Label htmlFor={searchId} className="sr-only">
+              Search jobs by role or company
+            </Label>
+            <Input
+              id={searchId}
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search by role or company"
+              autoComplete="off"
+            />
+          </div>
+        )}
 
         {error && (
           <div
@@ -114,6 +147,20 @@ export function BoardView() {
               Add job
             </Button>
           </div>
+        ) : filteredJobs.length === 0 ? (
+          <div className="mt-8 rounded-lg border border-dashed border-border px-6 py-16 text-center">
+            <h2 className="text-lg">No jobs match your search</h2>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+              Try a different role or company.
+            </p>
+            <Button
+              variant="outline"
+              className="mt-5 h-9 px-3.5"
+              onClick={() => setQuery("")}
+            >
+              Clear search
+            </Button>
+          </div>
         ) : (
           <>
             <div className="mt-6 grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -123,6 +170,7 @@ export function BoardView() {
                   stage={stage}
                   jobs={byStage[stage]}
                   onMove={moveJob}
+                  searching={term !== ""}
                 />
               ))}
             </div>
