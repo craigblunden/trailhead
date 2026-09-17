@@ -155,7 +155,7 @@ describe("the account page (account issue 05)", () => {
 
     const section = await screen.findByRole("region", { name: "Your plan" });
     expect(await within(section).findByText("7 of 10 interviews left this week")).toBeInTheDocument();
-    await waitFor(() => expect(row(section, "Interview lengths")).toHaveTextContent("5, 10, or 30 minutes"));
+    await waitFor(() => expect(row(section, "Interview lengths")).toHaveTextContent("15, 20, or 30 minutes"));
   });
 
   it.each(["free", "basic"] as const)(

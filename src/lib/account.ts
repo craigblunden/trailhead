@@ -73,7 +73,7 @@ export function interviewsLeftLine(quota: InterviewQuotaStatus): string {
   return `${quota.remaining} of ${quota.limit} interviews left this week`;
 }
 
-/** The Attempt lengths a Plan may choose between: "5 minutes", "5 or 10 minutes", "5, 10, or 30 minutes". */
+/** The Attempt lengths a Plan may choose between: "15 minutes", "15 or 20 minutes", "15, 20, or 30 minutes". */
 export function interviewLengthsLine(lengths: readonly AttemptLength[]): string {
   if (lengths.length <= 2) return `${lengths.join(" or ")} minutes`;
   return `${lengths.slice(0, -1).join(", ")}, or ${lengths.at(-1)} minutes`;

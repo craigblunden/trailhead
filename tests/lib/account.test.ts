@@ -51,8 +51,8 @@ describe("the interview Limits under Your plan", () => {
 
   it("ACCT-10: names the lengths a Plan may choose between", async () => {
     const { interviewLengthsLine } = await import("@/lib/account");
-    expect(interviewLengthsLine([5])).toBe("5 minutes");
-    expect(interviewLengthsLine([5, 10])).toBe("5 or 10 minutes");
-    expect(interviewLengthsLine([5, 10, 30])).toBe("5, 10, or 30 minutes");
+    expect(interviewLengthsLine([15])).toBe("15 minutes");
+    expect(interviewLengthsLine([15, 20])).toBe("15 or 20 minutes");
+    expect(interviewLengthsLine([15, 20, 30])).toBe("15, 20, or 30 minutes");
   });
 });
