@@ -26,3 +26,7 @@ See `spec.md` → 3. Reading aloud, and the handover.
       guard.
 - [ ] Manual check on an iPhone (Safari): the first question is heard after Go, and "Your turn"
       appears when it finishes. Note the result in a comment on this ticket.
+
+## Comments
+
+- 2026-09-17 (implementation): the manual iPhone check has not been done yet.

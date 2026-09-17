@@ -39,3 +39,7 @@ message is reused if it has landed, otherwise the plain error)
       words, and the end's button per Plan. An e2e for the offer appearing for a new Tenant, skipping
       hiding it, and the tutorial running to its end with the fake recogniser. Manual check on an iPhone
       that the permission prompt appears at the microphone step and the question is heard.
+
+## Comments
+
+- 2026-09-17 (implementation): on a job's set-up the offer sits at the top of the page rather than directly above Go. On the hub the plain "Take the tutorial" link shows only when the offer does not (the offer carries the same link). The manual iPhone check has not been done.

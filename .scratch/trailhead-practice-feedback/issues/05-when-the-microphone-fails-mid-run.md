@@ -25,3 +25,7 @@ See `spec.md` → 5. The microphone failing mid-run.
 - [ ] Component tests with a fake recogniser that errors: the clock stops, Try again restarts it, and
       the transcript is kept. e2e: the fake recogniser emits `not-allowed`, and Leave and resume later
       lands on Resume with the time that was left.
+
+## Comments
+
+- 2026-09-17 (implementation): "Leave and resume later" is a button that returns the page to its Resume step, not a link: the run already sits at the URL a link would go to, and a same-URL navigation keeps the running state.
