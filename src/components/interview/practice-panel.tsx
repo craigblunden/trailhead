@@ -14,7 +14,7 @@ import { useSpeechSupported } from "@/components/interview/use-speech";
 import { LoadingTrail } from "@/components/loading-trail";
 import { PageMain } from "@/components/page-main";
 import { Button } from "@/components/ui/button";
-import { formatClock, isComplete, secondsLeft, type InputMode } from "@/lib/interview";
+import { formatClock, isComplete, secondsLeft, type InputMode, type RecordAnswerRequest } from "@/lib/interview";
 import { PRACTICE_QUESTION_COUNT, PRACTICE_SECONDS, PRACTICE_SUMMARY, type PracticeRound } from "@/lib/practice";
 
 /**
@@ -64,7 +64,7 @@ export function PracticePanel({ round: initial, client = practiceClient }: Pract
     setFailure(answer.message);
   }
 
-  async function recordAnswer(answer: { questionId: string; transcript: string; elapsedSeconds: number }) {
+  async function recordAnswer(answer: RecordAnswerRequest) {
     const outcome = await client.answer(round!.id, answer);
     if (!outcome.ok) return outcome.message;
     setRound(outcome.round);
@@ -118,8 +118,8 @@ export function PracticePanel({ round: initial, client = practiceClient }: Pract
           </Button>
           <h1 className="text-3xl tracking-tight">Practice round</h1>
           <p className="mt-1 text-muted-foreground">
-            A taste of the Interview Simulator: two questions about you and two about how you’ve handled work,
-            answered against the clock. {PRACTICE_SUMMARY}.
+            Two questions about you and two about how you’ve handled work, answered against the clock the way the
+            Interview Simulator runs. {PRACTICE_SUMMARY}.
           </p>
 
           <div className={round && !unfinished ? "mt-8 space-y-5" : "mt-8 max-w-sm space-y-5"}>
@@ -199,7 +199,9 @@ function RoundEnd({ round, busy, onPractiseAgain }: { round: PracticeRound; busy
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl">{isComplete(round) ? "That’s the practice round" : "Time’s up"}</h2>
+        {/* The clock running out mid-answer on the last question keeps that answer too, so every question can
+          have one and it was still time that ended the round: time left is what tells the two apart. */}
+      <h2 className="text-xl">{isComplete(round) && secondsLeft(round) > 0 ? "That’s the practice round" : "Time’s up"}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Here’s what you said. Your answers are saved, and you can read them again from the Interview Simulator.
         </p>

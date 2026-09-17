@@ -81,7 +81,7 @@ export function pickPracticeQuestions(previous: readonly string[], random: () =>
 
 /**
  * Whether a Plan may start a Practice round: exactly the Plans that cannot start an Attempt. A Tenant
- * with the full Simulator has no use for the taste of it.
+ * with the full Simulator rehearses for real Jobs instead.
  */
 export function canStartPracticeRound(plan: Plan): boolean {
   return !canStartAttempt(plan);

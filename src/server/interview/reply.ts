@@ -12,7 +12,7 @@ import { ACTION_MESSAGES } from "@/server/action-result";
 import { NotFoundError } from "@/server/data/errors";
 
 /**
- * What the three Interview Simulator Route Handlers share: the status each failure means, and the
+ * What the Interview Simulator's Route Handlers — an Attempt's three and a Practice round's two — share: the status each failure means, and the
  * replies a handler makes itself before the orchestration layer is reached. Kept here rather than
  * repeated in each route, so a new failure code gets a status once — and so a handler that forgets
  * one fails the typecheck rather than answering 200.

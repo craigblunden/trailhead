@@ -8,6 +8,7 @@ import { BrandLogo } from "@/components/brand-logo";
 import { PracticeAnswers, ScoringOnPro } from "@/components/interview/practice-read-back";
 import { PageMain } from "@/components/page-main";
 import { Button } from "@/components/ui/button";
+import { isoDate } from "@/lib/dates";
 import { formatShortDate } from "@/lib/jobs";
 import type { Plan } from "@/lib/plans";
 import {
@@ -80,9 +81,8 @@ export function SavedPracticeRound({ round, plan }: { round: PracticeRound; plan
           </Button>
           <h1 className="text-3xl tracking-tight">Practice round</h1>
           <p className="mt-1 text-muted-foreground">
-            {practising
-              ? `What you said on ${formatShortDate(round.startedAt.slice(0, 10))}.`
-              : `What you said on ${formatShortDate(round.startedAt.slice(0, 10))}. Practice rounds are not scored.`}
+            What you said on {formatShortDate(isoDate(new Date(round.startedAt)))}.
+            {!practising && " Practice rounds are not scored."}
           </p>
 
           <div className="mt-8 space-y-6">

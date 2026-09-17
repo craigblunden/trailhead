@@ -63,7 +63,8 @@ export function useAskAloud(text: string, speaking: boolean): AskAloud {
       setPending(false);
     };
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = navigator.language || "en-US";
+    // The page's language, which is the questions' language — not the browser's, which may be another.
+    utterance.lang = document.documentElement.lang || navigator.language || "en";
     utterance.onend = asked;
     utterance.onerror = asked;
     const guard = window.setTimeout(() => {

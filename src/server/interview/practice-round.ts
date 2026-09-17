@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { RecordAnswerRequest } from "@/lib/interview";
 import { PRACTICE_FAILURES, type PracticeFailure, type PracticeRound } from "@/lib/practice";
 import { UnauthenticatedError, requireSession } from "@/server/auth/session";
 import { RuleError } from "@/server/data/errors";
@@ -17,7 +18,7 @@ import { logError } from "@/server/log";
 
 export type PracticeOutcome =
   | { ok: true; round: PracticeRound }
-  | { ok: false; reason: PracticeFailure; round?: PracticeRound; unexpected?: true };
+  | { ok: false; reason: PracticeFailure; round?: PracticeRound };
 
 /** Starts a round, or says why not — handing back the unfinished one an `in-progress` refusal is about. */
 export async function startPracticeRound({ reset }: { reset: boolean }): Promise<PracticeOutcome> {
@@ -32,7 +33,7 @@ export async function startPracticeRound({ reset }: { reset: boolean }): Promise
 /** One Answer recorded, with the seconds it took. A second Answer to a question, or a finished round, is `no-round`. */
 export async function answerPracticeQuestion(
   roundId: string,
-  answer: { questionId: string; transcript: string; elapsedSeconds: number },
+  answer: RecordAnswerRequest,
 ): Promise<PracticeOutcome> {
   const { userId: tenant } = await requireSession();
   try {
@@ -58,11 +59,11 @@ export async function endPracticeRound(
 function failure(
   error: unknown,
   { tenant, operation }: { tenant: string; operation: string },
-): { ok: false; reason: PracticeFailure; unexpected?: true } {
+): { ok: false; reason: PracticeFailure } {
   if (error instanceof UnauthenticatedError) throw error;
   if (error instanceof RuleError && error.code in PRACTICE_FAILURES) {
     return { ok: false, reason: error.code as PracticeFailure };
   }
   logError({ operation, tenant }, error);
-  return { ok: false, reason: "failed", unexpected: true };
+  return { ok: false, reason: "failed" };
 }

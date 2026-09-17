@@ -45,12 +45,13 @@ afterEach(() => {
 });
 
 describe("asking a question aloud (practice round ticket 02)", () => {
-  it("PR-A1: reads the question in the page's language, and it is being asked until the voice finishes", () => {
+  it("PR-A1: reads the question in the page's language, not the browser's, and it is being asked until the voice finishes", () => {
+    document.documentElement.lang = "en";
     const { result } = renderHook(() => useAskAloud("Tell me about yourself.", true));
 
     expect(result.current.asking).toBe(true);
     expect(lastUtterance().text).toBe("Tell me about yourself.");
-    expect(lastUtterance().lang).toBe(navigator.language);
+    expect(lastUtterance().lang).toBe("en");
 
     act(() => lastUtterance().onend?.());
 

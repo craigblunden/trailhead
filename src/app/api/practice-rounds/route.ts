@@ -11,7 +11,8 @@ import { parseInput, startPracticeSchema } from "@/server/validation";
  *
  * A Route Handler rather than a Server Action for the same reason as the rest of the Simulator: the
  * page it serves runs against a clock, and answers must never queue behind the page's other work.
- * Who may start one, and what happens to an unfinished round, is the orchestration layer's.
+ * Who may start one, and what happens to an unfinished round, is decided below this handler — in the
+ * data layer, inside the transaction that writes the round.
  */
 export async function POST(request: Request) {
   const session = await getOptionalSession();

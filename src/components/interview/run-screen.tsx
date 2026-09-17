@@ -69,8 +69,9 @@ export type RunScreenProps = {
 export function RunScreen(props: RunScreenProps) {
   const question = nextQuestion(props.run);
   if (!question) return null;
-  // A fresh run per question, keyed by it: it is asked from the moment it mounts — which is the moment
-  // the question is on screen — and nothing written or read for the last question carries into this one.
+  // A fresh run per question, keyed by it: it goes up the moment it mounts — read aloud first when
+  // speaking, its clock starting once it has been asked — and nothing written or read for the last
+  // question carries into this one.
   return <QuestionRun key={question.id} question={question} {...props} />;
 }
 
@@ -221,7 +222,7 @@ function QuestionRun({
               {ask.asking ? (
                 <div className="flex flex-wrap items-center gap-3">
                   <p role="status" className="text-sm text-muted-foreground">
-                    Reading the question aloud. Your clock starts once it’s asked.
+                    Reading the question aloud. Your clock starts once it’s asked, or press Skip to start now.
                   </p>
                   <Button type="button" variant="outline" className="h-9 px-3" onClick={ask.skip}>
                     Skip

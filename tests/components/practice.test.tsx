@@ -219,6 +219,13 @@ describe("the end of a Practice round (practice round ticket 04)", () => {
     expect(answers[3]).toHaveTextContent("Not reached");
   });
 
+  it("PR-U11b: a round the clock ran out on mid-way through the last question is still Time's up, though every question kept an answer", () => {
+    renderPractice({ round: { ...roundOf({ answered: 4, activeSeconds: 480 }), completedAt: "2026-09-17T10:08:00.000Z" } });
+
+    expect(screen.getByRole("heading", { level: 2, name: "Time’s up" })).toBeInTheDocument();
+    expect(screen.getAllByRole("article")[3]).toHaveTextContent("My answer 4.");
+  });
+
   it("PR-U12: where a Scorecard would be, scoring is shown as part of Pro — no scores, and a way to see the plans", () => {
     renderPractice({ round: roundOf({ answered: 4, completed: true }) });
 
