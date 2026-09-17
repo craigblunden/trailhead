@@ -19,7 +19,7 @@ import {
 } from "@/lib/interview";
 import { PLAN_LIMITS } from "@/lib/plans";
 import { setJobDocument } from "@/server/data/documents";
-import { interviewQuota, latestAttempt } from "@/server/data/interview";
+import { earlierQuestions, interviewQuota, latestAttempt } from "@/server/data/interview";
 import { createJob } from "@/server/data/jobs";
 import { withTenant } from "@/server/db/tenant";
 import { answerQuestion, endAttempt, scoreAttempt } from "@/server/interview/answer-attempt";
@@ -39,6 +39,8 @@ type Reply = { status?: number; delayMs?: number; body: unknown };
 
 let reply: Reply;
 let requests = 0;
+/** The prompt each request carried, in order, so a test can read what reached the call. */
+let prompts: string[] = [];
 let server: Server;
 let baseURL: string;
 
@@ -75,6 +77,7 @@ beforeAll(async () => {
     request.on("data", (chunk) => (raw += chunk));
     request.on("end", () => {
       requests += 1;
+      prompts.push(String((JSON.parse(raw || "{}") as { messages?: { content?: unknown }[] }).messages?.[0]?.content ?? ""));
       setTimeout(() => {
         if (response.destroyed) return;
         response.writeHead(reply.status ?? 200, { "content-type": "application/json" });
@@ -153,6 +156,7 @@ beforeEach(async () => {
   signOut();
   reply = { body: QUESTIONS() };
   requests = 0;
+  prompts = [];
   vi.restoreAllMocks();
 });
 
@@ -233,6 +237,55 @@ describe("ticket 01: starting an Attempt", () => {
     }
     expect(requests).toBe(0);
     expect(await usedThisWeek(userId)).toBe(0);
+  });
+});
+
+describe("interview second pass ticket 07: new questions on a repeat Attempt", () => {
+  /** A question set whose every question names the Attempt it was written for. */
+  const labelled = (label: string) =>
+    answer({ questions: questionSet(15).map((question) => ({ ...question, text: `${label}: a ${question.category} question?` })) });
+
+  it("a first Attempt's call carries no history; a repeat Attempt's carries the questions of this Job's three most recent earlier Attempts, newest first", async () => {
+    const { jobId } = await proTenantWithJob();
+
+    for (const label of ["First", "Second", "Third", "Fourth"]) {
+      reply = { body: labelled(label) };
+      // Each earlier Attempt is abandoned for the next: reset ones count as asked, like any other.
+      expect(await start(jobId, 15, label !== "First")).toMatchObject({ ok: true });
+    }
+    expect(prompts[0]).not.toContain("<earlier_questions>");
+
+    reply = { body: QUESTIONS() };
+    expect(await start(jobId, 15, true)).toMatchObject({ ok: true });
+
+    const last = prompts[prompts.length - 1];
+    const block = /<earlier_questions>\n([\s\S]*?)\n<\/earlier_questions>/.exec(last)?.[1] ?? "";
+    expect(block).toContain("- Fourth: a personal question?");
+    expect(block).toContain("- Second: a design question?");
+    expect(block.indexOf("Fourth:")).toBeLessThan(block.indexOf("Third:"));
+    expect(block.indexOf("Third:")).toBeLessThan(block.indexOf("Second:"));
+    // Only three: the oldest is left out.
+    expect(block).not.toContain("First:");
+  });
+
+  it("reads earlier questions for one Job only, in the order they were asked", async () => {
+    const { userId, jobId } = await proTenantWithJob();
+    reply = { body: labelled("This job") };
+    await start(jobId);
+    const other = await createJob(
+      { company: "Harvest", role: "Researcher", location: "Remote", salaryMin: null, salaryMax: null, postingUrl: "", description: "A posting." },
+      MONDAY,
+    );
+    await withTenant(userId, (tx) =>
+      tx.attempt.create({
+        data: { userId, jobId: other.id, length: 15, questions: { create: [{ userId, category: "personal", order: 0, text: "Another job?" }] } },
+      }),
+    );
+
+    const earlier = await earlierQuestions(jobId);
+
+    expect(earlier).toHaveLength(1);
+    expect(earlier[0]).toEqual(questionSet(15).map((question) => `This job: a ${question.category} question?`));
   });
 });
 
@@ -587,8 +640,9 @@ describe("tenant isolation", () => {
       ok: false,
       reason: "no-attempt",
     });
-    // The other Tenant's Job is not on this Tenant's trail at all.
+    // The other Tenant's Job is not on this Tenant's trail at all — nor are the questions it was asked.
     await expect(latestAttempt(owner.jobId)).rejects.toThrow(/isn't on your trail/);
+    await expect(earlierQuestions(owner.jobId)).rejects.toThrow(/isn't on your trail/);
 
     // Nothing the intruder did reached the owner's Attempt.
     signInAs(owner.userId);

@@ -15,7 +15,7 @@ import {
 import { limitsOf } from "@/lib/plans";
 import { requireSession } from "@/server/auth/session";
 import type { GeneratedQuestion } from "@/server/interview/claude";
-import type { InterviewContext } from "@/server/interview/prompt";
+import { EARLIER_ATTEMPTS_MAX, type InterviewContext } from "@/server/interview/prompt";
 import { toAttemptDto, toDateColumn } from "@/server/db/mappers";
 import { withTenant, type Tenant, type TenantClient } from "@/server/db/tenant";
 
@@ -195,6 +195,26 @@ export async function latestAttempt(jobId: string): Promise<Attempt | null> {
     });
   });
   return row ? toAttemptDto(row) : null;
+}
+
+/**
+ * What this Job's most recent Attempts asked, newest first: each one's question texts in the order
+ * they were asked (interview second pass ticket 07). Reset and unscored Attempts count — a question
+ * that was put to the Tenant was asked, however the Attempt ended. Read before a new Attempt is
+ * stored, so every one of these is an earlier Attempt.
+ */
+export async function earlierQuestions(jobId: string): Promise<string[][]> {
+  const { userId } = await requireSession();
+  const rows = await withTenant(userId, async (tx, tenant) => {
+    const job = await ownJob(tenant, jobId, { id: true });
+    return tx.attempt.findMany({
+      where: { userId, jobId: job.id },
+      orderBy: { startedAt: "desc" },
+      take: EARLIER_ATTEMPTS_MAX,
+      select: { questions: { select: { text: true }, orderBy: { order: "asc" } } },
+    });
+  });
+  return rows.map((row) => row.questions.map((question) => question.text));
 }
 
 /**

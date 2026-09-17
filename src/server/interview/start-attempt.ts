@@ -16,6 +16,7 @@ import { limitsOf } from "@/lib/plans";
 import { UnauthenticatedError, requireSession } from "@/server/auth/session";
 import { NotFoundError, RuleError } from "@/server/data/errors";
 import {
+  earlierQuestions,
   interviewQuota,
   interviewSources,
   latestAttempt,
@@ -126,11 +127,14 @@ export async function startAttempt(
     }
 
     const sources = await interviewSources(jobId);
+    // What this Job was asked before, so a repeat Attempt covers new ground (interview second pass
+    // ticket 07). Read before the reservation: nothing about it costs the Tenant anything.
+    const earlierAttempts = await earlierQuestions(jobId);
 
     reservedWeek = (await reserveAttempt()).weekStart;
 
     // The call, outside any transaction.
-    const outcome = await generateQuestions({ ...sources, length }, { client, tenant });
+    const outcome = await generateQuestions({ ...sources, length, earlierAttempts }, { client, tenant });
     if (outcome.ok) {
       const attempt = await storeAttempt(jobId, length, outcome.questions);
       reservedWeek = null; // Delivered and stored: this Attempt is used.
