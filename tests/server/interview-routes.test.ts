@@ -181,6 +181,33 @@ describe("recording an Answer (ticket 02)", () => {
     expect(orchestration.answerQuestion).not.toHaveBeenCalled();
   });
 
+  it("IV-R8b: a time-up body carries the answer part-written by then — stripped — and ends the Attempt rather than recording an Answer", async () => {
+    orchestration.endAttempt.mockResolvedValue({ ok: true, attempt: { ...attempt, completedAt: "2026-09-16T10:00:00.000Z" } });
+
+    const outcome = await post(
+      answerRoute,
+      "attempt-1",
+      ...json({ timeUp: true, questionId: "q1", transcript: "  I led the​ redesign and  " }),
+    );
+
+    expect(outcome.status).toBe(200);
+    expect(orchestration.endAttempt).toHaveBeenCalledWith("attempt-1", { questionId: "q1", transcript: "I led the redesign and" });
+    expect(orchestration.answerQuestion).not.toHaveBeenCalled();
+  });
+
+  it("IV-R8c: a time-up body that is not one — no question, a transcript over the cap, extra fields, or timeUp not true — is a 400", async () => {
+    for (const body of [
+      { timeUp: true, transcript: "No question named." },
+      { timeUp: true, questionId: "q1", transcript: "x".repeat(TRANSCRIPT_MAX_CHARS + 1) },
+      { timeUp: true, questionId: "q1", transcript: "Sneaky.", elapsedSeconds: 0 },
+      { timeUp: false, questionId: "q1", transcript: "Not time up." },
+    ]) {
+      expect(await post(answerRoute, "attempt-1", ...json(body))).toMatchObject({ status: 400, body: { error: "bad-answer" } });
+    }
+    expect(orchestration.endAttempt).not.toHaveBeenCalled();
+    expect(orchestration.answerQuestion).not.toHaveBeenCalled();
+  });
+
   it("IV-R9: a second Answer to the same question, and an Answer to a finished Attempt, are the same 404", async () => {
     orchestration.answerQuestion.mockResolvedValue({ ok: false, reason: "no-attempt" });
 

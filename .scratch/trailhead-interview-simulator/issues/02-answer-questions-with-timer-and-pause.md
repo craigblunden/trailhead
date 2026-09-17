@@ -16,9 +16,10 @@ at whatever length ticket 01 hardcodes.
       itself is untimed.
 - [ ] Typing and submitting an Answer records its transcript against the correct question.
 - [ ] The Attempt reaches a completed state once every question has a recorded Answer.
-- [ ] The countdown reaching zero mid-question ends the Attempt at that point: whatever was typed
-      so far is not recorded, and any remaining questions are simply left unanswered — no question
-      is force-submitted or retried.
+- [ ] The countdown reaching zero mid-question ends the Attempt at that point: whatever was said or
+      typed so far is recorded as that question's Answer (changed 2026-09-17 — discarding it read as
+      the app losing answers), and any remaining questions are simply left unanswered — no question
+      is retried. Before scoring, an Attempt that ran out says how many questions were answered.
 - [ ] The record-Answer Route Handler is tested with the orchestration layer mocked, covering each
       outcome.
 - [ ] The UI is tested with `fetch` mocked, covering the countdown running and pausing, submitting
