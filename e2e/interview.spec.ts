@@ -459,15 +459,16 @@ test.describe("interview simulator: a Practice round (practice round ticket 03)"
     await say(page, "Half of it");
     await refuseMicrophone(page);
 
-    const alert = page.getByRole("alert");
-    await expect(alert).toContainText("won’t let the page use your microphone");
+    // Filtered: Next's route announcer is an alert too.
+    const alert = page.getByRole("alert").filter({ hasText: "won’t let the page use your microphone" });
+    await expect(alert).toBeVisible();
     const stopped = await page.getByRole("timer").textContent();
     await page.waitForTimeout(2_000);
     await expect(page.getByRole("timer")).toHaveText(stopped!);
 
     await alert.getByRole("button", { name: "Leave and resume later" }).click();
     await expect(page.getByRole("heading", { name: "Pick up where you left off" })).toBeVisible();
-    await expect(page.getByText(/1 of 4 answered, with 7:5d left/)).toBeVisible();
+    await expect(page.getByText(/1 of 4 answered, with 7:5\d left/)).toBeVisible();
   });
 
   test("a pro Tenant has the full Simulator, so has no Practice round to start", async ({ page }) => {
