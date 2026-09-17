@@ -166,9 +166,43 @@ export type Attempt = {
   questions: AttemptQuestion[];
 };
 
+/** A question as a timed run reads it: where it sits, what it asks, and its Answer's words if it has one. */
+export type RunQuestion = Pick<AttemptQuestion, "id" | "category" | "order" | "text"> & {
+  answer?: Pick<AttemptAnswer, "transcript">;
+};
+
+/**
+ * What the run screen and the countdown read of any timed run — an Attempt or a Practice round
+ * (practice round ticket 01): ordered questions that may carry an Answer, one countdown in seconds, and
+ * the seconds already answered for. Nothing here names a Job, a length, or a score.
+ */
+export type TimedRun<Q extends RunQuestion = RunQuestion> = {
+  id: string;
+  /** The whole countdown, in seconds. One for the whole run, never per question. */
+  countdownSeconds: number;
+  /** Seconds this run has actually been answered for. Not wall-clock time since it started. */
+  activeSeconds: number;
+  questions: Q[];
+};
+
+/** An Attempt as a timed run: its countdown is its length. */
+export function attemptRun(attempt: Attempt): TimedRun<AttemptQuestion> {
+  return {
+    id: attempt.id,
+    countdownSeconds: attemptSeconds(attempt.length),
+    activeSeconds: attempt.activeSeconds,
+    questions: attempt.questions,
+  };
+}
+
+/** Seconds left on a timed run's countdown. Never negative. */
+export function secondsLeft(run: Pick<TimedRun, "countdownSeconds" | "activeSeconds">): number {
+  return Math.max(run.countdownSeconds - run.activeSeconds, 0);
+}
+
 /** Seconds left on an Attempt's countdown. Never negative. */
 export function remainingSeconds(attempt: Pick<Attempt, "length" | "activeSeconds">): number {
-  return Math.max(attemptSeconds(attempt.length) - attempt.activeSeconds, 0);
+  return secondsLeft({ countdownSeconds: attemptSeconds(attempt.length), activeSeconds: attempt.activeSeconds });
 }
 
 /** "12:05" — the countdown as it reads on the page. */
@@ -182,13 +216,13 @@ export function formatClock(seconds: number): string {
  * one — the Attempt is complete. A question left half-answered when the Tenant navigated away has no
  * Answer recorded at all, so returning resumes on it or the one after it, never inside it.
  */
-export function nextQuestion(attempt: Pick<Attempt, "questions">): AttemptQuestion | undefined {
-  return [...attempt.questions].sort((a, b) => a.order - b.order).find((question) => !question.answer);
+export function nextQuestion<Q extends Pick<RunQuestion, "order" | "answer">>(run: { questions: Q[] }): Q | undefined {
+  return [...run.questions].sort((a, b) => a.order - b.order).find((question) => !question.answer);
 }
 
 /** Answered every question. */
-export function isComplete(attempt: Pick<Attempt, "questions">): boolean {
-  return attempt.questions.length > 0 && attempt.questions.every((question) => question.answer);
+export function isComplete(run: { questions: Pick<RunQuestion, "answer">[] }): boolean {
+  return run.questions.length > 0 && run.questions.every((question) => question.answer);
 }
 
 /** An Attempt that has been scored carries an overall score and a rationale on every Answer. */

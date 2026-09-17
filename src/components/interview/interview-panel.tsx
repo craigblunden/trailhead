@@ -4,7 +4,6 @@ import { useState } from "react";
 
 import { AppHeader } from "@/components/app-header";
 import { BrandLogo } from "@/components/brand-logo";
-import { AttemptRun } from "@/components/interview/attempt-run";
 import { interviewClient, type InterviewClient } from "@/components/interview/interview-client";
 import {
   JobPicker,
@@ -16,6 +15,7 @@ import {
 } from "@/components/interview/interview-path";
 import { FeedbackAsk } from "@/components/interview/feedback-ask";
 import { PastInterviews } from "@/components/interview/past-interviews";
+import { RunScreen } from "@/components/interview/run-screen";
 import { Scorecard } from "@/components/interview/scorecard";
 import { useSpeechSupported } from "@/components/interview/use-speech";
 import { LoadingTrail } from "@/components/loading-trail";
@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { formatResetDay } from "@/lib/dates";
 import {
   INTERVIEW_FAILURES,
+  attemptRun,
   canStartAttempt,
   formatClock,
   isAttemptLength,
@@ -167,9 +168,9 @@ export function InterviewPanel({
       <div className="flex flex-1 flex-col">
         <AppHeader leading={<BrandLogo href="/board" />} />
         <PageMain className="pt-10 sm:pt-16">
-          <AttemptRun
-            attempt={attempt}
-            job={job}
+          <RunScreen
+            run={attemptRun(attempt)}
+            caption={`Rehearsing for ${job.role} at ${job.company}`}
             mode={effectiveMode}
             onModeChange={setMode}
             speechSupported={speechSupported}

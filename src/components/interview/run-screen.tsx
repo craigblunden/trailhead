@@ -15,18 +15,18 @@ import {
   formatClock,
   formatMinutes,
   nextQuestion,
-  remainingSeconds,
-  type Attempt,
-  type AttemptQuestion,
+  secondsLeft,
   type InputMode,
+  type RunQuestion,
+  type TimedRun,
 } from "@/lib/interview";
-import type { Job } from "@/lib/jobs";
 import { cn } from "@/lib/utils";
 
 /**
- * Answering an Attempt (interview simulator tickets 02, 06): one question at a time against one
- * countdown for the whole Attempt, with nothing on the page but the question, the clock, and the
- * Tenant's answer.
+ * Answering a timed run — an Attempt or a Practice round (interview simulator tickets 02, 06; practice
+ * round ticket 01): one question at a time against one countdown for the whole run, with nothing on the
+ * page but the question, the clock, and the Tenant's answer. It reads only what both have
+ * (`TimedRun`), so it cannot tell which it is driving.
  *
  * **The clock runs from the moment a question is visible.** Go puts the first question on screen with
  * its clock already running; submitting an answer puts the next one up the same way. There is no pause
@@ -37,16 +37,17 @@ import { cn } from "@/lib/utils";
  * It is still **active-time accounted**: what the server stores is the seconds each answer consumed,
  * added as the answer lands. So leaving the page stops the clock, and returning resumes on the next
  * unanswered question with exactly the time that was left. This component's countdown is display and
- * expiry; the Attempt's real time is whatever the server has added up.
+ * expiry; the run's real time is whatever the server has added up.
  *
  * Spoken answers are transcribed by the browser and nothing else: no audio is recorded, uploaded, or
  * stored (see `use-speech.ts`). Both modes write the same transcript, so scoring cannot tell which was
  * used.
  */
 
-export type AttemptRunProps = {
-  attempt: Attempt;
-  job: Pick<Job, "company" | "role">;
+export type RunScreenProps = {
+  run: TimedRun;
+  /** What is being rehearsed, above the question trail: "Rehearsing for Product Designer at Fernwood". */
+  caption: string;
   mode: InputMode;
   onModeChange: (mode: InputMode) => void;
   speechSupported: boolean;
@@ -56,14 +57,14 @@ export type AttemptRunProps = {
   /** Records one Answer. Resolves with null once it has landed, or a message saying why it hasn't. */
   onAnswer: (answer: { questionId: string; transcript: string; elapsedSeconds: number }) => Promise<string | null>;
   /**
-   * The countdown reached zero mid-question: the Attempt ends where it stands, with what had been said
+   * The countdown reached zero mid-question: the run ends where it stands, with what had been said
    * on this question so far — empty when nothing had.
    */
   onTimeUp: (partial: { questionId: string; transcript: string }) => Promise<string | null>;
 };
 
-export function AttemptRun(props: AttemptRunProps) {
-  const question = nextQuestion(props.attempt);
+export function RunScreen(props: RunScreenProps) {
+  const question = nextQuestion(props.run);
   if (!question) return null;
   // A fresh run per question, keyed by it: its clock starts the moment it mounts — which is the moment
   // the question is on screen — and nothing written for the last question carries into this one.
@@ -73,8 +74,8 @@ export function AttemptRun(props: AttemptRunProps) {
 type Status = "answering" | "submitting";
 
 function QuestionRun({
-  attempt,
-  job,
+  run,
+  caption,
   question,
   mode,
   onModeChange,
@@ -83,7 +84,7 @@ function QuestionRun({
   onTranscriptShownChange,
   onAnswer,
   onTimeUp,
-}: AttemptRunProps & { question: AttemptQuestion }) {
+}: RunScreenProps & { question: RunQuestion }) {
   const questionId = useId();
   const notepadId = useId();
   const speech = useSpeech();
@@ -103,7 +104,7 @@ function QuestionRun({
    * those seconds back — retry often enough and the countdown never moves.
    */
   const [spentOnFailedTries, setSpentOnFailedTries] = useState(0);
-  const left = Math.max(remainingSeconds(attempt) - spentOnFailedTries - spent, 0);
+  const left = Math.max(secondsLeft(run) - spentOnFailedTries - spent, 0);
 
   // The clock, running whenever the question is being answered — which, from the moment it mounts, it
   // is. It stands still only while an answer is on its way to the server.
@@ -128,7 +129,7 @@ function QuestionRun({
   const spoken = [typed, speech.transcript, speech.interim].map((part) => part.trim()).filter(Boolean).join(" ");
   const answer = speaking ? spoken : typed.trim();
 
-  // Out of time, mid-question: the Attempt ends here. What is on the notepad — or what the browser had
+  // Out of time, mid-question: the run ends here. What is on the notepad — or what the browser had
   // heard — is kept as this question's Answer, so half an answer is still scored; the questions after
   // it are unreached (interview second pass ticket 03).
   const expired = left === 0 && status === "answering";
@@ -169,9 +170,9 @@ function QuestionRun({
     onModeChange("type");
   }
 
-  const position = attempt.questions.findIndex((candidate) => candidate.id === question.id);
-  const total = attempt.questions.length;
-  const last = attempt.questions.every((candidate) => candidate.id === question.id || candidate.answer);
+  const position = run.questions.findIndex((candidate) => candidate.id === question.id);
+  const total = run.questions.length;
+  const last = run.questions.every((candidate) => candidate.id === question.id || candidate.answer);
   const submitting = status === "submitting";
   const micState: MicState = !speech.listening || submitting ? "off" : speech.hearing ? "hearing" : "listening";
 
@@ -181,10 +182,8 @@ function QuestionRun({
     <div className="mx-auto max-w-3xl">
       <div className="flex items-start justify-between gap-6">
         <div className="min-w-0 space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Rehearsing for {job.role} at {job.company}
-          </p>
-          <QuestionTrail questions={attempt.questions} current={position} />
+          <p className="text-sm text-muted-foreground">{caption}</p>
+          <QuestionTrail questions={run.questions} current={position} />
           <p className="flex flex-wrap items-center gap-2 text-sm">
             <span>
               Question {position + 1} of {total}
@@ -301,7 +300,7 @@ function Clock({ seconds }: { seconds: number }) {
  * "how far through" reads the way it does everywhere else. Decoration for the eye: the "Question 3 of
  * 5" beside it says the same thing in words.
  */
-function QuestionTrail({ questions, current }: { questions: AttemptQuestion[]; current: number }) {
+function QuestionTrail({ questions, current }: { questions: RunQuestion[]; current: number }) {
   return (
     <ol aria-hidden="true" className="flex flex-wrap items-center gap-1">
       {questions.map((question, index) => (

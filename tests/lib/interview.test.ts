@@ -6,6 +6,7 @@ import {
   CATEGORIES,
   CATEGORY_MIX,
   INTERVIEW_PLAN,
+  attemptRun,
   attemptSeconds,
   canStartAttempt,
   formatClock,
@@ -20,6 +21,7 @@ import {
   questionCount,
   remainingSeconds,
   rollUp,
+  secondsLeft,
   SCORE_BAND_LABEL,
   scoreBand,
   starsFor,
@@ -141,6 +143,38 @@ describe("the countdown (tickets 02, 04)", () => {
     expect(formatClock(9)).toBe("0:09");
     expect(formatClock(0)).toBe("0:00");
     expect(formatClock(-5)).toBe("0:00");
+  });
+});
+
+describe("any timed run, not only an Attempt (practice round ticket 01)", () => {
+  /** A run as the run screen reads it: no Job, no length, no scores. */
+  const run = (questions: { id: string; order: number; answer?: { transcript: string } }[], activeSeconds = 0) => ({
+    id: "run-1",
+    countdownSeconds: 480,
+    activeSeconds,
+    questions: questions.map((item) => ({ category: "personal" as Category, text: "?", ...item })),
+  });
+
+  it("IV-6b: time left is the run's own countdown less its active seconds, and never negative", () => {
+    expect(secondsLeft(run([], 100))).toBe(380);
+    expect(secondsLeft(run([], 600))).toBe(0);
+  });
+
+  it("IV-6c: an Attempt's run counts down from its length, with its questions as they are", () => {
+    const answered = question(0, "personal", {});
+    const timed = attemptRun(attempt([answered, question(1, "design")], { length: 15, activeSeconds: 60 }));
+
+    expect(timed.countdownSeconds).toBe(900);
+    expect(secondsLeft(timed)).toBe(840);
+    expect(nextQuestion(timed)?.order).toBe(1);
+  });
+
+  it("IV-6d: where a run picks up, and whether it is complete, need nothing but ordered questions and their Answers", () => {
+    const halfway = run([{ id: "b", order: 1 }, { id: "a", order: 0, answer: { transcript: "Said it." } }]);
+
+    expect(nextQuestion(halfway)?.id).toBe("b");
+    expect(isComplete(halfway)).toBe(false);
+    expect(isComplete(run([{ id: "a", order: 0, answer: { transcript: "" } }]))).toBe(true);
   });
 });
 
