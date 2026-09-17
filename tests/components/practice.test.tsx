@@ -9,7 +9,9 @@ import { SavedPracticeRound } from "@/components/interview/practice-rounds";
 import type { PracticeClient } from "@/components/interview/practice-client";
 import type { Job } from "@/lib/jobs";
 import type { Plan } from "@/lib/plans";
+import { SPEAK_UNSUPPORTED } from "@/lib/interview";
 import { PRACTICE_FAILURES, type PracticeCategory, type PracticeRound } from "@/lib/practice";
+import { hear, setSpeechSupport } from "../fakes/speech-recognition";
 import { SEED_JOBS } from "../fixtures/jobs";
 import { renderWithJobs, screen, userEvent, within } from "../test-utils";
 
@@ -59,7 +61,7 @@ const go = () => screen.getByRole("button", { name: "Go" });
 
 beforeEach(() => {
   for (const mock of Object.values(client)) mock.mockReset();
-  delete (window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition;
+  setSpeechSupport(true);
 });
 
 afterEach(() => {
@@ -129,7 +131,7 @@ describe("taking a Practice round (practice round ticket 03)", () => {
     client.answer.mockResolvedValue({ ok: true, round: roundOf({ answered: 1, activeSeconds: 12 }) });
 
     await user.click(screen.getByRole("button", { name: "Resume" }));
-    await user.type(screen.getByRole("textbox"), "I like building things.");
+    hear("I like building things.");
     await user.click(screen.getByRole("button", { name: "Submit answer" }));
 
     expect(client.answer).toHaveBeenCalledWith(round.id, expect.objectContaining({ questionId: "round-1-q0", transcript: "I like building things." }));
@@ -146,6 +148,18 @@ describe("taking a Practice round (practice round ticket 03)", () => {
     expect(client.start).toHaveBeenCalledWith(true);
     expect(await screen.findByRole("heading", { level: 1, name: "Practice personal question 1?" })).toBeInTheDocument();
     expect(screen.getByRole("timer")).toHaveTextContent("8:00 left");
+  });
+
+  it("PR-U6b: a browser that can't transcribe speech can neither Go nor Resume, and is told which browsers can (practice feedback ticket 02)", () => {
+    setSpeechSupport(false);
+    const setUp = renderPractice();
+    expect(screen.queryByRole("button", { name: "Go" })).not.toBeInTheDocument();
+    expect(screen.getByText(SPEAK_UNSUPPORTED)).toBeInTheDocument();
+    setUp.unmount();
+
+    renderPractice({ round: roundOf({ answered: 1 }) });
+    expect(screen.queryByRole("button", { name: "Resume" })).not.toBeInTheDocument();
+    expect(screen.getByText(SPEAK_UNSUPPORTED)).toBeInTheDocument();
   });
 
   it("PR-U7: a round already in progress elsewhere is offered to resume rather than reported as a failure", async () => {
@@ -196,7 +210,7 @@ describe("the end of a Practice round (practice round ticket 04)", () => {
     client.answer.mockResolvedValue({ ok: true, round: roundOf({ answered: 4, activeSeconds: 360, completed: true }) });
 
     await user.click(screen.getByRole("button", { name: "Resume" }));
-    await user.type(screen.getByRole("textbox"), "My answer 4.");
+    hear("My answer 4.");
     await user.click(screen.getByRole("button", { name: "Submit final answer" }));
 
     expect(await screen.findByRole("heading", { level: 2, name: "That’s the practice round" })).toBeInTheDocument();

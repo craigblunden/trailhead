@@ -11,7 +11,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
  *
  * The API is prefixed in every browser that has it, and absent in the ones that don't (Firefox, and
  * Safari before 14.1). Where it is absent, `supported` is false from the first render and the page
- * offers typing instead of failing confusingly.
+ * offers no run at all — answers are spoken only (practice feedback ticket 02) — rather than failing
+ * confusingly.
  */
 
 /** The slice of the Web Speech API this uses. Typed here because `lib.dom` still doesn't carry it. */
@@ -53,7 +54,7 @@ const neverChanges = () => () => {};
  * Whether this browser can transcribe speech.
  *
  * Feature detection is a client-only fact, so it is read as an external store with a server snapshot
- * of `false`: the server renders the typing fallback, and the browser swaps to speaking on hydration
+ * of `false`: the server renders the unsupported note, and the browser swaps to the real set-up on hydration
  * without the two disagreeing. Reading it during render instead would be a hydration mismatch, and
  * setting it from an effect a cascading render for something that never changes.
  */
@@ -95,13 +96,13 @@ const QUICK_END_MS = 1_000;
 /** This many quick stops in a row and the page stops restarting it, rather than spin. */
 const QUICK_ENDS_BEFORE_GIVING_UP = 3;
 
-const STALLED = "The microphone keeps stopping, so this answer can’t be heard. Type it instead.";
+const STALLED = "The microphone keeps stopping, so this answer can’t be heard.";
 
 const ERRORS: Record<string, string> = {
-  "not-allowed": "This browser won’t let the page use your microphone. Allow it, or type your answer instead.",
-  "service-not-allowed": "This browser won’t let the page use your microphone. Allow it, or type your answer instead.",
-  "audio-capture": "No microphone was found. Plug one in, or type your answer instead.",
-  network: "Speech recognition needs a connection and couldn’t reach it. You can type your answer instead.",
+  "not-allowed": "This browser won’t let the page use your microphone. Allow it in your browser’s settings.",
+  "service-not-allowed": "This browser won’t let the page use your microphone. Allow it in your browser’s settings.",
+  "audio-capture": "No microphone was found. Plug one in.",
+  network: "Speech recognition needs a connection and couldn’t reach it.",
 };
 
 /** What a running recogniser reaches back into: the hook's refs and state setters. */

@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react";
 
 import { AppHeader } from "@/components/app-header";
 import { BrandLogo } from "@/components/brand-logo";
-import { AnswerModeChoice } from "@/components/interview/interview-path";
+import { SpeechUnsupported, SpokenAnswers } from "@/components/interview/interview-path";
 import { practiceClient, type PracticeClient } from "@/components/interview/practice-client";
 import { PracticeAnswers, ScoringOnPro } from "@/components/interview/practice-read-back";
 import { RunScreen } from "@/components/interview/run-screen";
@@ -14,7 +14,7 @@ import { useSpeechSupported } from "@/components/interview/use-speech";
 import { LoadingTrail } from "@/components/loading-trail";
 import { PageMain } from "@/components/page-main";
 import { Button } from "@/components/ui/button";
-import { formatClock, isComplete, secondsLeft, type InputMode, type RecordAnswerRequest } from "@/lib/interview";
+import { formatClock, isComplete, secondsLeft, type RecordAnswerRequest } from "@/lib/interview";
 import { PRACTICE_QUESTION_COUNT, PRACTICE_SECONDS, PRACTICE_SUMMARY, type PracticeRound } from "@/lib/practice";
 
 /**
@@ -36,7 +36,6 @@ export type PracticePanelProps = {
 export function PracticePanel({ round: initial, client = practiceClient }: PracticePanelProps) {
   const speechSupported = useSpeechSupported();
   const [round, setRound] = useState<PracticeRound | null>(initial);
-  const [mode, setMode] = useState<InputMode>("speak");
   const [transcriptShown, setTranscriptShown] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -44,7 +43,6 @@ export function PracticePanel({ round: initial, client = practiceClient }: Pract
   const [running, setRunning] = useState(false);
 
   const unfinished = round !== null && !round.completedAt && !isComplete(round);
-  const effectiveMode: InputMode = speechSupported ? mode : "type";
 
   async function start(reset: boolean) {
     setBusy(true);
@@ -92,9 +90,6 @@ export function PracticePanel({ round: initial, client = practiceClient }: Pract
           <RunScreen
             run={round}
             caption="Practice round"
-            mode={effectiveMode}
-            onModeChange={setMode}
-            speechSupported={speechSupported}
             transcriptShown={transcriptShown}
             onTranscriptShownChange={setTranscriptShown}
             onAnswer={recordAnswer}
@@ -124,13 +119,15 @@ export function PracticePanel({ round: initial, client = practiceClient }: Pract
 
           <div className={round && !unfinished ? "mt-8 space-y-5" : "mt-8 max-w-sm space-y-5"}>
             {round && unfinished ? (
-              <ResumeRound round={round} busy={busy} onResume={() => setRunning(true)} onStartOver={() => start(true)} />
+              <ResumeRound round={round} speechSupported={speechSupported} busy={busy} onResume={() => setRunning(true)} onStartOver={() => start(true)} />
             ) : round ? (
               <RoundEnd round={round} busy={busy} onPractiseAgain={practiseAgain} />
             ) : (
               <>
-                <AnswerModeChoice mode={effectiveMode} onModeChange={setMode} speechSupported={speechSupported} />
-                {busy ? (
+                <SpokenAnswers />
+                {!speechSupported ? (
+                  <SpeechUnsupported />
+                ) : busy ? (
                   <LoadingTrail>Setting up your round…</LoadingTrail>
                 ) : (
                   <div>
@@ -160,11 +157,14 @@ export function PracticePanel({ round: initial, client = practiceClient }: Pract
 /** A round left unfinished: pick it up where it was, or throw it away for a fresh one — it cost nothing. */
 function ResumeRound({
   round,
+  speechSupported,
   busy,
   onResume,
   onStartOver,
 }: {
   round: PracticeRound;
+  /** Answers are spoken only, so a browser that cannot transcribe can't resume (practice feedback ticket 02). */
+  speechSupported: boolean;
   busy: boolean;
   onResume: () => void;
   onStartOver: () => void;
@@ -174,18 +174,24 @@ function ResumeRound({
     <div className="space-y-3">
       <h2 className="text-xl">Pick up where you left off</h2>
       <p className="text-sm text-muted-foreground">
-        {answered} of {round.questions.length} answered, with {formatClock(secondsLeft(round))} left. Resume puts your
-        next question up.
+        {answered} of {round.questions.length} answered, with {formatClock(secondsLeft(round))} left.
+        {speechSupported && " Resume puts your next question up."}
       </p>
-      <Button type="button" className="h-12 w-full text-lg font-semibold" onClick={onResume}>
-        Resume
-      </Button>
-      {busy ? (
-        <LoadingTrail>Setting up your round…</LoadingTrail>
+      {!speechSupported ? (
+        <SpeechUnsupported />
       ) : (
-        <Button type="button" variant="ghost" className="h-auto w-full py-2" onClick={onStartOver}>
-          Start over
-        </Button>
+        <>
+          <Button type="button" className="h-12 w-full text-lg font-semibold" onClick={onResume}>
+            Resume
+          </Button>
+          {busy ? (
+            <LoadingTrail>Setting up your round…</LoadingTrail>
+          ) : (
+            <Button type="button" variant="ghost" className="h-auto w-full py-2" onClick={onStartOver}>
+              Start over
+            </Button>
+          )}
+        </>
       )}
     </div>
   );

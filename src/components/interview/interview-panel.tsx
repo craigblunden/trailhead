@@ -11,6 +11,7 @@ import {
   Path,
   PickedJob,
   RehearsalChoices,
+  SpeechUnsupported,
   Step,
   type PathJob,
 } from "@/components/interview/interview-path";
@@ -38,7 +39,6 @@ import {
   remainingSeconds,
   type Attempt,
   type AttemptLength,
-  type InputMode,
   type InterviewQuotaStatus,
   type PastAttempt,
   type Scorecard as ScorecardData,
@@ -104,7 +104,6 @@ export function InterviewPanel({
   const [attempt, setAttempt] = useState<Attempt | null>(initial);
   const [quota, setQuota] = useState<InterviewQuotaStatus | null>(initialQuota);
   const [length, setLength] = useState<AttemptLength>(lengths[0]);
-  const [mode, setMode] = useState<InputMode>("speak");
   // Chosen once and kept across questions: a Tenant who opens the transcript on the first question
   // shouldn't have to open it again on every one after.
   const [transcriptShown, setTranscriptShown] = useState(false);
@@ -119,8 +118,6 @@ export function InterviewPanel({
 
   const unfinished = attempt !== null && !attempt.completedAt && !isComplete(attempt);
   const finished = attempt !== null && !unfinished;
-  // Speaking is the default wherever the browser can transcribe; typing is offered where it cannot.
-  const effectiveMode: InputMode = speechSupported ? mode : "type";
   const outOfAttempts = quota?.remaining === 0;
 
   async function start(reset: boolean, startLength: AttemptLength) {
@@ -183,9 +180,6 @@ export function InterviewPanel({
           <RunScreen
             run={attemptRun(attempt)}
             caption={`Rehearsing for ${job.role} at ${job.company}`}
-            mode={effectiveMode}
-            onModeChange={setMode}
-            speechSupported={speechSupported}
             transcriptShown={transcriptShown}
             onTranscriptShownChange={setTranscriptShown}
             onAnswer={recordAnswer}
@@ -232,6 +226,7 @@ export function InterviewPanel({
                   // An Attempt started at a retired length starts over at the shortest length offered now.
                   onStartOver={() => start(true, isAttemptLength(attempt!.length) ? attempt!.length : lengths[0])}
                   outOfAttempts={outOfAttempts}
+                  speechSupported={speechSupported}
                   busy={busy}
                   failure={failure}
                 />
@@ -276,9 +271,6 @@ export function InterviewPanel({
                     lengths={lengths}
                     length={length}
                     onLengthChange={setLength}
-                    mode={effectiveMode}
-                    onModeChange={setMode}
-                    speechSupported={speechSupported}
                   />
                 </Step>
                 <Step number={3} title="Ready when you are" open={ready || locked} last>
@@ -287,6 +279,7 @@ export function InterviewPanel({
                     available={available}
                     length={length}
                     quota={quota}
+                    speechSupported={speechSupported}
                     busy={busy}
                     failure={failure}
                     onGo={() => start(false, length)}
@@ -330,7 +323,7 @@ function PracticeOffer({ unfinished }: { unfinished: boolean }) {
 
 /**
  * Go, or why there is no Go. Locked, a Pro note stands where it would be — no disabled button to
- * click into (ticket 08). With nothing left this week, when more arrive; without a key, that the
+ * click into (ticket 08). In a browser that cannot transcribe, that it can't hear answers. With nothing left this week, when more arrive; without a key, that the
  * simulator isn't available here. While the questions are written, the wait, and what happens next.
  */
 function GoStep({
@@ -338,6 +331,7 @@ function GoStep({
   available,
   length,
   quota,
+  speechSupported,
   busy,
   failure,
   onGo,
@@ -346,6 +340,8 @@ function GoStep({
   available: boolean;
   length: AttemptLength;
   quota: InterviewQuotaStatus | null;
+  /** Answers are spoken only, so a browser that cannot transcribe has no Go (practice feedback ticket 02). */
+  speechSupported: boolean;
   busy: boolean;
   failure: string | null;
   onGo: () => void;
@@ -358,6 +354,7 @@ function GoStep({
       </p>
     );
   }
+  if (!speechSupported) return <SpeechUnsupported className="max-w-sm" />;
   if (!available) {
     return (
       <p role="alert" className="max-w-sm rounded-md border border-destructive/40 px-3 py-2 text-sm">
@@ -407,6 +404,7 @@ function ResumeStep({
   onResume,
   onStartOver,
   outOfAttempts,
+  speechSupported,
   busy,
   failure,
 }: {
@@ -414,10 +412,22 @@ function ResumeStep({
   onResume: () => void;
   onStartOver: () => void;
   outOfAttempts: boolean;
+  speechSupported: boolean;
   busy: boolean;
   failure: string | null;
 }) {
   const answered = attempt.questions.filter((question) => question.answer).length;
+  // Nothing can be answered here, so nothing can be resumed or started over.
+  if (!speechSupported) {
+    return (
+      <div className="max-w-sm space-y-3">
+        <p className="text-sm text-muted-foreground">
+          {answered} of {attempt.questions.length} answered, with {formatClock(remainingSeconds(attempt))} left.
+        </p>
+        <SpeechUnsupported />
+      </div>
+    );
+  }
   return (
     <div className="max-w-sm space-y-3">
       <p className="text-sm text-muted-foreground">

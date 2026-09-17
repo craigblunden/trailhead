@@ -47,7 +47,7 @@ afterEach(() => {
 describe("asking a question aloud (practice round ticket 02)", () => {
   it("PR-A1: reads the question in the page's language, not the browser's, and it is being asked until the voice finishes", () => {
     document.documentElement.lang = "en";
-    const { result } = renderHook(() => useAskAloud("Tell me about yourself.", true));
+    const { result } = renderHook(() => useAskAloud("Tell me about yourself."));
 
     expect(result.current.asking).toBe(true);
     expect(lastUtterance().text).toBe("Tell me about yourself.");
@@ -59,7 +59,7 @@ describe("asking a question aloud (practice round ticket 02)", () => {
   });
 
   it("PR-A2: a voice that fails counts as asked, with nothing to tell the Tenant", () => {
-    const { result } = renderHook(() => useAskAloud("Tell me about yourself.", true));
+    const { result } = renderHook(() => useAskAloud("Tell me about yourself."));
 
     act(() => lastUtterance().onerror?.());
 
@@ -67,7 +67,7 @@ describe("asking a question aloud (practice round ticket 02)", () => {
   });
 
   it("PR-A3: skipping stops the voice and the question counts as asked at once", () => {
-    const { result } = renderHook(() => useAskAloud("Tell me about yourself.", true));
+    const { result } = renderHook(() => useAskAloud("Tell me about yourself."));
 
     act(() => result.current.skip());
 
@@ -78,7 +78,7 @@ describe("asking a question aloud (practice round ticket 02)", () => {
   it("PR-A4: a voice that never finishes is cancelled by its guard, so the clock can never be frozen", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const text = "Tell me about yourself.";
-    const { result } = renderHook(() => useAskAloud(text, true));
+    const { result } = renderHook(() => useAskAloud(text));
 
     act(() => vi.advanceTimersByTime(askGuardMs(text) - 1));
     expect(result.current.asking).toBe(true);
@@ -95,20 +95,13 @@ describe("asking a question aloud (practice round ticket 02)", () => {
 
   it("PR-A6: a browser with no speech synthesis has asked the question already", () => {
     setSynthesisSupport(false);
-    const { result } = renderHook(() => useAskAloud("Tell me about yourself.", true));
+    const { result } = renderHook(() => useAskAloud("Tell me about yourself."));
 
     expect(result.current.asking).toBe(false);
-  });
-
-  it("PR-A7: answering by typing never reads the question", () => {
-    const { result } = renderHook(() => useAskAloud("Tell me about yourself.", false));
-
-    expect(result.current.asking).toBe(false);
-    expect(synth.speak).not.toHaveBeenCalled();
   });
 
   it("PR-A8: a question that goes away mid-read stops the voice", () => {
-    const { unmount } = renderHook(() => useAskAloud("Tell me about yourself.", true));
+    const { unmount } = renderHook(() => useAskAloud("Tell me about yourself."));
     synth.cancel.mockClear();
 
     unmount();

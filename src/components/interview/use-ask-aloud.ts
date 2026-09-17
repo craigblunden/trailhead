@@ -3,13 +3,11 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
 /**
- * Asking a question aloud (practice round ticket 02). When a Tenant answers by speaking, the browser's
- * own voice reads each question as it comes up, and the question counts as **asked** — the moment its
+ * Asking a question aloud (practice round ticket 02). The browser's own voice reads each question as it comes up, and the question counts as **asked** — the moment its
  * clock and microphone start — only once the voice is done with it.
  *
  * Asked is a one-way latch per question: the voice finishing, failing, being skipped, or overrunning its
- * guard all end it, and nothing starts it again. So a Tenant who switches to speaking partway through a
- * question is never read it — its clock is already running. Where the browser has no speech synthesis,
+ * guard all end it, and nothing starts it again. Where the browser has no speech synthesis,
  * the question is asked from the start, exactly as before there was a voice; no message, because there
  * is nothing the Tenant can do about it.
  */
@@ -42,15 +40,15 @@ export type AskAloud = {
 };
 
 /**
- * Reads `text` aloud once, on mount, when `speaking` and the browser can. Keyed by the caller to one
+ * Reads `text` aloud once, on mount, where the browser can. Keyed by the caller to one
  * question, so the next question is a fresh read.
  */
-export function useAskAloud(text: string, speaking: boolean): AskAloud {
+export function useAskAloud(text: string): AskAloud {
   const supported = useSpeechSynthesisSupported();
   // Whether this question is still to be asked. Starts true only for a question that will be read —
   // `supported` is already the browser's answer by the time a question mounts after hydration.
-  const [pending, setPending] = useState(() => speaking && synthesisAvailable());
-  const asking = pending && speaking && supported;
+  const [pending, setPending] = useState(() => synthesisAvailable());
+  const asking = pending && supported;
 
   useEffect(() => {
     if (!asking) return;

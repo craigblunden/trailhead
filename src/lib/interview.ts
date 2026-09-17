@@ -137,18 +137,17 @@ export type AttemptAnswer = {
  */
 export type TakeawayPoint = { point: string; from: string };
 
-/** How a Tenant answered: spoken aloud (recommended) or typed. Nothing but the text reaches the server. */
-export const INPUT_MODES = ["speak", "type"] as const;
+/**
+ * How answers are given, said on every set-up. Answers are spoken only (practice feedback ticket 02): a
+ * choice between typing and speaking confused first-time users more than it helped. Nothing but the text
+ * the browser heard reaches the server.
+ */
+export const SPOKEN_ANSWERS =
+  "You answer out loud, as you would in the room. Your browser does the transcribing — no audio is recorded, uploaded, or stored.";
 
-export type InputMode = (typeof INPUT_MODES)[number];
-
-/** Why speaking is offered first — shown on the start screen so the default isn't arbitrary. */
-export const SPEAK_RECOMMENDED =
-  "Speaking is the closer rehearsal: a real interview is answered out loud, under the clock, with no chance to edit. Your browser does the transcribing — no audio is recorded, uploaded, or stored.";
-
-/** What a browser without speech recognition is told, so the fallback isn't a confusing failure. */
+/** What a browser without speech recognition is told in place of Go or Resume. */
 export const SPEAK_UNSUPPORTED =
-  "This browser can’t transcribe speech, so type your answers here. Chrome and Edge can, if you’d rather rehearse out loud.";
+  "This browser can’t hear your answers. Open this page in Chrome, Edge, or Safari to rehearse out loud.";
 
 /** An Attempt in flight, as the page holds it. */
 export type Attempt = {

@@ -13,18 +13,21 @@ import { SIGNED_OUT, createJob, expect, signUpAndVerify, test } from "./fixtures
  * API Playwright starts (`tests/fakes/anthropic-server.mjs`). Everything on the app's side — the
  * routes, the quota, the persisted question set, the Answers, the Scorecard — is the real thing.
  *
- * Chromium exposes the speech-recognition API, so the page opens in speaking mode — which is what
- * ticket 06 asks for and is asserted below. Driving it further would need a real speech service to
- * transcribe against, so every answer here goes through the switch to typing, the other half of the
- * same ticket. That both modes write the same field is covered in the component tests, where the API
- * can be stubbed.
+ * Answers are spoken only (practice feedback ticket 02), and a headless Chromium has no speech service
+ * to transcribe against, so speech recognition is stubbed in every test here too: the stub keeps each
+ * recogniser the page makes, and `say` plays the browser settling on some words.
  *
  * Speech synthesis is stubbed in every test here (practice round ticket 02): a headless browser's voice
  * may never finish, which would hold each question's clock for its whole guard. The stub finishes at
  * once unless a test says otherwise, and records what it was asked to read.
  */
 
-type VoiceWindow = Window & { __voiceHolds?: boolean; __spoken?: string[] };
+type FakeRecogniser = {
+  started: boolean;
+  onresult: ((event: unknown) => void) | null;
+  onend: (() => void) | null;
+};
+type VoiceWindow = Window & { __voiceHolds?: boolean; __spoken?: string[]; __recognisers?: FakeRecogniser[] };
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -40,8 +43,49 @@ test.beforeEach(async ({ page }) => {
       cancel() {},
     };
     Object.defineProperty(window, "speechSynthesis", { value: synth, configurable: true });
+
+    voiced.__recognisers = [];
+    class Recognition {
+      lang = "";
+      continuous = false;
+      interimResults = false;
+      started = false;
+      onresult = null;
+      onerror = null;
+      onspeechstart = null;
+      onspeechend = null;
+      onend: (() => void) | null = null;
+      constructor() {
+        voiced.__recognisers!.push(this);
+      }
+      start() {
+        this.started = true;
+      }
+      stop() {
+        this.started = false;
+        queueMicrotask(() => this.onend?.());
+      }
+      abort() {
+        this.started = false;
+      }
+    }
+    for (const name of ["SpeechRecognition", "webkitSpeechRecognition"]) {
+      Object.defineProperty(window, name, { value: Recognition, configurable: true });
+    }
   });
 });
+
+/** Plays the browser hearing `text`, once the page has its microphone on. */
+async function say(page: Page, text: string) {
+  await expect
+    .poll(() => page.evaluate(() => (window as VoiceWindow).__recognisers!.some((recogniser) => recogniser.started)))
+    .toBe(true);
+  await page.evaluate((words) => {
+    const live = (window as VoiceWindow).__recognisers!.filter((recogniser) => recogniser.started);
+    const result = Object.assign([{ transcript: words }], { isFinal: true });
+    live[live.length - 1].onresult?.({ resultIndex: 0, results: [result] });
+  }, text);
+}
 
 const POSTING =
   "Fernwood is a subscription plant company. The Growth design team owns onboarding, pricing, and the referral loop, and works closely with lifecycle marketing and data science. ".repeat(
@@ -79,13 +123,7 @@ async function jobReadyToRehearse(page: Page) {
  * Playwright types faster than one, so a test that wants to see time actually spent has to spend some.
  */
 async function answerOne(page: Page, text: string, dwellMs = 0) {
-  // Chromium opens in speaking mode with no speech service behind it, so take the typed path.
-  // Typing carries across questions once chosen, so wait for whichever this question shows.
-  const switchToTyping = page.getByRole("button", { name: "Type instead" });
-  const notepad = page.getByRole("textbox", { name: /Your answer to/ });
-  await expect(notepad.or(switchToTyping)).toBeVisible();
-  if (await switchToTyping.isVisible()) await switchToTyping.click();
-  await notepad.fill(text);
+  await say(page, text);
   if (dwellMs > 0) await page.waitForTimeout(dwellMs);
   await page.getByRole("button", { name: /^Submit (final )?answer$/ }).click();
 }
@@ -112,8 +150,8 @@ test.describe("interview simulator: a pro Tenant rehearses and is scored", () =>
     await page.getByRole("button", { name: /^15\s*minutes/ }).click();
     await expect(page.getByText(/1 personal, 1 behavioural, 1 stakeholder, 1 technical, 1 design/)).toBeVisible();
 
-    // Speaking is the default where the browser can transcribe, with the reason beside it (ticket 06).
-    await expect(page.getByRole("button", { name: /Speaking/ })).toHaveAttribute("aria-pressed", "true");
+    // Answers are spoken, and no audio is kept (practice feedback ticket 02).
+    await expect(page.getByRole("button", { name: /Typing/ })).toHaveCount(0);
     await expect(page.getByText(/no audio is recorded, uploaded, or stored/i)).toBeVisible();
 
     await page.getByRole("button", { name: "Go" }).click();
@@ -199,7 +237,7 @@ test.describe("interview simulator: a pro Tenant rehearses and is scored", () =>
     await expect(page.getByRole("timer")).toBeVisible({ timeout: 60_000 });
     await answerOne(page, "The one answer I finished.");
     await expect(page.getByText(/Question 2 of 5/)).toBeVisible();
-    await page.getByRole("textbox", { name: /Your answer to/ }).fill("Half of my second answ");
+    await say(page, "Half of my second answ");
 
     // The countdown runs out mid-answer (interview second pass ticket 03).
     await page.clock.fastForward("15:00");
@@ -271,7 +309,6 @@ test.describe("interview simulator: a Practice round (practice round ticket 03)"
     await offer.getByRole("link", { name: "Start a practice round" }).click();
 
     await expect(page.getByRole("heading", { level: 1, name: "Practice round" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Speaking/ })).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "Go" }).click();
 
     // No questions to write: the first is up at once, on the eight-minute clock.
@@ -333,7 +370,7 @@ test.describe("interview simulator: a Practice round (practice round ticket 03)"
     await page.getByRole("button", { name: "Go" }).click();
     await answerOne(page, "The one I finished.");
     await expect(page.getByText(/Question 2 of 4/)).toBeVisible();
-    await page.getByRole("textbox", { name: /Your answer to/ }).fill("Half of my sec");
+    await say(page, "Half of my sec");
 
     await page.clock.fastForward("08:00");
 
@@ -355,6 +392,19 @@ test.describe("interview simulator: a Practice round (practice round ticket 03)"
     await expect(page.getByRole("article").nth(1)).toContainText("Half of my sec");
     await expect(page.getByRole("link", { name: "Practise again" })).toHaveAttribute("href", "/interview/practice");
     await expectNoAxeViolations(page);
+  });
+
+  test("a browser that can't transcribe speech is told so, with no Go (practice feedback ticket 02)", async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.addInitScript(() => {
+      delete (window as { SpeechRecognition?: unknown }).SpeechRecognition;
+      delete (window as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition;
+    });
+    await signUpAndVerify(page);
+
+    await page.goto("/interview/practice");
+    await expect(page.getByText(/can’t hear your answers/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Go" })).toHaveCount(0);
   });
 
   test("a pro Tenant has the full Simulator, so has no Practice round to start", async ({ page }) => {

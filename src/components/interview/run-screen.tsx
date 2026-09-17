@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Keyboard, Mic } from "lucide-react";
 
-import { SpokenNotepad, TypedNotepad } from "@/components/interview/notepad";
+import { SpokenNotepad } from "@/components/interview/notepad";
 import { Soundwave, type MicState } from "@/components/interview/soundwave";
 import { useAskAloud } from "@/components/interview/use-ask-aloud";
 import { useSpeech } from "@/components/interview/use-speech";
@@ -11,13 +10,11 @@ import { Button } from "@/components/ui/button";
 import {
   ANSWER_MINUTES,
   CATEGORY_LABEL,
-  SPEAK_UNSUPPORTED,
   TRANSCRIPT_MAX_CHARS,
   formatClock,
   formatMinutes,
   nextQuestion,
   secondsLeft,
-  type InputMode,
   type RunQuestion,
   type TimedRun,
 } from "@/lib/interview";
@@ -25,13 +22,13 @@ import { cn } from "@/lib/utils";
 
 /**
  * Answering a timed run — an Attempt or a Practice round (interview simulator tickets 02, 06; practice
- * round ticket 01): one question at a time against one countdown for the whole run, with nothing on the
+ * round ticket 01; practice feedback ticket 02): one question at a time against one countdown for the whole run, with nothing on the
  * page but the question, the clock, and the Tenant's answer. It reads only what both have
  * (`TimedRun`), so it cannot tell which it is driving.
  *
- * **The clock runs from the moment a question has been asked.** Typed, that is the moment it is on
- * screen; spoken, the browser's voice reads it first, with the clock standing still and the microphone
- * off until the voice is done or the Tenant skips it (practice round ticket 02, `use-ask-aloud.ts`).
+ * **The clock runs from the moment a question has been asked.** The browser's voice reads it first, with
+ * the clock standing still and the microphone off until the voice is done or the Tenant skips it
+ * (practice round ticket 02, `use-ask-aloud.ts`); where the browser has no voice, that is at once.
  * Go puts the first question up and submitting an answer puts the next one up the same way. There is no
  * pause to choose when to begin — a real interviewer doesn't wait for the candidate to say they're
  * ready. Otherwise the clock stands still only while an answer is on its way to the server, which is the
@@ -42,18 +39,16 @@ import { cn } from "@/lib/utils";
  * unanswered question with exactly the time that was left. This component's countdown is display and
  * expiry; the run's real time is whatever the server has added up.
  *
- * Spoken answers are transcribed by the browser and nothing else: no audio is recorded, uploaded, or
- * stored (see `use-speech.ts`). Both modes write the same transcript, so scoring cannot tell which was
- * used.
+ * Answers are spoken only — typing was taken away because switching between the two confused first-time
+ * users (practice feedback ticket 02) — so a run is only ever put up in a browser that can transcribe.
+ * They are transcribed by the browser and nothing else: no audio is recorded, uploaded, or stored (see
+ * `use-speech.ts`).
  */
 
 export type RunScreenProps = {
   run: TimedRun;
   /** What is being rehearsed, above the question trail: "Rehearsing for Product Designer at Fernwood". */
   caption: string;
-  mode: InputMode;
-  onModeChange: (mode: InputMode) => void;
-  speechSupported: boolean;
   /** Whether the transcript is on show while speaking. Hidden unless the Tenant asks for it. */
   transcriptShown: boolean;
   onTranscriptShownChange: (shown: boolean) => void;
@@ -81,9 +76,6 @@ function QuestionRun({
   run,
   caption,
   question,
-  mode,
-  onModeChange,
-  speechSupported,
   transcriptShown,
   onTranscriptShownChange,
   onAnswer,
@@ -92,14 +84,12 @@ function QuestionRun({
   const questionId = useId();
   const notepadId = useId();
   const speech = useSpeech();
-  const { start: listen, stop: stopListening, reset: forgetSpeech } = speech;
+  const { start: listen, stop: stopListening } = speech;
   const [status, setStatus] = useState<Status>("answering");
-  const [typed, setTyped] = useState("");
   const [failure, setFailure] = useState<string | null>(null);
 
-  const speaking = mode === "speak" && speechSupported;
-  // Spoken, the question is read aloud before it is answered; typed, it is asked the moment it is up.
-  const ask = useAskAloud(question.text, speaking);
+  // The question is read aloud before it is answered.
+  const ask = useAskAloud(question.text);
   const answering = status === "answering" && !ask.asking;
 
   /** When this try at the question began. Set as the clock starts, so it is never read before. */
@@ -122,23 +112,21 @@ function QuestionRun({
     return () => clearInterval(timer);
   }, [answering]);
 
-  // The microphone is on while a spoken question is being answered, and off the moment it isn't — so it
+  // The microphone is on while the question is being answered, and off the moment it isn't — so it
   // is off while the question is read, or the recogniser would transcribe the voice. The
   // hook keeps it on through the browser ending recognition in a silence, and gives up — saying why —
   // if it can't (see `use-speech.ts`).
   useEffect(() => {
-    if (!speaking || !answering) return;
+    if (!answering) return;
     listen();
     return () => stopListening();
-  }, [speaking, answering, listen, stopListening]);
+  }, [answering, listen, stopListening]);
 
-  // Spoken, the answer is anything typed before switching to speech, then what the browser heard —
-  // including the phrase still settling, so the last sentence before Submit isn't lost.
-  const spoken = [typed, speech.transcript, speech.interim].map((part) => part.trim()).filter(Boolean).join(" ");
-  const answer = speaking ? spoken : typed.trim();
+  // The answer is what the browser heard — including the phrase still settling, so the last sentence
+  // before Submit isn't lost.
+  const answer = [speech.transcript, speech.interim].map((part) => part.trim()).filter(Boolean).join(" ");
 
-  // Out of time, mid-question: the run ends here. What is on the notepad — or what the browser had
-  // heard — is kept as this question's Answer, so half an answer is still scored; the questions after
+  // Out of time, mid-question: the run ends here. What the browser had heard is kept as this question's Answer, so half an answer is still scored; the questions after
   // it are unreached (interview second pass ticket 03).
   const expired = left === 0 && answering;
   const ending = useRef(false);
@@ -164,20 +152,11 @@ function QuestionRun({
     });
     // Landed: the parent puts the next question up, and this one unmounts with its clock.
     if (!message) return;
-    // Didn't land: keep what was written, keep what the time cost, and carry on answering.
+    // Didn't land: keep what was said, keep what the time cost, and carry on answering.
     setFailure(message);
     setSpentOnFailedTries((current) => current + thisTry);
     setSpent(0);
     setStatus("answering");
-  }
-
-  function switchToTyping() {
-    // Typing mid-read stops the voice and starts the clock: the question has been asked.
-    ask.skip();
-    // What was said so far moves onto the page as text, so switching loses nothing.
-    setTyped(spoken);
-    forgetSpeech();
-    onModeChange("type");
   }
 
   const position = run.questions.findIndex((candidate) => candidate.id === question.id);
@@ -216,64 +195,37 @@ function QuestionRun({
       <p className="mt-3 text-sm text-muted-foreground">Aim for about {formatMinutes(ANSWER_MINUTES[question.category])} min</p>
 
       <div className="mt-8 space-y-4">
-        {speaking ? (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-              {ask.asking ? (
-                <div className="flex flex-wrap items-center gap-3">
-                  <p role="status" className="text-sm text-muted-foreground">
-                    Reading the question aloud. Your clock starts once it’s asked, or press Skip to start now.
-                  </p>
-                  <Button type="button" variant="outline" className="h-9 px-3" onClick={ask.skip}>
-                    Skip
-                  </Button>
-                </div>
-              ) : (
-                <Soundwave state={micState} />
-              )}
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-9 px-3"
-                  aria-expanded={transcriptShown}
-                  aria-controls={notepadId}
-                  onClick={() => onTranscriptShownChange(!transcriptShown)}
-                >
-                  {transcriptShown ? "Hide transcript" : "Show transcript"}
-                </Button>
-                <Button type="button" variant="ghost" className="h-9 px-3" onClick={switchToTyping}>
-                  <Keyboard aria-hidden="true" />
-                  Type instead
-                </Button>
-              </div>
-            </div>
-            {/* Hidden by default: while speaking, the words scrolling past pull the eye away from the
-                question. The Tenant can open it to check what the browser caught. */}
-            {transcriptShown && (
-              <SpokenNotepad id={notepadId} settled={[typed, speech.transcript].filter(Boolean).join(" ")} pending={speech.interim} />
-            )}
-            {speech.error && (
-              <p role="alert" className="text-sm text-destructive">
-                {speech.error}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          {ask.asking ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <p role="status" className="text-sm text-muted-foreground">
+                Reading the question aloud. Your clock starts once it’s asked, or press Skip to start now.
               </p>
-            )}
-          </>
-        ) : (
-          <>
-            <label htmlFor={notepadId} className="sr-only">
-              Your answer to: {question.text}
-            </label>
-            <TypedNotepad id={notepadId} value={typed} onChange={setTyped} />
-            {speechSupported ? (
-              <Button type="button" variant="ghost" className="-ml-3 h-9 px-3" onClick={() => onModeChange("speak")}>
-                <Mic aria-hidden="true" />
-                Speak instead
+              <Button type="button" variant="outline" className="h-9 px-3" onClick={ask.skip}>
+                Skip
               </Button>
-            ) : (
-              <p className="text-xs text-muted-foreground">{SPEAK_UNSUPPORTED}</p>
-            )}
-          </>
+            </div>
+          ) : (
+            <Soundwave state={micState} />
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-9 px-3"
+            aria-expanded={transcriptShown}
+            aria-controls={notepadId}
+            onClick={() => onTranscriptShownChange(!transcriptShown)}
+          >
+            {transcriptShown ? "Hide transcript" : "Show transcript"}
+          </Button>
+        </div>
+        {/* Hidden by default: while speaking, the words scrolling past pull the eye away from the
+            question. The Tenant can open it to check what the browser caught. */}
+        {transcriptShown && <SpokenNotepad id={notepadId} settled={speech.transcript} pending={speech.interim} />}
+        {speech.error && (
+          <p role="alert" className="text-sm text-destructive">
+            {speech.error}
+          </p>
         )}
       </div>
 

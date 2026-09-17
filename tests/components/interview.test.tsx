@@ -11,7 +11,7 @@ import {
   CATEGORIES,
   CATEGORY_LABEL,
   INTERVIEW_FAILURES,
-  SPEAK_RECOMMENDED,
+  SPOKEN_ANSWERS,
   SPEAK_UNSUPPORTED,
   type Attempt,
   type KnownLength,
@@ -21,6 +21,7 @@ import {
 } from "@/lib/interview";
 import type { Job } from "@/lib/jobs";
 import type { Plan } from "@/lib/plans";
+import { hear, latestRecogniser, setSpeechSupport, speech as fakeSpeech } from "../fakes/speech-recognition";
 import { SEED_JOBS } from "../fixtures/jobs";
 import { render, renderWithJobs, screen, userEvent, waitFor, within } from "../test-utils";
 
@@ -117,65 +118,6 @@ function attemptOf({
   };
 }
 
-/**
- * A stand-in for the browser's speech recogniser. Every instance the page makes is kept, so a test
- * can play the part of the browser: hear speech, return a transcript, end on its own.
- */
-type FakeRecognition = {
-  started: boolean;
-  onresult: ((event: unknown) => void) | null;
-  onend: (() => void) | null;
-  onerror: ((event: { error?: string }) => void) | null;
-  onspeechstart: (() => void) | null;
-  onspeechend: (() => void) | null;
-};
-
-let recognisers: FakeRecognition[] = [];
-/** When set, the fake ends the moment it starts — a browser that won't keep a microphone open. */
-let endsAtOnce = false;
-
-function setSpeechSupport(supported: boolean) {
-  const holder = window as unknown as { SpeechRecognition?: unknown };
-  if (!supported) {
-    delete holder.SpeechRecognition;
-    return;
-  }
-  holder.SpeechRecognition = class implements FakeRecognition {
-    lang = "";
-    continuous = false;
-    interimResults = false;
-    started = false;
-    onresult: FakeRecognition["onresult"] = null;
-    onend: FakeRecognition["onend"] = null;
-    onerror: FakeRecognition["onerror"] = null;
-    onspeechstart: FakeRecognition["onspeechstart"] = null;
-    onspeechend: FakeRecognition["onspeechend"] = null;
-    constructor() {
-      recognisers.push(this);
-    }
-    start() {
-      this.started = true;
-      if (endsAtOnce) queueMicrotask(() => this.onend?.());
-    }
-    stop() {
-      this.started = false;
-      this.onend?.();
-    }
-    abort() {
-      this.started = false;
-    }
-  };
-}
-
-const latestRecogniser = () => recognisers[recognisers.length - 1];
-
-/** Plays the browser settling on some words. */
-function hear(text: string) {
-  act(() => {
-    latestRecogniser().onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: text }], { isFinal: true })] });
-  });
-}
-
 function renderPanel({
   plan = "pro" as Plan,
   job: chosen = job as PathJob | null,
@@ -209,8 +151,6 @@ beforeEach(() => {
   for (const mock of Object.values(client)) mock.mockReset();
   feedback.send.mockReset();
   feedback.send.mockResolvedValue({ ok: true, data: null });
-  recognisers = [];
-  endsAtOnce = false;
   setSpeechSupport(true);
 });
 
@@ -324,18 +264,27 @@ describe("steps two and three: set up and Go (tickets 05, 06)", () => {
     expect(screen.getByText(/2 personal, 3 behavioural, 3 stakeholder, 2 technical, 2 design/)).toBeInTheDocument();
   });
 
-  it("IV-U11: speaking is the default where the browser can transcribe, with the reason shown", () => {
+  it("IV-U11: answers are spoken — there is no choice of how, only the promise that no audio is kept (practice feedback ticket 02)", () => {
     renderPanel({ speech: true });
 
-    expect(screen.getByRole("button", { name: /Speaking/ })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: /Typing/ })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByText(SPEAK_RECOMMENDED)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Speaking/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Typing/ })).not.toBeInTheDocument();
+    expect(screen.getByText(SPOKEN_ANSWERS)).toBeInTheDocument();
+    expect(go()).toBeEnabled();
   });
 
-  it("IV-U12: a browser without speech recognition is offered typing only, with a note saying why", () => {
+  it("IV-U12: a browser that can't transcribe speech has no Go, and is told which browsers can (practice feedback ticket 02)", () => {
     renderPanel({ speech: false });
 
-    expect(screen.queryByRole("button", { name: /Speaking/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Go" })).not.toBeInTheDocument();
+    expect(screen.getByText(SPEAK_UNSUPPORTED)).toBeInTheDocument();
+    expect(SPEAK_UNSUPPORTED).not.toMatch(/type/i);
+  });
+
+  it("IV-U12b: nor can it resume an unfinished Attempt (practice feedback ticket 02)", () => {
+    renderPanel({ attempt: attemptOf({ answered: 1 }), speech: false });
+
+    expect(screen.queryByRole("button", { name: "Resume" })).not.toBeInTheDocument();
     expect(screen.getByText(SPEAK_UNSUPPORTED)).toBeInTheDocument();
   });
 
@@ -415,7 +364,7 @@ describe("the interview runs without a pause (ticket 02)", () => {
   it("IV-U15: Go puts the first question up with its clock already running — no second press", async () => {
     // Only the test moves the clock: real time leaking in makes exact seconds flaky on a busy machine.
     vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
-    const { user } = renderPanel({ speech: false });
+    const { user } = renderPanel({ speech: true });
     client.start.mockResolvedValue({ ok: true, attempt: attemptOf(), quota: quota(8) });
 
     await user.click(go());
@@ -430,15 +379,15 @@ describe("the interview runs without a pause (ticket 02)", () => {
   it("IV-U16: submitting puts the next question up with the clock still running, and sends what the first cost", async () => {
     // Only the test moves the clock: real time leaking in makes exact seconds flaky on a busy machine.
     vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
-    const typing = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const clicking = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const attempt = attemptOf();
-    renderPanel({ attempt, speech: false });
+    renderPanel({ attempt, speech: true });
     client.answer.mockResolvedValue({ ok: true, attempt: { ...attemptOf({ answered: 1 }), id: attempt.id } });
 
-    await typing.click(screen.getByRole("button", { name: "Resume" }));
-    await typing.type(screen.getByRole("textbox"), "I led the reporting redesign.");
+    await clicking.click(screen.getByRole("button", { name: "Resume" }));
+    hear("I led the reporting redesign.");
     await act(() => vi.advanceTimersByTimeAsync(20_000));
-    await typing.click(submitButton());
+    await clicking.click(submitButton());
 
     expect(client.answer).toHaveBeenCalledWith(attempt.id, {
       questionId: "q0",
@@ -447,7 +396,8 @@ describe("the interview runs without a pause (ticket 02)", () => {
     });
     // The next question is up at once — there is nothing to press to begin it — and its clock runs.
     expect(await screen.findByRole("heading", { level: 1, name: "A behavioural question?" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox")).toHaveValue("");
+    // Nothing said yet on this one: nothing to submit.
+    expect(submitButton()).toBeDisabled();
     await act(() => vi.advanceTimersByTimeAsync(5_000));
     expect(screen.getByRole("timer")).toHaveTextContent("4:35 left");
   });
@@ -455,13 +405,13 @@ describe("the interview runs without a pause (ticket 02)", () => {
   it("IV-U17: the clock stands still while an answer is on its way to the server", async () => {
     // Only the test moves the clock: real time leaking in makes exact seconds flaky on a busy machine.
     vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
-    const typing = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    renderPanel({ attempt: attemptOf(), speech: false });
+    const clicking = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderPanel({ attempt: attemptOf(), speech: true });
     client.answer.mockReturnValue(new Promise(() => {}));
 
-    await typing.click(screen.getByRole("button", { name: "Resume" }));
-    await typing.type(screen.getByRole("textbox"), "An answer.");
-    await typing.click(submitButton());
+    await clicking.click(screen.getByRole("button", { name: "Resume" }));
+    hear("An answer.");
+    await clicking.click(submitButton());
     const atSubmit = screen.getByRole("timer").textContent;
     await act(() => vi.advanceTimersByTimeAsync(15_000));
 
@@ -470,14 +420,14 @@ describe("the interview runs without a pause (ticket 02)", () => {
   });
 
   it("IV-U17b: under each question, how long to aim for in its Category — a guide, with the one countdown still running (interview second pass ticket 04)", async () => {
-    const { user } = renderPanel({ attempt: attemptOf({ length: 30 }), speech: false });
+    const { user } = renderPanel({ attempt: attemptOf({ length: 30 }), speech: true });
     client.answer.mockResolvedValue({ ok: true, attempt: { ...attemptOf({ length: 30, answered: 1 }) } });
 
     await user.click(screen.getByRole("button", { name: "Resume" }));
     expect(screen.getByText("Aim for about 1½ min")).toBeInTheDocument();
     expect(screen.getByRole("timer")).toHaveTextContent("30:00 left");
 
-    await user.type(screen.getByRole("textbox"), "An answer.");
+    hear("An answer.");
     await user.click(submitButton());
 
     expect(await screen.findByRole("heading", { level: 1, name: "A behavioural question?" })).toBeInTheDocument();
@@ -485,7 +435,7 @@ describe("the interview runs without a pause (ticket 02)", () => {
   });
 
   it("IV-U18: an empty answer cannot be submitted", async () => {
-    const { user } = renderPanel({ attempt: attemptOf(), speech: false });
+    const { user } = renderPanel({ attempt: attemptOf(), speech: true });
 
     await user.click(screen.getByRole("button", { name: "Resume" }));
 
@@ -493,12 +443,12 @@ describe("the interview runs without a pause (ticket 02)", () => {
   });
 
   it("IV-U19: the last question says so, and answering it reaches scoring rather than another question", async () => {
-    const { user } = renderPanel({ attempt: attemptOf({ answered: 4 }), speech: false });
+    const { user } = renderPanel({ attempt: attemptOf({ answered: 4 }), speech: true });
     client.answer.mockResolvedValue({ ok: true, attempt: attemptOf({ answered: 5 }) });
 
     await user.click(screen.getByRole("button", { name: "Resume" }));
     expect(screen.getByText("This is the last question.")).toBeInTheDocument();
-    await user.type(screen.getByRole("textbox"), "The last one.");
+    hear("The last one.");
     await user.click(screen.getByRole("button", { name: "Submit final answer" }));
 
     expect(await screen.findByRole("button", { name: "Score my interview" })).toBeInTheDocument();
@@ -508,13 +458,13 @@ describe("the interview runs without a pause (ticket 02)", () => {
   it("IV-U20: the countdown reaching zero ends the Attempt, keeping what was typed as that question's Answer (interview second pass ticket 03)", async () => {
     // Only the test moves the clock: real time leaking in makes exact seconds flaky on a busy machine.
     vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
-    const typing = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const clicking = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const nearlyOut: Attempt = { ...attemptOf(), activeSeconds: 299 };
-    renderPanel({ attempt: nearlyOut, speech: false });
+    renderPanel({ attempt: nearlyOut, speech: true });
     client.timeUp.mockResolvedValue({ ok: true, attempt: { ...nearlyOut, completedAt: "2026-09-16T10:00:00.000Z" } });
 
-    await typing.click(screen.getByRole("button", { name: "Resume" }));
-    await typing.type(screen.getByRole("textbox"), "Half an answ");
+    await clicking.click(screen.getByRole("button", { name: "Resume" }));
+    hear("Half an answ");
     await act(() => vi.advanceTimersByTimeAsync(2_000));
 
     await waitFor(() =>
@@ -526,13 +476,12 @@ describe("the interview runs without a pause (ticket 02)", () => {
 
   it("IV-U20b: the countdown reaching zero with nothing said sends nothing to keep — the question is unreached", async () => {
     vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
-    const typing = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const clicking = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const nearlyOut: Attempt = { ...attemptOf(), activeSeconds: 299 };
-    renderPanel({ attempt: nearlyOut, speech: false });
+    renderPanel({ attempt: nearlyOut, speech: true });
     client.timeUp.mockResolvedValue({ ok: true, attempt: { ...nearlyOut, completedAt: "2026-09-16T10:00:00.000Z" } });
 
-    await typing.click(screen.getByRole("button", { name: "Resume" }));
-    await typing.type(screen.getByRole("textbox"), "   ");
+    await clicking.click(screen.getByRole("button", { name: "Resume" }));
     await act(() => vi.advanceTimersByTimeAsync(2_000));
 
     await waitFor(() => expect(client.timeUp).toHaveBeenCalledWith(nearlyOut.id, undefined));
@@ -568,22 +517,22 @@ describe("the interview runs without a pause (ticket 02)", () => {
   it("IV-U21: a failed submission keeps the answer and the seconds it cost, so a retry resumes rather than starts over", async () => {
     // Only the test moves the clock: real time leaking in makes exact seconds flaky on a busy machine.
     vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
-    const typing = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    renderPanel({ attempt: attemptOf(), speech: false });
+    const clicking = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderPanel({ attempt: attemptOf(), speech: true });
     client.answer.mockResolvedValueOnce({ ok: false, error: "failed", message: INTERVIEW_FAILURES.failed });
 
-    await typing.click(screen.getByRole("button", { name: "Resume" }));
-    await typing.type(screen.getByRole("textbox"), "An answer.");
+    await clicking.click(screen.getByRole("button", { name: "Resume" }));
+    hear("An answer.");
     await act(() => vi.advanceTimersByTimeAsync(20_000));
-    await typing.click(submitButton());
+    await clicking.click(submitButton());
 
     expect(await screen.findByRole("alert")).toHaveTextContent(INTERVIEW_FAILURES.failed);
-    expect(screen.getByRole("textbox")).toHaveValue("An answer.");
+    expect(submitButton()).toBeEnabled();
     expect(screen.getByRole("timer")).toHaveTextContent("4:40 left");
 
     client.answer.mockResolvedValueOnce({ ok: true, attempt: attemptOf({ answered: 1 }) });
     await act(() => vi.advanceTimersByTimeAsync(5_000));
-    await typing.click(submitButton());
+    await clicking.click(submitButton());
     await waitFor(() => expect(client.answer).toHaveBeenCalledTimes(2));
     expect(client.answer.mock.calls[1][1].elapsedSeconds).toBe(25);
   });
@@ -622,7 +571,7 @@ describe("speaking an answer (ticket 06)", () => {
     expect(wave()).toHaveAttribute("data-mic", "listening");
   });
 
-  it("IV-U24: a spoken answer goes to the same transcript field a typed one does — and no audio is touched", async () => {
+  it("IV-U24: a spoken answer is sent as the words the browser heard — and no audio is touched", async () => {
     const attempt = attemptOf();
     const { user } = renderPanel({ attempt, speech: true });
     client.answer.mockResolvedValue({ ok: true, attempt: { ...attemptOf({ answered: 1 }), id: attempt.id } });
@@ -633,18 +582,6 @@ describe("speaking an answer (ticket 06)", () => {
 
     expect(client.answer.mock.calls[0][1]).toMatchObject({ transcript: "I led the reporting redesign." });
     expect((window as unknown as { MediaRecorder?: unknown }).MediaRecorder).toBeUndefined();
-  });
-
-  it("IV-U25: switching to typing carries what was said onto the notepad, and turns the microphone off", async () => {
-    const { user } = renderPanel({ attempt: attemptOf(), speech: true });
-
-    await user.click(screen.getByRole("button", { name: "Resume" }));
-    hear("I led the redesign.");
-    await user.click(screen.getByRole("button", { name: /Type instead/ }));
-
-    expect(screen.getByRole("textbox")).toHaveValue("I led the redesign.");
-    expect(document.querySelector("[data-mic]")).toBeNull();
-    expect(recognisers.every((recogniser) => !recogniser.started)).toBe(true);
   });
 
   it("IV-U26: a browser that ends recognition on its own is restarted, so a thinking pause doesn't kill the microphone", async () => {
@@ -663,15 +600,15 @@ describe("speaking an answer (ticket 06)", () => {
   });
 
   it("IV-U27: a microphone that stops the moment it starts gives up and says so, rather than spin", async () => {
-    endsAtOnce = true;
     const { user } = renderPanel({ attempt: attemptOf(), speech: true });
+    fakeSpeech.endsAtOnce = true;
 
     await user.click(screen.getByRole("button", { name: "Resume" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/microphone keeps stopping/);
-    const made = recognisers.length;
+    const made = fakeSpeech.recognisers.length;
     await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
-    expect(recognisers.length).toBe(made);
+    expect(fakeSpeech.recognisers.length).toBe(made);
     expect(made).toBeLessThanOrEqual(4);
   });
 });
@@ -703,15 +640,15 @@ describe("questions asked aloud (practice round ticket 02)", () => {
 
   it("IV-U50: speaking, the question is read aloud first — its clock stands still and the microphone is off until the voice finishes", async () => {
     vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
-    const typing = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const clicking = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderPanel({ attempt: attemptOf(), speech: true });
 
-    await typing.click(screen.getByRole("button", { name: "Resume" }));
+    await clicking.click(screen.getByRole("button", { name: "Resume" }));
 
     expect(screen.getByRole("heading", { level: 1, name: "A personal question?" })).toBeInTheDocument();
     expect(utterances.map((utterance) => utterance.text)).toEqual(["A personal question?"]);
     expect(screen.getByText(/Reading the question aloud/)).toBeInTheDocument();
-    expect(recognisers.some((recogniser) => recogniser.started)).toBe(false);
+    expect(fakeSpeech.recognisers.some((recogniser) => recogniser.started)).toBe(false);
     await act(() => vi.advanceTimersByTimeAsync(3_000));
     expect(screen.getByRole("timer")).toHaveTextContent("5:00 left");
 
@@ -735,57 +672,28 @@ describe("questions asked aloud (practice round ticket 02)", () => {
 
   it("IV-U52: the seconds spent being asked are not part of what an Answer cost", async () => {
     vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
-    const typing = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const clicking = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const attempt = attemptOf();
     renderPanel({ attempt, speech: true });
     client.answer.mockResolvedValue({ ok: true, attempt: { ...attemptOf({ answered: 1 }), id: attempt.id } });
 
-    await typing.click(screen.getByRole("button", { name: "Resume" }));
+    await clicking.click(screen.getByRole("button", { name: "Resume" }));
     await act(() => vi.advanceTimersByTimeAsync(3_000));
     finishReading();
     hear("I led the reporting redesign.");
     await act(() => vi.advanceTimersByTimeAsync(20_000));
-    await typing.click(submitButton());
+    await clicking.click(submitButton());
 
     expect(client.answer.mock.calls[0][1]).toMatchObject({ elapsedSeconds: 20 });
     // The next question is read in its turn.
     expect(await screen.findByRole("heading", { level: 1, name: "A behavioural question?" })).toBeInTheDocument();
     expect(utterances.map((utterance) => utterance.text)).toEqual(["A personal question?", "A behavioural question?"]);
   });
-
-  it("IV-U53: switching to typing while the question is read stops the voice and starts the clock; typing reads nothing", async () => {
-    const attempt = attemptOf();
-    const { user } = renderPanel({ attempt, speech: true });
-    client.answer.mockResolvedValue({ ok: true, attempt: { ...attemptOf({ answered: 1 }), id: attempt.id } });
-
-    await user.click(screen.getByRole("button", { name: "Resume" }));
-    await user.click(screen.getByRole("button", { name: /Type instead/ }));
-
-    expect(voice.cancel).toHaveBeenCalled();
-    expect(screen.queryByText(/Reading the question aloud/)).not.toBeInTheDocument();
-    await user.type(screen.getByRole("textbox"), "Typed.");
-    await user.click(submitButton());
-
-    expect(await screen.findByRole("heading", { level: 1, name: "A behavioural question?" })).toBeInTheDocument();
-    expect(utterances).toHaveLength(1);
-  });
-
-  it("IV-U54: switching to speaking partway through a question does not read it — its clock is already running", async () => {
-    const { user } = renderPanel({ attempt: attemptOf(), speech: true });
-
-    await user.click(screen.getByRole("button", { name: "Resume" }));
-    await user.click(screen.getByRole("button", { name: /Type instead/ }));
-    await user.click(screen.getByRole("button", { name: /Speak instead/ }));
-
-    expect(utterances).toHaveLength(1);
-    expect(screen.queryByText(/Reading the question aloud/)).not.toBeInTheDocument();
-    expect(latestRecogniser().started).toBe(true);
-  });
 });
 
 describe("resuming or starting over (ticket 04)", () => {
   it("IV-U28: an unfinished Attempt says where it got to, and Resume puts the next question up with its clock running", async () => {
-    const { user } = renderPanel({ attempt: attemptOf({ answered: 2 }), speech: false });
+    const { user } = renderPanel({ attempt: attemptOf({ answered: 2 }), speech: true });
 
     expect(screen.getByText(/2 of 5 answered, with 4:20 left/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Resume" }));
