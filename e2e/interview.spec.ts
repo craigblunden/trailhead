@@ -118,7 +118,9 @@ test.describe("interview simulator: a pro Tenant rehearses and is scored", () =>
     for (const category of ["Personal", "Behavioural", "Stakeholder", "Technical", "Design"]) {
       const section = page.getByRole("region", { name: category });
       await expect(section).toBeVisible();
-      await expect(section).toContainText("/ 100");
+      // Stars and a band word, never a number out of 100 (interview second pass ticket 02).
+      await expect(section.getByRole("img", { name: /^\S+ of 5 stars, / }).first()).toBeVisible();
+      await expect(section).not.toContainText("/ 100");
       await expect(section).toContainText("you named the work but not what came of it");
     }
     await expectNoAxeViolations(page);

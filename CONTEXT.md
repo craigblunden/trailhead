@@ -140,16 +140,40 @@ Session, Rehearsal
 
 **Category**:
 One of the five fixed dimensions an Attempt's questions are drawn from: personal, behavioural,
-stakeholder, technical, design. Every Attempt spans all five regardless of length.
+stakeholder, technical, design. Every Attempt spans all five regardless of length. Each Category has
+its own **answer time** — how long one of its Answers is meant to take (a personal question far less
+than a design one) — and an Attempt's countdown is its questions' answer times added up. The answer
+time is a guide the Tenant is shown, never a cut-off: the countdown is still one for the whole Attempt.
 
 **Answer**:
 The response captured for one question during an Attempt, within that question's time.
 _Avoid_: Response, Transcript (reserve for when the answer is actually spoken and transcribed)
 
 **Scorecard**:
-The result of a completed Attempt: a score and short rationale for each Answer, rolled up per
-Category and into one overall score. What tells the Tenant why the Attempt was marked as it was.
+The result of a completed Attempt: for each Answer a score, what landed, and its Missed points;
+rolled up per Category and into one overall score; and a Takeaway for the whole Attempt. What tells
+the Tenant why the Attempt was marked as it was, and what to do differently. Scores are shown as stars
+with a band word, never as a bare number.
+
+**Unreached question**:
+A question the countdown ran out before the Tenant got to — or reached with nothing yet said when it
+ran out. It has no Answer to score, so it counts as
+nothing at a reduced weight in the rollups — being cut off costs something, but not as much as
+answering badly. Distinct from a question the Tenant reached and left empty, which is an Answer and
+is scored like any other.
+_Avoid_: Skipped question (skipping is the Tenant's choice; running out of time is not), Missed question
+
+**Takeaway**:
+The two or three things most worth changing next time, drawn from across a whole Attempt's Answers
+rather than any one of them. Part of the Scorecard, and the first feedback the Tenant reads.
+_Avoid_: Summary, Verdict, Review, Next steps
 _Avoid_: Score (alone, for the whole result — a Score is one number on the Scorecard), Report, Review
+
+**Missed point**:
+One specific thing an Answer could have said and did not — drawn from the Job's posting or the
+Tenant's resume ("the Kafka migration on your resume"), so it tells the Tenant what to reach for
+next time rather than only that the Answer fell short. Part of the Scorecard, one to three per Answer.
+_Avoid_: Gap (a Requirement with no Evidence — a different comparison), Weakness, Mistake
 
 ### Hearing from users
 

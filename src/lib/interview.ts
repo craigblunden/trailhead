@@ -186,12 +186,54 @@ export function rollUp(questions: AttemptQuestion[]): Scorecard {
   return { overall: scored.length === 0 ? 0 : average(scored.map((q) => q.answer.score)), categories };
 }
 
-/** Where a score sits, so the Scorecard reads as words and not only a number. */
-export function scoreBand(score: number): "strong" | "solid" | "developing" | "weak" {
+/** Where a score sits, so the Scorecard reads as words and not only stars. */
+export type ScoreBand = "strong" | "solid" | "developing" | "not-there-yet";
+
+export function scoreBand(score: number): ScoreBand {
   if (score >= 80) return "strong";
   if (score >= 60) return "solid";
   if (score >= 40) return "developing";
-  return "weak";
+  return "not-there-yet";
+}
+
+/**
+ * The band's word, always shown beside the stars (interview second pass ticket 02). The lowest is
+ * "Not there yet": not "Weak", a verdict on the Tenant, and not "Needs work", which App feedback's
+ * rating already uses.
+ */
+export const SCORE_BAND_LABEL: Record<ScoreBand, string> = {
+  strong: "Strong",
+  solid: "Solid",
+  developing: "Developing",
+  "not-there-yet": "Not there yet",
+};
+
+/** How each band is coloured wherever a score is shown: strong in the brand colour, the lowest as a warning. */
+export const SCORE_BAND_CLASS: Record<ScoreBand, string> = {
+  strong: "text-primary",
+  solid: "text-foreground",
+  developing: "text-muted-foreground",
+  "not-there-yet": "text-destructive",
+};
+
+/** How many stars a score is shown as. */
+export const STARS_MAX = 5;
+
+/**
+ * A 0–100 score as stars in half-steps: score ÷ 20, to the nearest half. Scores are still stored and
+ * returned as 0–100; only how they read changes.
+ */
+export function starsFor(score: number): number {
+  const clamped = Math.min(Math.max(score, SCORE_MIN), SCORE_MAX);
+  return Math.round((clamped / SCORE_MAX) * STARS_MAX * 2) / 2;
+}
+
+/** "3½ of 5 stars, solid": what assistive technology hears in place of the stars themselves. */
+export function starsLabel(score: number): string {
+  const stars = starsFor(score);
+  const whole = Math.floor(stars);
+  const amount = stars === whole ? String(whole) : `${whole === 0 ? "" : whole}½`;
+  return `${amount} of ${STARS_MAX} stars, ${SCORE_BAND_LABEL[scoreBand(score)].toLowerCase()}`;
 }
 
 /**

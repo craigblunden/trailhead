@@ -5,6 +5,7 @@ import { axe } from "vitest-axe";
 import { InterviewPanel } from "@/components/interview/interview-panel";
 import type { PathJob } from "@/components/interview/interview-path";
 import type { InterviewClient } from "@/components/interview/interview-client";
+import { ScoreStars } from "@/components/interview/score-stars";
 import {
   CATEGORIES,
   CATEGORY_LABEL,
@@ -19,7 +20,7 @@ import {
 import type { Job } from "@/lib/jobs";
 import type { Plan } from "@/lib/plans";
 import { SEED_JOBS } from "../fixtures/jobs";
-import { renderWithJobs, screen, userEvent, waitFor, within } from "../test-utils";
+import { render, renderWithJobs, screen, userEvent, waitFor, within } from "../test-utils";
 
 /**
  * The Interview Simulator's screens (interview simulator tickets 02–08), against a faked client —
@@ -637,13 +638,39 @@ describe("the Scorecard (ticket 03)", () => {
 
     await user.click(screen.getByRole("button", { name: "Score my interview" }));
 
-    expect((await screen.findByText("Overall")).closest("div")).toHaveTextContent("70");
+    const overall = await screen.findByRole("region", { name: "Overall" });
+    expect(within(overall).getByRole("img", { name: "3½ of 5 stars, solid" })).toBeInTheDocument();
     expect(client.score).toHaveBeenCalledWith(complete.id);
+    // 60, 65, 70, 75, 80: the Category rollup and its one Answer read the same, as stars and a band word.
+    const labels = ["3 of 5 stars, solid", "3½ of 5 stars, solid", "3½ of 5 stars, solid", "4 of 5 stars, solid", "4 of 5 stars, strong"];
     for (const [index, category] of CATEGORIES.entries()) {
       const section = screen.getByRole("region", { name: CATEGORY_LABEL[category] });
-      expect(section).toHaveTextContent(`${60 + index * 5} / 100`);
+      expect(within(section).getAllByRole("img", { name: labels[index] })).toHaveLength(2);
       expect(section).toHaveTextContent(`Because of the ${category} thing.`);
     }
+    // No score is shown as a number anywhere on the Scorecard.
+    expect(document.body).not.toHaveTextContent(/\/ 100/);
+    for (const score of [60, 65, 70, 75, 80]) expect(screen.queryByText(String(score))).not.toBeInTheDocument();
+  });
+
+  it("IV-U31b: stars fill in half-steps beside the band word, and only the whole is announced", () => {
+    render(<ScoreStars score={70} />);
+
+    const stars = screen.getByRole("img", { name: "3½ of 5 stars, solid" });
+    expect(stars).toHaveTextContent("Solid");
+    expect(stars.querySelectorAll('[data-star="full"]')).toHaveLength(3);
+    expect(stars.querySelectorAll('[data-star="half"]')).toHaveLength(1);
+    expect(stars.querySelectorAll('[data-star="empty"]')).toHaveLength(1);
+    // The stars and the word are one image to assistive technology, never five separate marks.
+    for (const child of Array.from(stars.children)) expect(child).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("IV-U31c: the lowest band is \"Not there yet\", in the warning colour", () => {
+    render(<ScoreStars score={20} />);
+
+    const stars = screen.getByRole("img", { name: "1 of 5 stars, not there yet" });
+    expect(stars).toHaveTextContent("Not there yet");
+    expect(stars).toHaveClass("text-destructive");
   });
 
   it("IV-U32: an Attempt already scored opens on its Scorecard, with no scoring to do again", () => {

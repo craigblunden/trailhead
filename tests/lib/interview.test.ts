@@ -16,7 +16,10 @@ import {
   questionCount,
   remainingSeconds,
   rollUp,
+  SCORE_BAND_LABEL,
   scoreBand,
+  starsFor,
+  starsLabel,
   type Attempt,
   type AttemptQuestion,
   type Category,
@@ -186,11 +189,40 @@ describe("the Scorecard's rollups (ticket 03)", () => {
     expect(rollUp([])).toEqual({ overall: 0, categories: [] });
   });
 
-  it("IV-15: a score reads as a band, so the Scorecard is words as well as a number", () => {
+  it("IV-15: a score reads as a band, so the Scorecard is words as well as stars", () => {
     expect([100, 80].map(scoreBand)).toEqual(["strong", "strong"]);
     expect([79, 60].map(scoreBand)).toEqual(["solid", "solid"]);
     expect([59, 40].map(scoreBand)).toEqual(["developing", "developing"]);
-    expect([39, 0].map(scoreBand)).toEqual(["weak", "weak"]);
+    expect([39, 0].map(scoreBand)).toEqual(["not-there-yet", "not-there-yet"]);
+    expect([100, 60, 40, 0].map((score) => SCORE_BAND_LABEL[scoreBand(score)])).toEqual([
+      "Strong",
+      "Solid",
+      "Developing",
+      "Not there yet",
+    ]);
+  });
+});
+
+describe("scores shown as stars (interview second pass ticket 02)", () => {
+  it("IV-15b: a score is five stars in half-steps — score ÷ 20, to the nearest half", () => {
+    expect(starsFor(0)).toBe(0);
+    expect(starsFor(100)).toBe(5);
+    expect(starsFor(70)).toBe(3.5);
+    // The band boundaries, and either side of them.
+    expect([80, 79, 60, 59, 40, 39].map(starsFor)).toEqual([4, 4, 3, 3, 2, 2]);
+    // The nearest half, rounding a midpoint up.
+    expect([4, 5, 14, 15, 94, 95].map(starsFor)).toEqual([0, 0.5, 0.5, 1, 4.5, 5]);
+    // Never off the scale, whatever the column holds.
+    expect(starsFor(-20)).toBe(0);
+    expect(starsFor(140)).toBe(5);
+  });
+
+  it("IV-15c: what assistive technology hears is the stars and the band, never a number out of 100", () => {
+    expect(starsLabel(70)).toBe("3½ of 5 stars, solid");
+    expect(starsLabel(100)).toBe("5 of 5 stars, strong");
+    expect(starsLabel(10)).toBe("½ of 5 stars, not there yet");
+    expect(starsLabel(0)).toBe("0 of 5 stars, not there yet");
+    expect(starsLabel(40)).toBe("2 of 5 stars, developing");
   });
 });
 
