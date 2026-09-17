@@ -115,7 +115,8 @@ export function AccountView() {
               </dl>
             </Section>
 
-            <Section title="Plans — coming soon">
+            {/* Linked to from elsewhere — a Practice round's end — so it has an address of its own. */}
+            <Section title="Plans — coming soon" id="plans">
               <PlanComparison current={account.plan} />
             </Section>
 
@@ -135,18 +136,22 @@ export function AccountView() {
 
 function Section({
   title,
+  id,
   className,
   children,
 }: {
   title: string;
+  /** The section's fragment, for a section other pages link to. */
+  id?: string;
   className?: string;
   children: React.ReactNode;
 }) {
   const headingId = useId();
   return (
     <section
+      id={id}
       aria-labelledby={headingId}
-      className={cn("rounded-lg bg-card p-5 ring-1 ring-foreground/10", className)}
+      className={cn("scroll-mt-20 rounded-lg bg-card p-5 ring-1 ring-foreground/10", className)}
     >
       <h2 id={headingId} className="text-lg">
         {title}

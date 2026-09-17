@@ -10,7 +10,7 @@ import type { Job } from "@/lib/jobs";
 import type { Plan } from "@/lib/plans";
 import { PRACTICE_FAILURES, type PracticeCategory, type PracticeRound } from "@/lib/practice";
 import { SEED_JOBS } from "../fixtures/jobs";
-import { renderWithJobs, screen, userEvent } from "../test-utils";
+import { renderWithJobs, screen, userEvent, within } from "../test-utils";
 
 /**
  * The Practice round's screens (practice round ticket 03), against a faked client — the seam the page
@@ -179,5 +179,71 @@ describe("taking a Practice round (practice round ticket 03)", () => {
 
     const resumable = renderPractice({ round: roundOf({ answered: 1 }) });
     expect(await axe(resumable.container, AXE_OPTIONS)).toHaveNoViolations();
+  });
+});
+
+describe("the end of a Practice round (practice round ticket 04)", () => {
+  /** A round the clock ran out on: two answered, the third half-said and kept, the fourth unreached. */
+  const timedOut = (): PracticeRound => {
+    const round = roundOf({ answered: 3, activeSeconds: 480 });
+    return { ...round, completedAt: "2026-09-17T10:08:00.000Z" };
+  };
+
+  it("PR-U10: answering the last question ends the round, and every answer is read back in order", async () => {
+    const round = roundOf({ answered: 3, activeSeconds: 300 });
+    const { user } = renderPractice({ round });
+    client.answer.mockResolvedValue({ ok: true, round: roundOf({ answered: 4, activeSeconds: 360, completed: true }) });
+
+    await user.click(screen.getByRole("button", { name: "Resume" }));
+    await user.type(screen.getByRole("textbox"), "My answer 4.");
+    await user.click(screen.getByRole("button", { name: "Submit final answer" }));
+
+    expect(await screen.findByRole("heading", { level: 2, name: "That’s the practice round" })).toBeInTheDocument();
+    const answers = screen.getAllByRole("article");
+    expect(answers).toHaveLength(4);
+    for (const [index, answer] of answers.entries()) {
+      expect(within(answer).getByRole("heading", { level: 3 })).toHaveTextContent(`question ${index + 1}?`);
+      expect(answer).toHaveTextContent(`My answer ${index + 1}.`);
+    }
+    expect(answers[0]).toHaveTextContent("Personal");
+    expect(answers[3]).toHaveTextContent("Behavioural");
+  });
+
+  it("PR-U11: when the clock ran out, it says so, and a question never reached reads Not reached", () => {
+    renderPractice({ round: timedOut() });
+
+    expect(screen.getByRole("heading", { level: 2, name: "Time’s up" })).toBeInTheDocument();
+    const answers = screen.getAllByRole("article");
+    expect(answers[2]).toHaveTextContent("My answer 3.");
+    expect(answers[3]).toHaveTextContent("Not reached");
+  });
+
+  it("PR-U12: where a Scorecard would be, scoring is shown as part of Pro — no scores, and a way to see the plans", () => {
+    renderPractice({ round: roundOf({ answered: 4, completed: true }) });
+
+    const locked = screen.getByRole("region", { name: "Scoring comes with Pro" });
+    expect(locked).toHaveTextContent(/stars/);
+    expect(locked).toHaveTextContent(/what landed/);
+    expect(locked).toHaveTextContent(/what you missed/);
+    expect(locked).toHaveTextContent(/what to change next time/);
+    expect(within(locked).getByRole("link", { name: "Compare plans" })).toHaveAttribute("href", "/account#plans");
+    expect(screen.queryByRole("img", { name: /of 5 stars/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/full Interview Simulator/)).toBeInTheDocument();
+  });
+
+  it("PR-U13: Practise again starts a fresh round, straight onto its first question", async () => {
+    const { user } = renderPractice({ round: roundOf({ answered: 4, completed: true }) });
+    client.start.mockResolvedValue({ ok: true, round: roundOf({ id: "round-2" }) });
+
+    await user.click(screen.getByRole("button", { name: "Practise again" }));
+
+    expect(client.start).toHaveBeenCalledWith(false);
+    expect(await screen.findByRole("heading", { level: 1, name: "Practice personal question 1?" })).toBeInTheDocument();
+  });
+
+  it("PR-U14: the end of a round has no accessibility violations", async () => {
+    const { container } = renderPractice({ round: timedOut() });
+
+    expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
   });
 });

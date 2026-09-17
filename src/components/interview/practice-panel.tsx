@@ -8,6 +8,7 @@ import { AppHeader } from "@/components/app-header";
 import { BrandLogo } from "@/components/brand-logo";
 import { AnswerModeChoice } from "@/components/interview/interview-path";
 import { practiceClient, type PracticeClient } from "@/components/interview/practice-client";
+import { PracticeAnswers, ScoringOnPro } from "@/components/interview/practice-read-back";
 import { RunScreen } from "@/components/interview/run-screen";
 import { useSpeechSupported } from "@/components/interview/use-speech";
 import { LoadingTrail } from "@/components/loading-trail";
@@ -121,7 +122,7 @@ export function PracticePanel({ round: initial, client = practiceClient }: Pract
             answered against the clock. {PRACTICE_SUMMARY}.
           </p>
 
-          <div className="mt-8 max-w-sm space-y-5">
+          <div className={round && !unfinished ? "mt-8 space-y-5" : "mt-8 max-w-sm space-y-5"}>
             {round && unfinished ? (
               <ResumeRound round={round} busy={busy} onResume={() => setRunning(true)} onStartOver={() => start(true)} />
             ) : round ? (
@@ -190,14 +191,29 @@ function ResumeRound({
   );
 }
 
-/** Every question answered, or the clock ran out. */
+/**
+ * Every question answered, or the clock ran out (practice round ticket 04): what was said, read back, with
+ * scoring shown as the Pro feature it is where a Scorecard would be — and another round, straight away.
+ */
 function RoundEnd({ round, busy, onPractiseAgain }: { round: PracticeRound; busy: boolean; onPractiseAgain: () => void }) {
   return (
-    <div className="space-y-3">
-      <h2 className="text-xl">{isComplete(round) ? "That’s the practice round" : "Time’s up"}</h2>
-      <Button type="button" variant="outline" className="h-10 px-5" disabled={busy} onClick={onPractiseAgain}>
-        Practise again
-      </Button>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl">{isComplete(round) ? "That’s the practice round" : "Time’s up"}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Here’s what you said. Your answers are saved, and you can read them again from the Interview Simulator.
+        </p>
+      </div>
+      <ScoringOnPro />
+      <PracticeAnswers round={round} />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <Button type="button" className="h-11 px-6 text-base" disabled={busy} onClick={onPractiseAgain}>
+          Practise again
+        </Button>
+        <p className="text-sm text-muted-foreground">
+          The full Interview Simulator on Pro asks about a real job, from its posting and your resume.
+        </p>
+      </div>
     </div>
   );
 }

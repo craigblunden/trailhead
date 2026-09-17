@@ -296,6 +296,54 @@ test.describe("interview simulator: a Practice round (practice round ticket 03)"
     await expect(page.getByRole("timer")).toHaveText(/^(8:00|7:5\d) left$/);
   });
 
+  test("a round answered to the end reads every answer back, shows scoring as part of Pro, and goes again (practice round ticket 04)", async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await signUpAndVerify(page);
+
+    await page.goto("/interview/practice");
+    await page.getByRole("button", { name: "Go" }).click();
+    for (let index = 1; index <= 4; index += 1) {
+      await expect(page.getByText(new RegExp(`Question ${index} of 4`))).toBeVisible();
+      await answerOne(page, `Practice answer ${index}.`);
+    }
+
+    await expect(page.getByRole("heading", { level: 2, name: "That’s the practice round" })).toBeVisible();
+    const answers = page.getByRole("article");
+    await expect(answers).toHaveCount(4);
+    for (let index = 0; index < 4; index += 1) await expect(answers.nth(index)).toContainText(`Practice answer ${index + 1}.`);
+    const scoring = page.getByRole("region", { name: "Scoring comes with Pro" });
+    await expect(scoring.getByRole("link", { name: "Compare plans" })).toHaveAttribute("href", "/account#plans");
+    await expect(page.getByRole("img", { name: /of 5 stars/ })).toHaveCount(0);
+    await expectNoAxeViolations(page);
+
+    await page.getByRole("button", { name: "Practise again" }).click();
+    await expect(page.getByText(/Question 1 of 4/)).toBeVisible();
+  });
+
+  test("a round the clock runs out on keeps what was half-said, and the rest read Not reached (practice round ticket 04)", async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    await page.clock.install();
+    await signUpAndVerify(page);
+
+    await page.goto("/interview/practice");
+    await page.getByRole("button", { name: "Go" }).click();
+    await answerOne(page, "The one I finished.");
+    await expect(page.getByText(/Question 2 of 4/)).toBeVisible();
+    await page.getByRole("textbox", { name: /Your answer to/ }).fill("Half of my sec");
+
+    await page.clock.fastForward("08:00");
+
+    await expect(page.getByRole("heading", { level: 2, name: "Time’s up" })).toBeVisible({ timeout: 30_000 });
+    const answers = page.getByRole("article");
+    await expect(answers.nth(0)).toContainText("The one I finished.");
+    await expect(answers.nth(1)).toContainText("Half of my sec");
+    for (const index of [2, 3]) await expect(answers.nth(index)).toContainText("Not reached");
+  });
+
   test("a pro Tenant has the full Simulator, so has no Practice round to start", async ({ page }) => {
     test.setTimeout(120_000);
     const account = await signUpAndVerify(page);
