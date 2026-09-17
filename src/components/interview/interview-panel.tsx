@@ -105,9 +105,9 @@ export function InterviewPanel({
   const [attempt, setAttempt] = useState<Attempt | null>(initial);
   const [quota, setQuota] = useState<InterviewQuotaStatus | null>(initialQuota);
   const [length, setLength] = useState<AttemptLength>(lengths[0]);
-  // Chosen once and kept across questions: a Tenant who opens the transcript on the first question
-  // shouldn't have to open it again on every one after.
-  const [transcriptShown, setTranscriptShown] = useState(false);
+  // Shown by default — with nothing typed, it is the only sign the microphone is hearing (practice feedback
+  // ticket 04) — and chosen once and kept across questions: hidden on the first, it stays hidden.
+  const [transcriptShown, setTranscriptShown] = useState(true);
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [scorecard, setScorecard] = useState<ScorecardData | undefined>(undefined);
@@ -179,7 +179,7 @@ export function InterviewPanel({
     return (
       <div className="flex flex-1 flex-col">
         <AppHeader leading={<BrandLogo href="/board" />} />
-        <PageMain className="pt-10 sm:pt-16">
+        <PageMain className="pt-4 sm:pt-16">
           <RunScreen
             run={attemptRun(attempt)}
             caption={`Rehearsing for ${job.role} at ${job.company}`}

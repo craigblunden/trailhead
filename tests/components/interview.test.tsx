@@ -539,19 +539,19 @@ describe("the interview runs without a pause (ticket 02)", () => {
 });
 
 describe("speaking an answer (ticket 06)", () => {
-  it("IV-U22: the transcript is hidden by default while speaking, and opens as a ruled notepad", async () => {
+  it("IV-U22: the transcript shows by default as a ruled notepad — the only sign the microphone is hearing — and can be hidden (practice feedback ticket 04)", async () => {
     const { user } = renderPanel({ attempt: attemptOf(), speech: true });
 
     await user.click(screen.getByRole("button", { name: "Resume" }));
     hear("I led the reporting redesign.");
 
-    const toggle = screen.getByRole("button", { name: "Show transcript" });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText("I led the reporting redesign.")).not.toBeInTheDocument();
+    const toggle = screen.getByRole("button", { name: "Hide transcript" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("I led the reporting redesign.")).toHaveClass("notepad-paper");
 
     await user.click(toggle);
-    expect(screen.getByRole("button", { name: "Hide transcript" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("I led the reporting redesign.")).toHaveClass("notepad-paper");
+    expect(screen.getByRole("button", { name: "Show transcript" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("I led the reporting redesign.")).not.toBeInTheDocument();
   });
 
   it("IV-U23: the soundwave says whether the microphone is listening or hearing speech", async () => {
@@ -969,7 +969,6 @@ describe("the Scorecard (ticket 03; interview second pass tickets 02, 03, 05)", 
 
     const running = renderPanel({ attempt: attemptOf({ answered: 1 }), speech: true });
     await running.user.click(screen.getByRole("button", { name: "Resume" }));
-    await running.user.click(screen.getByRole("button", { name: "Show transcript" }));
     expect(await axe(running.container, AXE_OPTIONS)).toHaveNoViolations();
   });
 });

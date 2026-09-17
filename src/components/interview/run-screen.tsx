@@ -174,10 +174,14 @@ function QuestionRun({
     // Centred, unlike every other page's content: while the clock runs this is a stage, not a section
     // of the app, and there is no page title at the frame's edge for it to line up with.
     <div className="mx-auto max-w-3xl">
-      <div className="flex items-start justify-between gap-6">
+      <p className="text-sm text-muted-foreground">{caption}</p>
+      {/* On a phone this bar sticks under the header, so how long is left and how far through never scroll
+          out of sight while an answer grows (practice feedback ticket 04). From sm up, it sits in place. */}
+      <div className="sticky top-[calc(3.75rem+1px)] z-20 -mx-4 mt-1 flex items-center justify-between gap-6 border-b border-border bg-background/95 px-4 py-2 backdrop-blur sm:static sm:mx-0 sm:mt-3 sm:items-start sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
         <div className="min-w-0 space-y-3">
-          <p className="text-sm text-muted-foreground">{caption}</p>
-          <QuestionTrail questions={run.questions} current={position} />
+          <div className="hidden sm:block">
+            <QuestionTrail questions={run.questions} current={position} />
+          </div>
           <p className="flex flex-wrap items-center gap-2 text-sm">
             <span>
               Question {position + 1} of {total}
@@ -192,7 +196,7 @@ function QuestionRun({
 
       {/* The question is the page's heading: it is what the Tenant is here to answer, and a screen
           reader moving by headings lands on it first. */}
-      <h1 id={questionId} className="mt-8 text-2xl leading-snug text-balance sm:mt-12 sm:text-3xl lg:text-4xl">
+      <h1 id={questionId} className="mt-6 text-2xl leading-snug text-balance sm:mt-12 sm:text-3xl lg:text-4xl">
         {question.text}
       </h1>
       {/* A guide to pace against, never a cut-off: the one countdown above is still the only clock
@@ -244,7 +248,8 @@ function QuestionRun({
         </p>
       )}
 
-      <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2">
+      {/* On a phone, Submit sticks to the bottom of the screen: the one thing to press is never below the fold. */}
+      <div className="sticky bottom-0 z-20 -mx-4 mt-8 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border bg-background/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
         <Button type="button" className="h-11 px-6 text-base" disabled={submitting || ask.asking || !answer} onClick={submit}>
           {submitting ? "Saving your answer…" : last ? "Submit final answer" : "Submit answer"}
         </Button>
@@ -267,8 +272,8 @@ function Clock({ seconds }: { seconds: number }) {
   return (
     <div className="shrink-0 text-right">
       <p role="timer" aria-live="off" className={cn("tabular-nums", low && "text-warning")}>
-        <span className="block text-4xl leading-none font-semibold sm:text-5xl">{formatClock(seconds)}</span>{" "}
-        <span className="mt-1 block text-xs text-muted-foreground">left</span>
+        <span className="text-3xl leading-none font-semibold sm:block sm:text-5xl">{formatClock(seconds)}</span>{" "}
+        <span className="text-xs text-muted-foreground sm:mt-1 sm:block">left</span>
       </p>
       <p aria-live="polite" className="sr-only">
         {announcement}

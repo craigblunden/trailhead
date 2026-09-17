@@ -37,7 +37,7 @@ export type PracticePanelProps = {
 export function PracticePanel({ round: initial, client = practiceClient }: PracticePanelProps) {
   const speechSupported = useSpeechSupported();
   const [round, setRound] = useState<PracticeRound | null>(initial);
-  const [transcriptShown, setTranscriptShown] = useState(false);
+  const [transcriptShown, setTranscriptShown] = useState(true);
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // An unfinished round on arrival waits for Resume; one started here runs at once.
@@ -89,7 +89,7 @@ export function PracticePanel({ round: initial, client = practiceClient }: Pract
     return (
       <div className="flex flex-1 flex-col">
         <AppHeader leading={<BrandLogo href="/board" />} />
-        <PageMain className="pt-10 sm:pt-16">
+        <PageMain className="pt-4 sm:pt-16">
           <RunScreen
             run={round}
             caption="Practice round"

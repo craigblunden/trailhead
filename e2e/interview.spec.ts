@@ -411,6 +411,26 @@ test.describe("interview simulator: a Practice round (practice round ticket 03)"
     await expect(page.getByRole("button", { name: "Go" })).toHaveCount(0);
   });
 
+  test("on a phone, the clock, the question count, and Submit stay in view while a long answer grows (practice feedback ticket 04)", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await signUpAndVerify(page);
+    await page.setViewportSize({ width: 375, height: 667 });
+
+    await page.goto("/interview/practice");
+    await page.getByRole("button", { name: "Go" }).click();
+    await expect(page.getByText(/Question 1 of 4/)).toBeVisible();
+    for (let line = 1; line <= 12; line += 1) {
+      await say(page, `Sentence ${line} of a long answer about how I came to design through support work and stayed.`);
+    }
+    await page.getByText(/Sentence 12 of a long answer/).scrollIntoViewIfNeeded();
+
+    await expect(page.getByRole("timer")).toBeInViewport();
+    await expect(page.getByText(/Question 1 of 4/)).toBeInViewport();
+    await expect(page.getByRole("button", { name: "Submit answer" })).toBeInViewport();
+  });
+
   test("a pro Tenant has the full Simulator, so has no Practice round to start", async ({ page }) => {
     test.setTimeout(120_000);
     const account = await signUpAndVerify(page);
