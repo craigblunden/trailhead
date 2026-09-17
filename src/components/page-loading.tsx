@@ -630,8 +630,8 @@ function InterviewLoading({ id }: { id: string | null }) {
         <div className="mx-auto max-w-2xl">
           <SectionTitle>Interview Simulator</SectionTitle>
           <SectionLede>
-            Three steps to a rehearsal: a job, how long, and Go. The clock starts with your first question and
-            doesn’t pause between them.
+            Three steps to a rehearsal: a job, how long, and Go. The clock starts once your first question is asked
+            and doesn’t pause between them.
           </SectionLede>
 
           <div className="mt-8">

@@ -5,6 +5,7 @@ import { Keyboard, Mic } from "lucide-react";
 
 import { SpokenNotepad, TypedNotepad } from "@/components/interview/notepad";
 import { Soundwave, type MicState } from "@/components/interview/soundwave";
+import { useAskAloud } from "@/components/interview/use-ask-aloud";
 import { useSpeech } from "@/components/interview/use-speech";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,10 +29,12 @@ import { cn } from "@/lib/utils";
  * page but the question, the clock, and the Tenant's answer. It reads only what both have
  * (`TimedRun`), so it cannot tell which it is driving.
  *
- * **The clock runs from the moment a question is visible.** Go puts the first question on screen with
- * its clock already running; submitting an answer puts the next one up the same way. There is no pause
- * to choose when to begin — a real interviewer doesn't wait for the candidate to say they're ready.
- * The only time the clock stands still is while an answer is on its way to the server, which is the
+ * **The clock runs from the moment a question has been asked.** Typed, that is the moment it is on
+ * screen; spoken, the browser's voice reads it first, with the clock standing still and the microphone
+ * off until the voice is done or the Tenant skips it (practice round ticket 02, `use-ask-aloud.ts`).
+ * Go puts the first question up and submitting an answer puts the next one up the same way. There is no
+ * pause to choose when to begin — a real interviewer doesn't wait for the candidate to say they're
+ * ready. Otherwise the clock stands still only while an answer is on its way to the server, which is the
  * network's time, not the Tenant's.
  *
  * It is still **active-time accounted**: what the server stores is the seconds each answer consumed,
@@ -66,8 +69,8 @@ export type RunScreenProps = {
 export function RunScreen(props: RunScreenProps) {
   const question = nextQuestion(props.run);
   if (!question) return null;
-  // A fresh run per question, keyed by it: its clock starts the moment it mounts — which is the moment
-  // the question is on screen — and nothing written for the last question carries into this one.
+  // A fresh run per question, keyed by it: it is asked from the moment it mounts — which is the moment
+  // the question is on screen — and nothing written or read for the last question carries into this one.
   return <QuestionRun key={question.id} question={question} {...props} />;
 }
 
@@ -94,6 +97,9 @@ function QuestionRun({
   const [failure, setFailure] = useState<string | null>(null);
 
   const speaking = mode === "speak" && speechSupported;
+  // Spoken, the question is read aloud before it is answered; typed, it is asked the moment it is up.
+  const ask = useAskAloud(question.text, speaking);
+  const answering = status === "answering" && !ask.asking;
 
   /** When this try at the question began. Set as the clock starts, so it is never read before. */
   const startedAt = useRef(0);
@@ -106,23 +112,24 @@ function QuestionRun({
   const [spentOnFailedTries, setSpentOnFailedTries] = useState(0);
   const left = Math.max(secondsLeft(run) - spentOnFailedTries - spent, 0);
 
-  // The clock, running whenever the question is being answered — which, from the moment it mounts, it
-  // is. It stands still only while an answer is on its way to the server.
+  // The clock, running whenever the question is being answered — which, from the moment it has been
+  // asked, it is. It stands still while it is read aloud, and while an answer is on its way to the server.
   useEffect(() => {
-    if (status !== "answering") return;
+    if (!answering) return;
     startedAt.current = Date.now();
     const timer = setInterval(() => setSpent(Math.round((Date.now() - startedAt.current) / 1_000)), 250);
     return () => clearInterval(timer);
-  }, [status]);
+  }, [answering]);
 
-  // The microphone is on while a spoken question is being answered, and off the moment it isn't. The
+  // The microphone is on while a spoken question is being answered, and off the moment it isn't — so it
+  // is off while the question is read, or the recogniser would transcribe the voice. The
   // hook keeps it on through the browser ending recognition in a silence, and gives up — saying why —
   // if it can't (see `use-speech.ts`).
   useEffect(() => {
-    if (!speaking || status !== "answering") return;
+    if (!speaking || !answering) return;
     listen();
     return () => stopListening();
-  }, [speaking, status, listen, stopListening]);
+  }, [speaking, answering, listen, stopListening]);
 
   // Spoken, the answer is anything typed before switching to speech, then what the browser heard —
   // including the phrase still settling, so the last sentence before Submit isn't lost.
@@ -132,7 +139,7 @@ function QuestionRun({
   // Out of time, mid-question: the run ends here. What is on the notepad — or what the browser had
   // heard — is kept as this question's Answer, so half an answer is still scored; the questions after
   // it are unreached (interview second pass ticket 03).
-  const expired = left === 0 && status === "answering";
+  const expired = left === 0 && answering;
   const ending = useRef(false);
   useEffect(() => {
     if (!expired || ending.current) return;
@@ -144,7 +151,7 @@ function QuestionRun({
   }, [expired, onTimeUp, stopListening, question.id, answer]);
 
   async function submit() {
-    if (status !== "answering" || !answer) return;
+    if (!answering || !answer) return;
     const thisTry = Math.max(Math.round((Date.now() - startedAt.current) / 1_000), 0);
     setStatus("submitting");
     setFailure(null);
@@ -164,6 +171,8 @@ function QuestionRun({
   }
 
   function switchToTyping() {
+    // Typing mid-read stops the voice and starts the clock: the question has been asked.
+    ask.skip();
     // What was said so far moves onto the page as text, so switching loses nothing.
     setTyped(spoken);
     forgetSpeech();
@@ -209,7 +218,18 @@ function QuestionRun({
         {speaking ? (
           <>
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-              <Soundwave state={micState} />
+              {ask.asking ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <p role="status" className="text-sm text-muted-foreground">
+                    Reading the question aloud. Your clock starts once it’s asked.
+                  </p>
+                  <Button type="button" variant="outline" className="h-9 px-3" onClick={ask.skip}>
+                    Skip
+                  </Button>
+                </div>
+              ) : (
+                <Soundwave state={micState} />
+              )}
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
@@ -263,7 +283,7 @@ function QuestionRun({
       )}
 
       <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <Button type="button" className="h-11 px-6 text-base" disabled={submitting || !answer} onClick={submit}>
+        <Button type="button" className="h-11 px-6 text-base" disabled={submitting || ask.asking || !answer} onClick={submit}>
           {submitting ? "Saving your answer…" : last ? "Submit final answer" : "Submit answer"}
         </Button>
         <p className="text-sm text-muted-foreground">

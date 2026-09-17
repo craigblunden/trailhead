@@ -121,7 +121,7 @@ export function InterviewPanel({
       setAttempt(answer.attempt);
       setQuota(answer.quota ?? quota);
       setScorecard(undefined);
-      // Go means go: the first question goes up with its clock running, no second press.
+      // Go means go: the first question goes up and is asked at once, no second press.
       setRunning(true);
       return;
     }
@@ -201,8 +201,8 @@ export function InterviewPanel({
             )}
           </h1>
           <p className="mt-1 text-muted-foreground">
-            Three steps to a rehearsal: a job, how long, and Go. The clock starts with your first question and
-            doesn’t pause between them.
+            Three steps to a rehearsal: a job, how long, and Go. The clock starts once your first question is asked
+            and doesn’t pause between them.
           </p>
 
           <Path>
@@ -330,7 +330,7 @@ function GoStep({
       <div className="max-w-sm space-y-2">
         <LoadingTrail>Writing your questions…</LoadingTrail>
         <p className="text-sm text-muted-foreground">
-          This usually takes 10 to 25 seconds. Your first question appears straight after, with the clock running.
+          This usually takes 10 to 25 seconds. Your first question appears straight after, with the clock running once it’s asked.
         </p>
       </div>
     );
@@ -350,7 +350,7 @@ function GoStep({
       <p className="mt-2 text-center text-sm text-muted-foreground">
         {outOfAttempts && quota
           ? `You’ve used this week’s interviews. More on ${formatResetDay(quota.resetsOn)}.`
-          : `${pluralize(questionCount(length), "question")} in ${length} minutes. The clock starts with the first.`}
+          : `${pluralize(questionCount(length), "question")} in ${length} minutes. The clock starts once the first is asked.`}
       </p>
       {quota && quota.remaining !== "unlimited" && !outOfAttempts && (
         <p className="mt-1 text-center text-sm text-muted-foreground">

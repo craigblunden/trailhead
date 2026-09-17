@@ -18,7 +18,30 @@ import { SIGNED_OUT, createJob, expect, signUpAndVerify, test } from "./fixtures
  * transcribe against, so every answer here goes through the switch to typing, the other half of the
  * same ticket. That both modes write the same field is covered in the component tests, where the API
  * can be stubbed.
+ *
+ * Speech synthesis is stubbed in every test here (practice round ticket 02): a headless browser's voice
+ * may never finish, which would hold each question's clock for its whole guard. The stub finishes at
+ * once unless a test says otherwise, and records what it was asked to read.
  */
+
+type VoiceWindow = Window & { __voiceHolds?: boolean; __spoken?: string[] };
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    const voiced = window as VoiceWindow;
+    voiced.__spoken = [];
+    const synth = {
+      speaking: false,
+      pending: false,
+      speak(utterance: SpeechSynthesisUtterance) {
+        voiced.__spoken!.push(utterance.text);
+        if (!voiced.__voiceHolds) queueMicrotask(() => utterance.onend?.(new Event("end") as SpeechSynthesisEvent));
+      },
+      cancel() {},
+    };
+    Object.defineProperty(window, "speechSynthesis", { value: synth, configurable: true });
+  });
+});
 
 const POSTING =
   "Fernwood is a subscription plant company. The Growth design team owns onboarding, pricing, and the referral loop, and works closely with lifecycle marketing and data science. ".repeat(
@@ -232,6 +255,35 @@ test.describe("interview simulator: a pro Tenant rehearses and is scored", () =>
     // gone, and nothing drained in between.
     await expect(page.getByRole("timer")).not.toHaveText("15:00 left");
     await expect(page.getByRole("timer")).toHaveText(/^14:5\d left$/);
+  });
+});
+
+test.describe("interview simulator: questions asked aloud (practice round ticket 02)", () => {
+  test.use({ storageState: SIGNED_OUT });
+
+  test("speaking, each question is read aloud with its clock standing still, until the Tenant skips", async ({ page }) => {
+    test.setTimeout(180_000);
+    const account = await signUpAndVerify(page);
+    await putOnPlan(account.email, "pro");
+    await jobReadyToRehearse(page);
+
+    await page.getByRole("link", { name: "Practice interview" }).click();
+    // The voice reads and reads: only Skip ends it.
+    await page.evaluate(() => ((window as VoiceWindow).__voiceHolds = true));
+    await page.getByRole("button", { name: "Go" }).click();
+
+    const clock = page.getByRole("timer");
+    await expect(clock).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/Reading the question aloud/)).toBeVisible();
+    const question = await page.getByRole("heading", { level: 1 }).textContent();
+    expect(await page.evaluate(() => (window as VoiceWindow).__spoken)).toEqual([question]);
+    // Held well past a second, the clock has not moved.
+    await page.waitForTimeout(2_500);
+    await expect(clock).toHaveText("15:00 left");
+
+    await page.getByRole("button", { name: "Skip" }).click();
+    await expect(page.getByText(/Reading the question aloud/)).toHaveCount(0);
+    await expect(clock).not.toHaveText("15:00 left", { timeout: 5_000 });
   });
 });
 
