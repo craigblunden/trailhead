@@ -9,7 +9,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/80",
+        // Hover mixes toward the foreground rather than fading the primary: a faded primary lets the page
+        // show through and drops its text below AA contrast (3.6–3.9:1 in the light theme). Opaque, it
+        // is 6.6:1 light and 8.2:1 dark on any background.
+        default:
+          "bg-primary text-primary-foreground hover:bg-[color-mix(in_oklch,var(--primary),var(--foreground)_15%)]",
         outline:
           "border-border hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
         secondary:

@@ -170,9 +170,8 @@ test.describe("ticket 18: generate a cover letter", () => {
     await expect(card(page).getByText("Copied to your clipboard.")).toBeVisible();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("Dear Hiring Team,");
 
-    // The whole job page, with a written letter and its copy status on it — checked at rest, not with
-    // the pointer still hovering the button just pressed.
-    await letter(page).hover();
+    // The whole job page, with a written letter and its copy status on it — and the pointer still on
+    // the button just pressed, so its hover shade is checked too.
     await expectNoAxeViolations(page);
   });
 
@@ -346,8 +345,6 @@ test.describe("feedback issue 07: the Draft, Rewrites, and the Hold", () => {
     await card(page).getByRole("button", { name: "Copy cover letter" }).click();
     await expect(card(page).getByText("Copied to your clipboard.")).toBeVisible();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("Dear Hiring Team,");
-    // Checked at rest, not with the pointer still hovering the button just pressed.
-    await letter(page).hover();
     await expectNoAxeViolations(page);
 
     // The Hold survives a reload, from the status read alone.
