@@ -196,9 +196,11 @@ function Callout({
     >
       {children}
       {onNext && (
-        <Button type="button" variant="outline" className="mt-3 h-9 px-3" onClick={onNext}>
-          Next
-        </Button>
+        <div className="mt-3">
+          <Button type="button" variant="outline" className="h-9 px-3" onClick={onNext}>
+            Next
+          </Button>
+        </div>
       )}
     </div>
   );
