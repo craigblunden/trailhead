@@ -16,6 +16,7 @@ import {
 } from "@/components/interview/interview-path";
 import { FeedbackAsk } from "@/components/interview/feedback-ask";
 import { PastInterviews } from "@/components/interview/past-interviews";
+import { PracticeRounds } from "@/components/interview/practice-rounds";
 import { RunScreen } from "@/components/interview/run-screen";
 import { Scorecard } from "@/components/interview/scorecard";
 import { useSpeechSupported } from "@/components/interview/use-speech";
@@ -44,7 +45,7 @@ import {
 } from "@/lib/interview";
 import { pluralize } from "@/lib/jobs";
 import { limitsOf, type Plan } from "@/lib/plans";
-import { PRACTICE_SUMMARY } from "@/lib/practice";
+import { PRACTICE_SUMMARY, type PastPracticeRound } from "@/lib/practice";
 
 /**
  * The Interview Simulator: one path from choosing a job to Go, the interview itself, and the
@@ -79,6 +80,8 @@ export type InterviewPanelProps = {
    * it has one unfinished decides the offer's words — and null or absent for one that may not.
    */
   practice?: { unfinished: boolean } | null;
+  /** The Tenant's finished Practice rounds, listed on the hub on any Plan that has some (practice round ticket 05). */
+  practiceRounds?: PastPracticeRound[];
   /** Replaced in component tests. */
   client?: InterviewClient;
 };
@@ -91,6 +94,7 @@ export function InterviewPanel({
   available,
   history = [],
   practice = null,
+  practiceRounds = [],
   client = interviewClient,
 }: InterviewPanelProps) {
   const locked = !canStartAttempt(plan);
@@ -292,6 +296,7 @@ export function InterviewPanel({
             )}
           </Path>
           {!job && !locked && <PastInterviews attempts={history} />}
+          {!job && <PracticeRounds rounds={practiceRounds} />}
         </div>
       </PageMain>
     </div>

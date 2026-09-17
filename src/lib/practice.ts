@@ -122,3 +122,12 @@ type PracticeError = {
 
 /** What the start route and the record-Answer route return: the round as it now stands. */
 export type PracticeRoundResponse = { ok: true; round: PracticeRound } | PracticeError;
+
+/** One row of the hub's saved Practice rounds (practice round ticket 05): a finished round, never scored. */
+export type PastPracticeRound = {
+  id: string;
+  /** ISO `YYYY-MM-DD`, UTC: the day it was started. */
+  startedOn: string;
+  /** How many of its questions have an Answer. */
+  answered: number;
+};

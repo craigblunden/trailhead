@@ -5,6 +5,7 @@ import { axe } from "vitest-axe";
 import { InterviewPanel } from "@/components/interview/interview-panel";
 import type { InterviewClient } from "@/components/interview/interview-client";
 import { PracticePanel } from "@/components/interview/practice-panel";
+import { SavedPracticeRound } from "@/components/interview/practice-rounds";
 import type { PracticeClient } from "@/components/interview/practice-client";
 import type { Job } from "@/lib/jobs";
 import type { Plan } from "@/lib/plans";
@@ -245,5 +246,69 @@ describe("the end of a Practice round (practice round ticket 04)", () => {
     const { container } = renderPractice({ round: timedOut() });
 
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
+  });
+});
+
+describe("saved Practice rounds (practice round ticket 05)", () => {
+  const saved = [
+    { id: "round-9", startedOn: "2026-09-17", answered: 4 },
+    { id: "round-8", startedOn: "2026-09-15", answered: 2 },
+  ];
+
+  const renderHub = (plan: Plan, practiceRounds: typeof saved) =>
+    renderWithJobs(
+      <InterviewPanel
+        job={null}
+        plan={plan}
+        attempt={null}
+        quota={null}
+        available
+        practice={plan === "pro" ? null : { unfinished: false }}
+        practiceRounds={practiceRounds}
+        client={{} as InterviewClient}
+      />,
+      { initialJobs: SEED_JOBS as Job[] },
+    );
+
+  it.each(["free", "pro"] as const)("PR-U15: a %s Tenant's hub lists finished rounds, newest first, each opening its own page", (plan) => {
+    renderHub(plan, saved);
+
+    const list = screen.getByRole("region", { name: "Practice rounds" });
+    const rows = within(list).getAllByRole("link");
+    expect(rows.map((row) => row.getAttribute("href"))).toEqual(["/interview/practice/round-9", "/interview/practice/round-8"]);
+    expect(rows[0]).toHaveTextContent("Practice round");
+    expect(rows[0]).toHaveTextContent("Not scored");
+    expect(rows[1]).toHaveTextContent("2 of 4 answered");
+  });
+
+  it("PR-U16: with no saved rounds there is no section at all", () => {
+    renderHub("free", []);
+
+    expect(screen.queryByRole("region", { name: "Practice rounds" })).not.toBeInTheDocument();
+  });
+
+  it("PR-U17: a saved round reads back view-only, with the way back, scoring on Pro, and another round", async () => {
+    const { container } = renderWithJobs(<SavedPracticeRound round={roundOf({ answered: 4, completed: true })} plan="free" />, {
+      initialJobs: SEED_JOBS as Job[],
+    });
+
+    expect(screen.getByRole("heading", { level: 1, name: "Practice round" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Interview Simulator" })).toHaveAttribute("href", "/interview");
+    expect(screen.getAllByRole("article")).toHaveLength(4);
+    expect(screen.getByRole("region", { name: "Scoring comes with Pro" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Practise again" })).toHaveAttribute("href", "/interview/practice");
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
+  });
+
+  it("PR-U18: a Tenant now on pro reads it back, and is offered no scoring or another round", () => {
+    renderWithJobs(<SavedPracticeRound round={roundOf({ answered: 4, completed: true })} plan="pro" />, {
+      initialJobs: SEED_JOBS as Job[],
+    });
+
+    expect(screen.getAllByRole("article")).toHaveLength(4);
+    expect(screen.queryByRole("region", { name: "Scoring comes with Pro" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Practise again" })).not.toBeInTheDocument();
+    expect(screen.getByText(/not scored/i)).toBeInTheDocument();
   });
 });

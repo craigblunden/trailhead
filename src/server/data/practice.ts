@@ -5,10 +5,11 @@ import {
   PRACTICE_SECONDS,
   canStartPracticeRound,
   pickPracticeQuestions,
+  type PastPracticeRound,
   type PracticeRound,
 } from "@/lib/practice";
 import { requireSession } from "@/server/auth/session";
-import { toPracticeRoundDto } from "@/server/db/mappers";
+import { toIsoDate, toPracticeRoundDto } from "@/server/db/mappers";
 import { withTenant } from "@/server/db/tenant";
 
 import { RuleError } from "./errors";
@@ -150,6 +151,39 @@ export async function unfinishedPracticeRound(): Promise<PracticeRound | null> {
       include: ROUND_INCLUDE,
       orderBy: { startedAt: "desc" },
     }),
+  );
+  return row ? toPracticeRoundDto(row) : null;
+}
+
+/**
+ * The hub's saved Practice rounds (practice round ticket 05): every finished round, newest first. The
+ * unfinished one is not a saved round — the hub offers it as Resume. Only what a row shows is read of
+ * each question, not the transcripts.
+ */
+export async function finishedPracticeRounds(): Promise<PastPracticeRound[]> {
+  const { userId } = await requireSession();
+  const rows = await withTenant(userId, (tx) =>
+    tx.practiceRound.findMany({
+      where: { userId, completedAt: { not: null } },
+      select: { id: true, startedAt: true, questions: { select: { answeredAt: true } } },
+      orderBy: { startedAt: "desc" },
+    }),
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    startedOn: toIsoDate(row.startedAt),
+    answered: row.questions.filter((question) => question.answeredAt).length,
+  }));
+}
+
+/**
+ * One finished Practice round, to read back at a link of its own (practice round ticket 05). An
+ * unfinished round, an unknown one, and another Tenant's are all null — a page answers each the same way.
+ */
+export async function finishedPracticeRound(roundId: string): Promise<PracticeRound | null> {
+  const { userId } = await requireSession();
+  const row = await withTenant(userId, (tx) =>
+    tx.practiceRound.findFirst({ where: { id: roundId, userId, completedAt: { not: null } }, include: ROUND_INCLUDE }),
   );
   return row ? toPracticeRoundDto(row) : null;
 }

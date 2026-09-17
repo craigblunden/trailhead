@@ -342,6 +342,19 @@ test.describe("interview simulator: a Practice round (practice round ticket 03)"
     await expect(answers.nth(0)).toContainText("The one I finished.");
     await expect(answers.nth(1)).toContainText("Half of my sec");
     for (const index of [2, 3]) await expect(answers.nth(index)).toContainText("Not reached");
+
+    // It is saved: listed on the hub, and read back the same at a link of its own (practice round ticket 05).
+    await page.goto("/interview");
+    const saved = page.getByRole("region", { name: "Practice rounds" }).getByRole("link");
+    await expect(saved).toHaveCount(1);
+    await expect(saved).toContainText("2 of 4 answered");
+    await expect(saved).toContainText("Not scored");
+    await saved.click();
+    await expect(page).toHaveURL(/\/interview\/practice\/[^/]+$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Practice round" })).toBeVisible();
+    await expect(page.getByRole("article").nth(1)).toContainText("Half of my sec");
+    await expect(page.getByRole("link", { name: "Practise again" })).toHaveAttribute("href", "/interview/practice");
+    await expectNoAxeViolations(page);
   });
 
   test("a pro Tenant has the full Simulator, so has no Practice round to start", async ({ page }) => {

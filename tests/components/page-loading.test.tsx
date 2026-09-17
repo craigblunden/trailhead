@@ -56,6 +56,7 @@ describe("where the wait stands", () => {
     [`/interview/${SEED_JOBS[0].id}`, "Loading your interview…"],
     [`/interview/${SEED_JOBS[0].id}/attempt-1`, "Loading this interview…"],
     ["/interview/practice", "Loading your practice round…"],
+    ["/interview/practice/round-1", "Loading this practice round…"],
   ])("on %s it is in the header, beside the account menu, and nowhere in the page", (path, message) => {
     pathname = path;
     renderLoading(<PageLoading />);

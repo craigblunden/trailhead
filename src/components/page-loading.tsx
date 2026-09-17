@@ -46,6 +46,7 @@ export function PageLoading() {
   if (pathname.startsWith("/documents")) return <DocumentsLoading />;
   if (pathname === "/interview") return <InterviewLoading id={null} />;
   if (pathname === "/interview/practice") return <PracticeLoading />;
+  if (pathname.startsWith("/interview/practice/")) return <PracticeLoading saved />;
   if (pathname.startsWith("/interview/")) {
     const [jobId, attemptId] = pathname.slice("/interview/".length).split("/");
     return attemptId ? <PastInterviewLoading jobId={jobId} /> : <InterviewLoading id={jobId} />;
@@ -679,14 +680,15 @@ function InterviewLoading({ id }: { id: string | null }) {
 }
 
 /**
- * `/interview/practice`: a Practice round's set-up, in outline (practice round ticket 03). The way back
- * is live, as on the page; the title is fixed words, so it is written; the choice and Go are bars.
+ * `/interview/practice`: a Practice round's set-up, in outline (practice round ticket 03) — or, `saved`, a
+ * saved round's read-back at `/interview/practice/<round>` (ticket 05). The way back is live, as on the
+ * page; the title is fixed words, so it is written; everything else is bars.
  */
-function PracticeLoading() {
+function PracticeLoading({ saved = false }: { saved?: boolean }) {
   return (
     <div className="flex flex-1 flex-col">
       <AppHeader leading={<BrandLogo href="/board" />} loading />
-      <PageWait>Loading your practice round…</PageWait>
+      <PageWait>{saved ? "Loading this practice round…" : "Loading your practice round…"}</PageWait>
 
       <PageMain>
         <div className="mx-auto max-w-2xl">
@@ -698,10 +700,18 @@ function PracticeLoading() {
           </Button>
           <SectionTitle>Practice round</SectionTitle>
           <Bar className="mt-2 h-4 w-full max-w-md" />
-          <div className="mt-8 max-w-sm space-y-5">
-            <Bar className="h-14 w-full rounded-md" />
-            <Bar className="h-12 w-full rounded-md" />
-          </div>
+          {saved ? (
+            <div className="mt-8 space-y-3">
+              {[0, 1, 2, 3].map((i) => (
+                <Bar key={i} className="h-28 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : (
+            <div className="mt-8 max-w-sm space-y-5">
+              <Bar className="h-14 w-full rounded-md" />
+              <Bar className="h-12 w-full rounded-md" />
+            </div>
+          )}
         </div>
       </PageMain>
     </div>

@@ -7,7 +7,7 @@ import { requirePageSession } from "@/server/auth/session";
 import { interviewQuota, pastAttempts } from "@/server/data/interview";
 import { listJobs } from "@/server/data/jobs";
 import { currentPlan } from "@/server/data/plans";
-import { unfinishedPracticeRound } from "@/server/data/practice";
+import { finishedPracticeRounds, unfinishedPracticeRound } from "@/server/data/practice";
 import { canStartPracticeRound } from "@/lib/practice";
 import { interviewAvailable } from "@/server/interview/claude";
 import { prefetchJobs } from "@/server/prefetch";
@@ -24,12 +24,14 @@ export const metadata: Metadata = { title: "Interview Simulator" };
 export default async function InterviewPage() {
   // The page, not the layout, decides who may see it.
   await requirePageSession();
-  const [state, plan, quota, history] = await Promise.all([
+  const [state, plan, quota, history, practiceRounds] = await Promise.all([
     prefetchJobs(listJobs),
     currentPlan(),
     interviewQuota().catch(() => null),
     // The list is extra: a failure to read it leaves the hub without it rather than without the page.
     pastAttempts().catch(() => []),
+    // Saved Practice rounds, on any Plan that has some (practice round ticket 05). Extra, like the history.
+    finishedPracticeRounds().catch(() => []),
   ]);
   // The offer is extra too: a failure to read the unfinished round offers a fresh one, which resumes it anyway.
   const practice = canStartPracticeRound(plan)
@@ -46,6 +48,7 @@ export default async function InterviewPage() {
           available={interviewAvailable()}
           history={history}
           practice={practice}
+          practiceRounds={practiceRounds}
         />
       </HydrationBoundary>
     </PageArrive>

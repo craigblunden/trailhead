@@ -5,6 +5,7 @@ import { signInAs } from "./session-mock";
 import { nextQuestion, secondsLeft } from "@/lib/interview";
 import { PRACTICE_QUESTIONS, PRACTICE_SECONDS, type PracticeRound } from "@/lib/practice";
 import { interviewQuota } from "@/server/data/interview";
+import { finishedPracticeRound, finishedPracticeRounds } from "@/server/data/practice";
 import { withTenant } from "@/server/db/tenant";
 import { answerPracticeQuestion, endPracticeRound, startPracticeRound } from "@/server/interview/practice-round";
 
@@ -178,5 +179,52 @@ describe("answering a Practice round (practice round ticket 03)", () => {
       await answerPracticeQuestion(round.id, { questionId: round.questions[0].id, transcript: "Mine now.", elapsedSeconds: 5 }),
     ).toEqual({ ok: false, reason: "no-round" });
     expect(await endPracticeRound(round.id)).toEqual({ ok: false, reason: "no-round" });
+  });
+});
+
+describe("saved Practice rounds (practice round ticket 05)", () => {
+  it("PRI-10: the list is every finished round, newest first, with how many were answered — never the unfinished one", async () => {
+    await tenantOn();
+    const first = await started();
+    await answerPracticeQuestion(first.id, { questionId: first.questions[0].id, transcript: "One.", elapsedSeconds: 5 });
+    await endPracticeRound(first.id);
+    const second = await started();
+    await endPracticeRound(second.id);
+    await started(); // unfinished
+
+    const list = await finishedPracticeRounds();
+
+    expect(list.map((row) => [row.id, row.answered])).toEqual([
+      [second.id, 0],
+      [first.id, 1],
+    ]);
+    expect(list[0].startedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("PRI-11: a finished round opens as it was; an unfinished, unknown, or foreign one is nothing", async () => {
+    await tenantOn();
+    const round = await started();
+    await answerPracticeQuestion(round.id, { questionId: round.questions[0].id, transcript: "Kept.", elapsedSeconds: 5 });
+    expect(await finishedPracticeRound(round.id)).toBeNull();
+
+    await endPracticeRound(round.id);
+    const opened = await finishedPracticeRound(round.id);
+    expect(opened?.questions[0].answer?.transcript).toBe("Kept.");
+    expect(await finishedPracticeRound("round-that-never-was")).toBeNull();
+
+    await tenantOn();
+    expect(await finishedPracticeRound(round.id)).toBeNull();
+    expect(await finishedPracticeRounds()).toEqual([]);
+  });
+
+  it("PRI-12: a Tenant moved to pro still has the rounds taken before", async () => {
+    const userId = await tenantOn();
+    const round = await started();
+    await endPracticeRound(round.id);
+
+    await setPlan(userId, "pro");
+
+    expect((await finishedPracticeRounds()).map((row) => row.id)).toEqual([round.id]);
+    expect(await finishedPracticeRound(round.id)).not.toBeNull();
   });
 });
