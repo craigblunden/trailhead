@@ -1,6 +1,6 @@
 import "server-only";
 
-import { APP_FEEDBACK_RATINGS } from "@/lib/app-feedback";
+import { APP_FEEDBACK_CONTEXT_LABEL, APP_FEEDBACK_RATINGS } from "@/lib/app-feedback";
 import { requireSession, type Session } from "@/server/auth/session";
 import type { AppFeedbackInput } from "@/server/validation";
 
@@ -24,10 +24,19 @@ const oneLine = (value: string) => value.replace(/[\r\n]+/g, " ").trim();
 export function composeAppFeedbackEmail(session: Session, input: AppFeedbackInput): AppFeedbackEmail {
   const rating = `${input.rating}/${APP_FEEDBACK_RATINGS.length}`;
   const from = `${oneLine(session.name)} <${session.email}>`;
+  // Asked from somewhere in particular, the email says where, so the owner reads it in that light.
+  const about = input.context ? APP_FEEDBACK_CONTEXT_LABEL[input.context] : null;
   return {
-    subject: `Trailhead feedback: ${rating} from ${oneLine(session.name)}`,
+    subject: `Trailhead feedback${about ? ` on the ${about}` : ""}: ${rating} from ${oneLine(session.name)}`,
     replyTo: session.email,
-    text: [`Rating: ${rating}`, `From: ${from}`, `User id: ${session.userId}`, "", input.message].join("\n"),
+    text: [
+      ...(about ? [`About: ${about}`] : []),
+      `Rating: ${rating}`,
+      `From: ${from}`,
+      `User id: ${session.userId}`,
+      "",
+      input.message,
+    ].join("\n"),
   };
 }
 

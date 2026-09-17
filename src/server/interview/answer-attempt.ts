@@ -3,8 +3,10 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 
 import {
+  ASK_FOR_FEEDBACK_AT,
   INTERVIEW_FAILURES,
   isComplete,
+  isScored,
   isUnreached,
   rollUp,
   type Attempt,
@@ -19,6 +21,7 @@ import {
   getAttempt,
   interviewSources,
   recordAnswer,
+  scoredAttemptCount,
   storeScores,
 } from "@/server/data/interview";
 import { logError } from "@/server/log";
@@ -89,7 +92,7 @@ export async function endAttempt(
 }
 
 export type ScoreOutcome =
-  | { ok: true; attempt: Attempt; scorecard: Scorecard }
+  | { ok: true; attempt: Attempt; scorecard: Scorecard; askForFeedback: boolean }
   | { ok: false; reason: InterviewFailure; unexpected?: true };
 
 /**
@@ -114,6 +117,8 @@ export async function scoreAttempt(
     if (!attempt.completedAt && !isComplete(attempt)) {
       throw new RuleError("incomplete", INTERVIEW_FAILURES.incomplete);
     }
+    // Scored before: this is a re-score, which never asks how the Simulator is going again.
+    const scoredBefore = isScored(attempt);
 
     const questions = [...attempt.questions].sort((a, b) => a.order - b.order);
     const answered = questions.filter((question) => !isUnreached(question));
@@ -160,7 +165,10 @@ export async function scoreAttempt(
       overall: scorecard.overall,
       takeaway,
     });
-    return { ok: true, attempt: stored, scorecard };
+    // Asked once, in the response to the scoring that made this the Tenant's second scored Attempt
+    // (interview second pass ticket 08). Nothing is stored to remember it.
+    const askForFeedback = !scoredBefore && (await scoredAttemptCount()) === ASK_FOR_FEEDBACK_AT;
+    return { ok: true, attempt: stored, scorecard, askForFeedback };
   } catch (error) {
     return failure(error, { tenant, operation: "interview.score" });
   }

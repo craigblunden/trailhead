@@ -14,6 +14,7 @@ import {
   Step,
   type PathJob,
 } from "@/components/interview/interview-path";
+import { FeedbackAsk } from "@/components/interview/feedback-ask";
 import { PastInterviews } from "@/components/interview/past-interviews";
 import { Scorecard } from "@/components/interview/scorecard";
 import { useSpeechSupported } from "@/components/interview/use-speech";
@@ -96,6 +97,9 @@ export function InterviewPanel({
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [scorecard, setScorecard] = useState<ScorecardData | undefined>(undefined);
+  // Set only by the scoring that made this the Tenant's second scored Attempt, and cleared for good once
+  // the ask is answered or closed — so a reload, or this Scorecard reopened, never asks.
+  const [askForFeedback, setAskForFeedback] = useState(false);
   // An unfinished Attempt on arrival waits for Resume; a new one started here runs at once.
   const [running, setRunning] = useState(false);
 
@@ -151,6 +155,7 @@ export function InterviewPanel({
     if (outcome.ok) {
       setAttempt(outcome.attempt);
       setScorecard(outcome.scorecard);
+      setAskForFeedback(outcome.askForFeedback);
       return;
     }
     setFailure(outcome.message);
@@ -235,12 +240,14 @@ export function InterviewPanel({
                       onClick={() => {
                         setAttempt(null);
                         setScorecard(undefined);
+                        setAskForFeedback(false);
                         setRunning(false);
                       }}
                     >
                       Rehearse this job again
                     </Button>
                   )}
+                  {askForFeedback && <FeedbackAsk onDismiss={() => setAskForFeedback(false)} />}
                 </div>
               </Step>
             ) : (

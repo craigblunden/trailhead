@@ -19,11 +19,13 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  APP_FEEDBACK_CONTEXT_LABEL,
   APP_FEEDBACK_MAX_CHARS,
   APP_FEEDBACK_RATINGS,
   APP_FEEDBACK_RATING_LABELS,
   APP_FEEDBACK_REFUSALS,
   appFeedbackWords,
+  type AppFeedbackContext,
   type AppFeedbackRating,
 } from "@/lib/app-feedback";
 import { cn } from "@/lib/utils";
@@ -39,8 +41,22 @@ type Phase = "writing" | "sending" | "thanked";
  * issue, an idea, or how it is going, emailed to the owner as App feedback. Every send that arrives
  * is met with thanks — the modal cannot be closed while one is on its way, so the thanks is never
  * missed — and one that fails keeps what was written so nothing has to be typed twice.
+ *
+ * The same modal can be opened from somewhere in particular (interview second pass ticket 08): a
+ * `trigger` of that place's own, and a `context` that the question and the email both name. `onClose`
+ * hears the modal close, whether after thanks or without sending.
  */
-export function AppFeedback({ send }: { send: Send }) {
+export function AppFeedback({
+  send,
+  context,
+  trigger,
+  onClose,
+}: {
+  send: Send;
+  context?: AppFeedbackContext;
+  trigger?: React.ReactElement;
+  onClose?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>("writing");
   // Remounting the form on each open starts it fresh.
@@ -53,14 +69,17 @@ export function AppFeedback({ send }: { send: Send }) {
       setPhase("writing");
     }
     setOpen(next);
+    if (!next) onClose?.();
   }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className={triggerClass}>
-          <TriggerContent />
-        </Button>
+        {trigger ?? (
+          <Button variant="ghost" size="sm" className={triggerClass}>
+            <TriggerContent />
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] gap-0 overflow-y-auto p-6 sm:max-w-md">
         {phase === "thanked" ? (
@@ -69,6 +88,7 @@ export function AppFeedback({ send }: { send: Send }) {
           <AppFeedbackForm
             key={formKey}
             send={send}
+            context={context}
             sending={phase === "sending"}
             onPhase={setPhase}
             onCancel={() => handleOpenChange(false)}
@@ -130,12 +150,13 @@ function AppFeedbackThanks({ onDone }: { onDone: () => void }) {
 
 type AppFeedbackFormProps = {
   send: Send;
+  context?: AppFeedbackContext;
   sending: boolean;
   onPhase: (phase: Phase) => void;
   onCancel: () => void;
 };
 
-function AppFeedbackForm({ send, sending, onPhase, onCancel }: AppFeedbackFormProps) {
+function AppFeedbackForm({ send, context, sending, onPhase, onCancel }: AppFeedbackFormProps) {
   const fieldId = useId();
   const [rating, setRating] = useState<AppFeedbackRating | null>(null);
   const [message, setMessage] = useState("");
@@ -154,7 +175,7 @@ function AppFeedbackForm({ send, sending, onPhase, onCancel }: AppFeedbackFormPr
 
     onPhase("sending");
     try {
-      unwrap(await send({ rating, message: words }));
+      unwrap(await send({ rating, message: words, ...(context ? { context } : {}) }));
       onPhase("thanked");
     } catch (error) {
       onPhase("writing");
@@ -179,7 +200,9 @@ function AppFeedbackForm({ send, sending, onPhase, onCancel }: AppFeedbackFormPr
 
       <form onSubmit={handleSubmit} noValidate className="space-y-5">
         <fieldset aria-describedby={errors.rating ? ratingErrorId : undefined} className="space-y-2">
-          <legend className="mb-2 text-sm leading-none font-medium">How is Trailhead working for you?</legend>
+          <legend className="mb-2 text-sm leading-none font-medium">
+            How is {context ? `the ${APP_FEEDBACK_CONTEXT_LABEL[context]}` : "Trailhead"} working for you?
+          </legend>
           <StarRating
             value={rating}
             onChange={(next) => {

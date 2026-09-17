@@ -50,6 +50,10 @@ const job: PathJob = {
   readiness: "ready",
 };
 
+/** App feedback's send, so the ask on the Scorecard can be followed through without a server. */
+const feedback = vi.hoisted(() => ({ send: vi.fn() }));
+vi.mock("@/server/actions/app-feedback", () => ({ sendAppFeedbackAction: feedback.send }));
+
 /** The seam the page takes to the Route Handlers. Cast at the render site, so each keeps its `Mock` type. */
 const client = vi.hoisted(() => ({
   start: vi.fn(),
@@ -203,6 +207,8 @@ const submitButton = () => screen.getByRole("button", { name: /^Submit (final )?
 
 beforeEach(() => {
   for (const mock of Object.values(client)) mock.mockReset();
+  feedback.send.mockReset();
+  feedback.send.mockResolvedValue({ ok: true, data: null });
   recognisers = [];
   endsAtOnce = false;
   setSpeechSupport(true);
@@ -925,6 +931,76 @@ describe("past interviews (interview second pass ticket 06)", () => {
   it("IV-U44: the past interviews list has no accessibility violations", async () => {
     const { container } = renderPanel({ job: null, history: [past({ id: "a", status: "in-progress", overall: null }), past({})] });
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
+  });
+});
+
+describe("asking how the Simulator is going (interview second pass ticket 08)", () => {
+  const scoredResponse = (askForFeedback: boolean) => ({
+    ok: true,
+    attempt: attemptOf({ scored: true }),
+    scorecard: {
+      overall: 70,
+      categories: CATEGORIES.map((category) => ({ category: category as Category, score: 70, questions: 1, unreached: 0 })),
+    },
+    askForFeedback,
+  });
+  const ask = () => screen.queryByRole("region", { name: "How’s the simulator going?" });
+
+  async function scoreWith(askForFeedback: boolean) {
+    const rendered = renderPanel({ attempt: attemptOf({ answered: 5 }) });
+    client.score.mockResolvedValue(scoredResponse(askForFeedback));
+    await rendered.user.click(screen.getByRole("button", { name: "Score my interview" }));
+    await screen.findByRole("region", { name: "Overall" });
+    return rendered;
+  }
+
+  it("IV-U45: told to ask, the Scorecard shows a small card below everything else, with no stars of its own", async () => {
+    await scoreWith(true);
+
+    const card = ask();
+    expect(card).toHaveTextContent("Two interviews in — how’s the simulator working for you?");
+    expect(within(card!).queryByRole("img")).not.toBeInTheDocument();
+    const again = screen.getByRole("button", { name: "Rehearse this job again" });
+    expect(Boolean(again.compareDocumentPosition(card!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+  });
+
+  it("IV-U46: not told to ask — and on a Scorecard reopened later — there is no card", async () => {
+    await scoreWith(false);
+    expect(ask()).not.toBeInTheDocument();
+  });
+
+  it("IV-U46b: a Scorecard opened already scored never asks", () => {
+    renderPanel({ attempt: attemptOf({ scored: true }) });
+    expect(ask()).not.toBeInTheDocument();
+  });
+
+  it("IV-U47: its button opens App feedback about the Interview Simulator, and sending leaves the card dismissed", async () => {
+    const { user } = await scoreWith(true);
+
+    await user.click(within(ask()!).getByRole("button", { name: "Tell us" }));
+    const dialog = await screen.findByRole("dialog", { name: /feedback/i });
+    await user.click(within(dialog).getByRole("radio", { name: /4 stars/i }));
+    await user.type(within(dialog).getByLabelText(/what.s on your mind/i), "Missed points are the useful part.");
+    await user.click(within(dialog).getByRole("button", { name: "Send feedback" }));
+    await user.click(await within(dialog).findByRole("button", { name: "Back to the trail" }));
+
+    expect(feedback.send).toHaveBeenCalledWith({
+      rating: 4,
+      message: "Missed points are the useful part.",
+      context: "interview-simulator",
+    });
+    await waitFor(() => expect(ask()).not.toBeInTheDocument());
+  });
+
+  it("IV-U48: closing the form without sending leaves the card dismissed too", async () => {
+    const { user } = await scoreWith(true);
+
+    await user.click(within(ask()!).getByRole("button", { name: "Tell us" }));
+    const dialog = await screen.findByRole("dialog", { name: /feedback/i });
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    expect(feedback.send).not.toHaveBeenCalled();
+    await waitFor(() => expect(ask()).not.toBeInTheDocument());
   });
 });
 

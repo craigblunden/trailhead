@@ -32,6 +32,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         ok: true,
         attempt: outcome.attempt,
         scorecard: outcome.scorecard,
+        askForFeedback: outcome.askForFeedback,
       } satisfies ScoreAttemptResponse);
     }
     return reply(outcome.unexpected ? 500 : INTERVIEW_STATUS[outcome.reason], {

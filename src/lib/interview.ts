@@ -492,7 +492,17 @@ export type StartAttemptResponse = { ok: true; attempt: Attempt; quota?: Intervi
 /** What the record-Answer route returns: the Attempt as it now stands. */
 export type RecordAnswerResponse = { ok: true; attempt: Attempt } | InterviewError;
 
-/** What the score route returns: the Attempt with every Answer scored, and its Scorecard. */
+/**
+ * How many scored Attempts, across all Jobs, before the Scorecard asks once how the Simulator is going
+ * (interview second pass ticket 08): enough to have an opinion, early enough to still shape it.
+ */
+export const ASK_FOR_FEEDBACK_AT = 2;
+
+/**
+ * What the score route returns: the Attempt with every Answer scored, and its Scorecard. `askForFeedback`
+ * is true only in the response to the scoring that made this the Tenant's second scored Attempt —
+ * never on a re-score, never on a reload — so the ask is shown once and nothing is stored to remember it.
+ */
 export type ScoreAttemptResponse =
-  | { ok: true; attempt: Attempt; scorecard: Scorecard }
+  | { ok: true; attempt: Attempt; scorecard: Scorecard; askForFeedback: boolean }
   | InterviewError;

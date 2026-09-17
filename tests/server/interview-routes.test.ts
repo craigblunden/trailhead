@@ -251,10 +251,19 @@ describe("scoring an Attempt (ticket 03)", () => {
   const scorecard = { overall: 71, categories: [{ category: "personal" as const, score: 71, questions: 1 }] };
 
   it("IV-R11: a scored Attempt is a 200 with the Attempt and its Scorecard, and the route sends no body of its own", async () => {
-    orchestration.scoreAttempt.mockResolvedValue({ ok: true, attempt, scorecard });
+    orchestration.scoreAttempt.mockResolvedValue({ ok: true, attempt, scorecard, askForFeedback: false });
 
-    expect(await post(scoreRoute, "attempt-1")).toEqual({ status: 200, body: { ok: true, attempt, scorecard } });
+    expect(await post(scoreRoute, "attempt-1")).toEqual({
+      status: 200,
+      body: { ok: true, attempt, scorecard, askForFeedback: false },
+    });
     expect(orchestration.scoreAttempt).toHaveBeenCalledWith("attempt-1", { client: null });
+  });
+
+  it("IV-R11b: the scoring that made this the second scored Attempt says so, so the Scorecard can ask once (interview second pass ticket 08)", async () => {
+    orchestration.scoreAttempt.mockResolvedValue({ ok: true, attempt, scorecard, askForFeedback: true });
+
+    expect(await post(scoreRoute, "attempt-1")).toMatchObject({ status: 200, body: { askForFeedback: true } });
   });
 
   it.each<[InterviewFailure, number]>([

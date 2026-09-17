@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  APP_FEEDBACK_CONTEXTS,
   APP_FEEDBACK_MAX_CHARS,
   APP_FEEDBACK_REFUSALS,
   appFeedbackWords,
@@ -305,6 +306,8 @@ export const appFeedbackSchema = z.strictObject({
         .min(1, APP_FEEDBACK_REFUSALS.message)
         .max(APP_FEEDBACK_MAX_CHARS, `Keep this under ${APP_FEEDBACK_MAX_CHARS} characters`),
     ),
+  /** Where it was asked from, when not the header's button (interview second pass ticket 08). */
+  context: z.enum(APP_FEEDBACK_CONTEXTS).optional(),
 });
 
 export type AppFeedbackInput = z.infer<typeof appFeedbackSchema>;

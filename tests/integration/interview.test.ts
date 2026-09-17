@@ -848,6 +848,55 @@ describe("interview second pass ticket 06: past interviews", () => {
   });
 });
 
+describe("interview second pass ticket 08: asking how the Simulator is going", () => {
+  it("scoring reports the Tenant's second scored Attempt across all Jobs — once: not the first, not the third, not a re-score", async () => {
+    const { userId, jobId } = await proTenantWithJob();
+    const otherJob = await createJob(
+      { company: "Harvest", role: "Researcher", location: "Remote", salaryMin: null, salaryMax: null, postingUrl: "", description: "A posting." },
+      MONDAY,
+    );
+    const resume = await withTenant(userId, (tx) => tx.document.findFirst({ select: { id: true } }));
+    await setJobDocument(otherJob.id, "resume", resume!.id);
+
+    /** Starts, finishes, and scores an Attempt on a Job, returning whether scoring asked. */
+    async function rehearse(job: string, reset = false) {
+      reply = { body: QUESTIONS() };
+      const started = await start(job, 15, reset);
+      if (!started.ok) throw new Error("expected a started Attempt");
+      await answerAll(started.attempt.id, started.attempt.questions, 20);
+      reply = { body: SCORES([70, 70, 70, 70, 70]) };
+      const scored = await scoreAttempt(started.attempt.id, { client: claude() });
+      if (!scored.ok) throw new Error("expected a scored Attempt");
+      return { attemptId: started.attempt.id, askForFeedback: scored.askForFeedback };
+    }
+
+    expect((await rehearse(jobId)).askForFeedback).toBe(false);
+    const second = await rehearse(otherJob.id);
+    expect(second.askForFeedback).toBe(true);
+
+    // Scoring the second again does not ask again.
+    reply = { body: SCORES([80, 80, 80, 80, 80]) };
+    expect(await scoreAttempt(second.attemptId, { client: claude() })).toMatchObject({ ok: true, askForFeedback: false });
+
+    expect((await rehearse(jobId)).askForFeedback).toBe(false);
+  });
+
+  it("an Attempt started but never scored does not count towards the second", async () => {
+    const { jobId } = await proTenantWithJob();
+    const abandoned = await start(jobId);
+    if (!abandoned.ok) throw new Error("expected a started Attempt");
+    await endAttempt(abandoned.attempt.id);
+
+    reply = { body: QUESTIONS() };
+    const first = await start(jobId, 15, true);
+    if (!first.ok) throw new Error("expected a started Attempt");
+    await answerAll(first.attempt.id, first.attempt.questions, 20);
+    reply = { body: SCORES([70, 70, 70, 70, 70]) };
+
+    expect(await scoreAttempt(first.attempt.id, { client: claude() })).toMatchObject({ ok: true, askForFeedback: false });
+  });
+});
+
 describe("tenant isolation", () => {
   it("one Tenant cannot see, answer, or score another's Attempt", async () => {
     const owner = await proTenantWithJob();

@@ -92,6 +92,29 @@ describe("AppFeedback", () => {
     expect(within(dialog).getByRole("button", { name: "Back to the trail" })).toHaveFocus();
   });
 
+  it("opened from elsewhere with a context, asks about that and sends the context with the words (interview second pass ticket 08)", async () => {
+    const user = userEvent.setup();
+    const send = vi.fn(async () => ({ ok: true as const, data: null }));
+    const onClose = vi.fn();
+    render(
+      <SessionProvider user={{ name: "Sam Rivera", email: "sam.rivera@example.com", plan: "pro" }}>
+        <AppFeedback send={send} context="interview-simulator" trigger={<button type="button">Tell us</button>} onClose={onClose} />
+      </SessionProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Tell us" }));
+    const dialog = await screen.findByRole("dialog", { name: /feedback/i });
+    const rating = within(dialog).getByRole("group", { name: /how is the interview simulator/i });
+    await user.click(within(rating).getByRole("radio", { name: /4 stars/i }));
+    await user.type(within(dialog).getByLabelText(/what.s on your mind/i), "The stars read well.");
+    await user.click(within(dialog).getByRole("button", { name: "Send feedback" }));
+
+    expect(send).toHaveBeenCalledWith({ rating: 4, message: "The stars read well.", context: "interview-simulator" });
+    expect(onClose).not.toHaveBeenCalled();
+    await user.click(await within(dialog).findByRole("button", { name: "Back to the trail" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("starts fresh when opened again after a thank-you", async () => {
     const { user } = setup();
     let dialog = await openDialog(user);

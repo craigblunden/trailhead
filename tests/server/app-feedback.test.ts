@@ -72,6 +72,14 @@ describe("appFeedbackSchema", () => {
     if (!result.ok) expect(result.errors.message).toMatch(String(APP_FEEDBACK_MAX_CHARS));
   });
 
+  it("takes an optional context naming where it was asked from, and refuses one it does not know (interview second pass ticket 08)", () => {
+    expect(parseInput(appFeedbackSchema, { rating: 4, message: "Good.", context: "interview-simulator" })).toEqual({
+      ok: true,
+      data: { rating: 4, message: "Good.", context: "interview-simulator" },
+    });
+    expect(parseInput(appFeedbackSchema, { rating: 4, message: "Good.", context: "somewhere-else" }).ok).toBe(false);
+  });
+
   it("rejects fields it does not know rather than passing them along", () => {
     expect(parseInput(appFeedbackSchema, { rating: 3, message: "Hi", to: "someone@else.com" }).ok).toBe(false);
   });
@@ -88,6 +96,14 @@ describe("composeAppFeedbackEmail", () => {
     expect(email.text).toContain(SIGNED_IN.userId);
     // The owner answers by replying.
     expect(email.replyTo).toBe("sam@example.com");
+  });
+
+  it("says in the subject and the body when it was asked from the Interview Simulator (interview second pass ticket 08)", () => {
+    const email = composeAppFeedbackEmail(SIGNED_IN, { rating: 4, message: "The Missed points help.", context: "interview-simulator" });
+
+    expect(email.subject).toBe("Trailhead feedback on the Interview Simulator: 4/5 from Sam Rivera");
+    expect(email.text).toContain("About: Interview Simulator");
+    expect(email.text).toContain("The Missed points help.");
   });
 
   it("keeps a line break in a name out of the subject", () => {
@@ -114,6 +130,16 @@ describe("sendAppFeedbackAction", () => {
     });
     expect(body.from).toMatch(/@/);
     expect(body.text).toContain("Love it.");
+  });
+
+  it("carries the context through to the email; sending from the header, without one, is unchanged", async () => {
+    await sendAppFeedbackAction({ rating: 4, message: "Going well.", context: "interview-simulator" });
+    await sendAppFeedbackAction({ rating: 4, message: "Going well." });
+
+    const [withContext, without] = fetchMock.mock.calls.map((call) => JSON.parse((call as [string, RequestInit])[1].body as string));
+    expect(withContext.subject).toBe("Trailhead feedback on the Interview Simulator: 4/5 from Sam Rivera");
+    expect(without.subject).toBe("Trailhead feedback: 4/5 from Sam Rivera");
+    expect(without.text).not.toContain("About:");
   });
 
   it("uses the configured sender when there is one", async () => {

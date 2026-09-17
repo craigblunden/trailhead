@@ -258,6 +258,12 @@ export async function pastAttempts(): Promise<PastAttempt[]> {
   });
 }
 
+/** How many of the Tenant's Attempts, across every Job, have been scored. */
+export async function scoredAttemptCount(): Promise<number> {
+  const { userId } = await requireSession();
+  return withTenant(userId, (tx) => tx.attempt.count({ where: { userId, overallScore: { not: null } } }));
+}
+
 /**
  * One scored Attempt of the Tenant's, opened from the hub at `/interview/<job>/<attempt>`: null when
  * there is no such Attempt, when it is another Tenant's, when it belongs to a different Job, or when it
