@@ -138,6 +138,13 @@ Scorecard once scored. What a Tenant's weekly Limit counts.
 _Avoid_: Interview (as a bare noun — reserve "Interview" for the Stage and the Simulator's name),
 Session, Rehearsal
 
+**Practice round**:
+A short, general run of the Interview Simulator for a Tenant whose Plan cannot start an Attempt:
+a few personal and behavioural questions that suit any role, answered against the clock the same
+way, and kept — but never scored. It belongs to no Job, draws on no posting or resume, and no weekly
+Limit counts it. It is not a kind of Attempt.
+_Avoid_: Demo, Trial, Taster, Demo Attempt
+
 **Category**:
 One of the five fixed dimensions an Attempt's questions are drawn from: personal, behavioural,
 stakeholder, technical, design. Every Attempt spans all five regardless of length. Each Category has
