@@ -34,3 +34,25 @@ describe("what Account deletion says goes (account issue 06)", () => {
     expect(deletionContents({ jobs: 0, documents: 0, contacts: 0 })).toBe("0 jobs, 0 documents, and 0 contacts");
   });
 });
+
+describe("the interview Limits under Your plan", () => {
+  const quota = { limit: 10, used: 1, remaining: 9, resetsOn: "2026-07-27" } as const;
+
+  it("ACCT-9: counts interviews left against a finite Limit, and started ones under an unlimited Limit", async () => {
+    const { interviewsLeftLine } = await import("@/lib/account");
+    expect(interviewsLeftLine(quota)).toBe("9 of 10 interviews left this week");
+    expect(interviewsLeftLine({ ...quota, used: 10, remaining: 0 })).toBe(
+      "You’ve used this week’s interviews — more on Monday, Jul 27",
+    );
+    expect(interviewsLeftLine({ ...quota, limit: "unlimited", used: 1, remaining: "unlimited" })).toBe(
+      "1 interview started this week",
+    );
+  });
+
+  it("ACCT-10: names the lengths a Plan may choose between", async () => {
+    const { interviewLengthsLine } = await import("@/lib/account");
+    expect(interviewLengthsLine([5])).toBe("5 minutes");
+    expect(interviewLengthsLine([5, 10])).toBe("5 or 10 minutes");
+    expect(interviewLengthsLine([5, 10, 30])).toBe("5, 10, or 30 minutes");
+  });
+});

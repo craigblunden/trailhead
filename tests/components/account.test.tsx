@@ -8,6 +8,7 @@ import { AccountView } from "@/components/account/account-view";
 import { PlanComparison } from "@/components/account/plan-comparison";
 import type { AccountSummary } from "@/lib/account";
 import type { QuotaStatus } from "@/lib/generation";
+import type { InterviewQuotaStatus } from "@/lib/interview";
 import { PLANS, PLAN_LIMITS, type Plan } from "@/lib/plans";
 import { createTrail } from "../fakes/trail";
 import { render, renderWithJobs, screen, waitFor, within } from "../test-utils";
@@ -21,6 +22,7 @@ vi.mock("next/navigation", () => ({
 const account = vi.hoisted(() => ({
   summary: vi.fn(),
   letters: vi.fn(),
+  interviews: vi.fn(),
   remove: vi.fn(),
 }));
 
@@ -48,11 +50,21 @@ const letters = (overrides: Partial<QuotaStatus> = {}): QuotaStatus => ({
   ...overrides,
 });
 
+const interviews = (overrides: Partial<InterviewQuotaStatus> = {}): InterviewQuotaStatus => ({
+  limit: 10,
+  used: 1,
+  remaining: 9,
+  resetsOn: "2026-07-27",
+  ...overrides,
+});
+
 const PLAN_NAMES: Record<Plan, string> = { free: "Free plan", basic: "Basic plan", pro: "Pro plan" };
 
 beforeEach(() => {
   account.summary.mockResolvedValue(SUMMARY);
   account.letters.mockResolvedValue(letters());
+  // Cleared, not just re-stubbed: PAGE-10 holds that a locked Plan never reads the count.
+  account.interviews.mockClear().mockResolvedValue(interviews());
   account.remove.mockReset();
 });
 
@@ -132,6 +144,41 @@ describe("the account page (account issue 05)", () => {
     const section = await screen.findByRole("region", { name: "Your plan" });
     expect(await within(section).findByText("14 documents")).toBeInTheDocument();
     expect(within(section).getByText("Cover letters are paused until Monday, Jul 27")).toBeInTheDocument();
+  });
+
+  const row = (section: HTMLElement, term: string) => within(section).getByText(term).nextElementSibling;
+
+  it("PAGE-9: on Pro, the interviews left this week and the lengths it may choose between", async () => {
+    account.summary.mockResolvedValue({ ...SUMMARY, plan: "pro" });
+    account.interviews.mockResolvedValue(interviews({ limit: 10, used: 3, remaining: 7 }));
+    renderWithJobs(<AccountView />, { trail: createTrail({ plan: "pro" }) });
+
+    const section = await screen.findByRole("region", { name: "Your plan" });
+    expect(await within(section).findByText("7 of 10 interviews left this week")).toBeInTheDocument();
+    await waitFor(() => expect(row(section, "Interview lengths")).toHaveTextContent("5, 10, or 30 minutes"));
+  });
+
+  it.each(["free", "basic"] as const)(
+    "PAGE-10: on %s, interviews are named a Pro feature, with no count and no lengths",
+    async (plan) => {
+      account.summary.mockResolvedValue({ ...SUMMARY, plan });
+      renderWithJobs(<AccountView />, { trail: createTrail({ plan }) });
+
+      const section = await screen.findByRole("region", { name: "Your plan" });
+      expect(row(section, "Interviews")).toHaveTextContent("The Interview Simulator is a Pro feature");
+      expect(within(section).queryByText("Interview lengths")).toBeNull();
+      expect(within(section).queryByText(/interviews left this week/)).toBeNull();
+      expect(account.interviews).not.toHaveBeenCalled();
+    },
+  );
+
+  it("PAGE-11: on Pro, a failed interviews read says so", async () => {
+    account.summary.mockResolvedValue({ ...SUMMARY, plan: "pro" });
+    account.interviews.mockRejectedValue(new Error("down"));
+    renderWithJobs(<AccountView />, { trail: createTrail({ plan: "pro" }) });
+
+    const section = await screen.findByRole("region", { name: "Your plan" });
+    expect(await within(section).findByText("We couldn’t check your interviews.")).toBeInTheDocument();
   });
 
   it("PAGE-8: one h1, the four sections in order, and no axe violations", async () => {

@@ -13,8 +13,15 @@ import { LoadingTrail } from "@/components/loading-trail";
 import { PageMain } from "@/components/page-main";
 import { PlanMark } from "@/components/plan-mark";
 import { Button } from "@/components/ui/button";
-import { documentsHeldLine, lettersLeftLine, signInMethodLabels } from "@/lib/account";
-import { accountCache, lettersCache } from "@/lib/account-client";
+import {
+  documentsHeldLine,
+  interviewLengthsLine,
+  interviewsLeftLine,
+  lettersLeftLine,
+  signInMethodLabels,
+} from "@/lib/account";
+import { accountCache, interviewsCache, lettersCache } from "@/lib/account-client";
+import { canStartAttempt } from "@/lib/interview";
 import { cn } from "@/lib/utils";
 
 /**
@@ -27,6 +34,9 @@ export function AccountView() {
   const limits = useLimits();
   const letters = useQuery(lettersCache.options(accountClient.letters));
   const account = summary.data;
+  // ADR-0005: a Plan that cannot start an Attempt is shown no count, so its count is never read.
+  const canInterview = account ? canStartAttempt(account.plan) : false;
+  const interviews = useQuery({ ...interviewsCache.options(accountClient.interviews), enabled: canInterview });
 
   return (
     <div className="flex flex-1 flex-col">
@@ -80,6 +90,28 @@ export function AccountView() {
                       ? "We couldn’t check your cover letters."
                       : "Checking…"}
                 </dd>
+                <dt className="text-muted-foreground">Interviews</dt>
+                <dd>
+                  {!canInterview
+                    ? "The Interview Simulator is a Pro feature"
+                    : interviews.data
+                      ? interviewsLeftLine(interviews.data)
+                      : interviews.isError
+                        ? "We couldn’t check your interviews."
+                        : "Checking…"}
+                </dd>
+                {canInterview && (
+                  <>
+                    <dt className="text-muted-foreground">Interview lengths</dt>
+                    <dd>
+                      {limits.data
+                        ? interviewLengthsLine(limits.data.interviewLengths)
+                        : limits.isError
+                          ? "We couldn’t check your interview lengths."
+                          : "Checking…"}
+                    </dd>
+                  </>
+                )}
               </dl>
             </Section>
 

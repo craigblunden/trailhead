@@ -1,5 +1,6 @@
 import { formatResetDay } from "@/lib/dates";
 import type { QuotaStatus } from "@/lib/generation";
+import type { AttemptLength, InterviewQuotaStatus } from "@/lib/interview";
 import { pluralize } from "@/lib/jobs";
 import type { Limit, Plan } from "@/lib/plans";
 
@@ -60,6 +61,22 @@ export function lettersLeftLine(quota: QuotaStatus): string {
   if (quota.held) return `Cover letters are paused until ${formatResetDay(quota.resetsOn)}`;
   if (quota.limit === "unlimited") return `${pluralize(quota.used, "cover letter")} written this week`;
   return `${quota.remaining} of ${quota.limit} cover letters left this week`;
+}
+
+/**
+ * Attempts left this quota week, in the Interview Simulator's start-screen terms: a started count when
+ * unlimited, and when the next ones arrive once none are left.
+ */
+export function interviewsLeftLine(quota: InterviewQuotaStatus): string {
+  if (quota.limit === "unlimited") return `${pluralize(quota.used, "interview")} started this week`;
+  if (quota.remaining === 0) return `You’ve used this week’s interviews — more on ${formatResetDay(quota.resetsOn)}`;
+  return `${quota.remaining} of ${quota.limit} interviews left this week`;
+}
+
+/** The Attempt lengths a Plan may choose between: "5 minutes", "5 or 10 minutes", "5, 10, or 30 minutes". */
+export function interviewLengthsLine(lengths: readonly AttemptLength[]): string {
+  if (lengths.length <= 2) return `${lengths.join(" or ")} minutes`;
+  return `${lengths.slice(0, -1).join(", ")}, or ${lengths.at(-1)} minutes`;
 }
 
 /** What Account deletion erases, counted: "12 jobs, 3 documents, and 8 contacts". */
