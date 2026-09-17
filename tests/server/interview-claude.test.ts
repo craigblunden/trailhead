@@ -328,7 +328,13 @@ describe("the scoring call (ticket 03)", () => {
     });
   });
 
-  it("IV-C10: the output schema is what constrains a score to the scale — an Answer cannot talk the scorer into a shape it may not have", async () => {
+  it("IV-C9b: neither output schema uses a numeric bound, which the live API answers with a 400", () => {
+    for (const schema of [SCORES_OUTPUT_SCHEMA, QUESTIONS_OUTPUT_SCHEMA]) {
+      expect(JSON.stringify(schema)).not.toMatch(/"(minimum|maximum|exclusiveMinimum|exclusiveMaximum|multipleOf)"/);
+    }
+  });
+
+  it("IV-C10: validation is what constrains a score to the scale — an Answer cannot talk the scorer into a shape it may not have", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     const malformed: unknown[] = [
       // Prose rather than the object.

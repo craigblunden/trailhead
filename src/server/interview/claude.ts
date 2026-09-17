@@ -82,7 +82,11 @@ export const QUESTIONS_OUTPUT_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-/** The object the scorer answers with. A score outside the scale is refused by the schema itself. */
+/**
+ * The object the scorer answers with. The API refuses `minimum`/`maximum` on an integer (a 400 on
+ * every call), so the scale is stated in the prompt and a score outside it is refused by
+ * `scoresAnswer` below, as a malformed answer.
+ */
 export const SCORES_OUTPUT_SCHEMA = {
   type: "object",
   properties: {
@@ -91,7 +95,7 @@ export const SCORES_OUTPUT_SCHEMA = {
       items: {
         type: "object",
         properties: {
-          score: { type: "integer", minimum: SCORE_MIN, maximum: SCORE_MAX },
+          score: { type: "integer" },
           rationale: { type: "string", maxLength: RATIONALE_MAX_CHARS },
         },
         required: ["score", "rationale"],
