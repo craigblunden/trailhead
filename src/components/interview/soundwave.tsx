@@ -17,10 +17,10 @@ import { cn } from "@/lib/utils";
 export type MicState = "off" | "listening" | "hearing";
 
 /** Each bar's share of the reach: highest in the middle, so the peak reads as a wave. */
-const SHAPE = [0.45, 0.75, 1, 0.7, 0.5];
+export const SOUNDWAVE_SHAPE = [0.45, 0.75, 1, 0.7, 0.5];
 
 /** Staggered so the bars ripple outward rather than pulse as one. */
-const DELAY_MS = [120, 60, 0, 90, 150];
+export const SOUNDWAVE_DELAY_MS = [120, 60, 0, 90, 150];
 
 const WORDS: Record<MicState, string> = {
   off: "Microphone off",
@@ -38,10 +38,10 @@ export function Soundwave({ state, className }: { state: MicState; className?: s
           state === "off" ? "bg-muted" : "bg-primary/10",
         )}
       >
-        {SHAPE.map((shape, index) => (
+        {SOUNDWAVE_SHAPE.map((shape, index) => (
           <span
             key={index}
-            style={{ "--shape": shape, animationDelay: `${DELAY_MS[index]}ms` } as React.CSSProperties}
+            style={{ "--shape": shape, animationDelay: `${SOUNDWAVE_DELAY_MS[index]}ms` } as React.CSSProperties}
             className={cn(
               "soundwave-bar block h-7 w-1 rounded-full",
               state === "off" ? "bg-muted-foreground/50" : "bg-primary",

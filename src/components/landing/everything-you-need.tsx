@@ -5,7 +5,18 @@ import {
   SectionTrail,
   TrailMarker,
 } from "@/components/landing/section-trail";
+import {
+  SOUNDWAVE_DELAY_MS,
+  SOUNDWAVE_SHAPE,
+} from "@/components/interview/soundwave";
 import { MetaChip } from "@/components/meta-chip";
+import {
+  CATEGORY_LABEL,
+  SCORE_BAND_CLASS,
+  SCORE_MAX,
+  scoreBand,
+  type Category,
+} from "@/lib/interview";
 import {
   ACTIVE_STAGES,
   STAGE_META,
@@ -288,6 +299,168 @@ function MiniCoverLetter() {
   );
 }
 
+/* ---------- Miniature: the Interview Simulator ---------- */
+
+/**
+ * A five-minute Attempt against the same sample job, one of each Category. The run is paused on
+ * question three; the Scorecard beside it is where the same Attempt ends up.
+ */
+const sampleAnswers: { category: Category; score: number }[] = [
+  { category: "personal", score: 82 },
+  { category: "behavioural", score: 78 },
+  { category: "stakeholder", score: 64 },
+  { category: "technical", score: 80 },
+  { category: "design", score: 58 },
+];
+
+const sampleOverall = Math.round(
+  sampleAnswers.reduce((sum, answer) => sum + answer.score, 0) /
+    sampleAnswers.length,
+);
+
+const currentQuestion = 2;
+
+/** The run and its Scorecard in small: one question on stage against the clock, then the marks and why. */
+function MiniInterview() {
+  const job = detailJob;
+  return (
+    <div
+      aria-hidden="true"
+      className="grid grid-cols-[minmax(0,1fr)] gap-2.5 rounded-lg bg-background p-3 ring-1 ring-foreground/10 sm:grid-cols-[minmax(0,1fr)_11rem] sm:p-4"
+    >
+      <div className="flex flex-col rounded-md bg-card p-3 ring-1 ring-foreground/10 sm:p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 space-y-2">
+            <p className="truncate text-[0.7rem] text-muted-foreground">
+              Rehearsing for {job.role} at {job.company}
+            </p>
+            {/* The question trail, as it sits above every question. */}
+            <ol className="flex items-center gap-1">
+              {sampleAnswers.map((answer, index) => (
+                <li key={answer.category} className="flex items-center gap-1">
+                  {index > 0 && (
+                    <span
+                      className={cn(
+                        "h-0.5 w-2.5 rounded",
+                        index <= currentQuestion ? "bg-primary" : "bg-border",
+                      )}
+                    />
+                  )}
+                  <span
+                    className={cn(
+                      "block rounded-full",
+                      index < currentQuestion && "size-2 bg-primary",
+                      index === currentQuestion &&
+                        "size-2.5 bg-card ring-2 ring-primary",
+                      index > currentQuestion && "size-2 bg-border",
+                    )}
+                  />
+                </li>
+              ))}
+            </ol>
+            <p className="flex items-center gap-1.5 text-[0.7rem]">
+              Question {currentQuestion + 1} of {sampleAnswers.length}
+              <span className="rounded-full bg-chip px-1.5 py-0.5 text-[0.6rem] font-medium text-chip-foreground">
+                {CATEGORY_LABEL[sampleAnswers[currentQuestion].category]}
+              </span>
+            </p>
+          </div>
+          <p className="shrink-0 text-right tabular-nums">
+            <span className="block text-2xl leading-none font-semibold">
+              3:12
+            </span>
+            <span className="mt-0.5 block text-[0.6rem] text-muted-foreground">
+              left
+            </span>
+          </p>
+        </div>
+
+        <p className="mt-4 font-heading text-base leading-snug tracking-tight text-balance sm:text-lg">
+          Engineering wants the merchant dashboard this quarter, but your
+          research says onboarding comes first. How do you settle it?
+        </p>
+
+        {/* The soundwave, hearing an answer. The one moving thing on the page;
+            it stands still under reduced motion (globals.css). */}
+        <div
+          data-mic="hearing"
+          className="mt-4 flex items-center gap-2"
+        >
+          <span className="flex h-8 w-12 shrink-0 items-center justify-center gap-[3px] rounded-full bg-primary/10">
+            {SOUNDWAVE_SHAPE.map((shape, index) => (
+              <span
+                key={index}
+                style={
+                  {
+                    "--shape": shape,
+                    animationDelay: `${SOUNDWAVE_DELAY_MS[index]}ms`,
+                  } as React.CSSProperties
+                }
+                className="soundwave-bar block h-5 w-[3px] rounded-full bg-primary"
+              />
+            ))}
+          </span>
+          <span className="text-[0.7rem] font-medium">Hearing you</span>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2 sm:mt-auto sm:pt-4">
+          <MiniButton>Submit answer</MiniButton>
+          <span className="text-[0.65rem] text-muted-foreground">
+            The next question starts as soon as you submit.
+          </span>
+        </div>
+      </div>
+
+      <div className="space-y-2.5">
+        <div className="rounded-md bg-accent/70 p-2.5 ring-1 ring-primary/15">
+          <p className="text-[0.65rem] font-medium text-muted-foreground">
+            Overall
+          </p>
+          <p
+            className={cn(
+              "font-heading text-2xl leading-tight tabular-nums",
+              SCORE_BAND_CLASS[scoreBand(sampleOverall)],
+            )}
+          >
+            {sampleOverall}
+            <span className="text-xs text-muted-foreground">
+              {" "}
+              / {SCORE_MAX}
+            </span>
+          </p>
+        </div>
+        <div className="rounded-md bg-card p-2.5 ring-1 ring-foreground/10">
+          <ul className="space-y-1">
+            {sampleAnswers.map(({ category, score }) => (
+              <li
+                key={category}
+                className="flex items-baseline justify-between gap-2 text-[0.7rem]"
+              >
+                <span>{CATEGORY_LABEL[category]}</span>
+                <span
+                  className={cn(
+                    "tabular-nums",
+                    SCORE_BAND_CLASS[scoreBand(score)],
+                  )}
+                >
+                  {score}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2.5 border-t border-border pt-2 text-[0.65rem] font-medium">
+            {CATEGORY_LABEL.design}
+          </p>
+          <p className="mt-1 border-l-2 border-primary/40 pl-2 text-[0.65rem] leading-snug">
+            Went straight to screens without asking which merchants the
+            dashboard is for.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Section ---------- */
 
 type FeatureProps = {
@@ -372,6 +545,17 @@ export const EveryThingYouNeed = () => {
             attached to it, nothing generic and nothing reused between jobs. Read
             it, tell {BRAND_NAME} what should change, and it rewrites from your
             feedback.
+          </Feature>
+
+          <Feature
+            id="feature-interview"
+            heading="Rehearse the interview before it happens"
+            preview={<MiniInterview />}
+          >
+            Questions written from this job&rsquo;s posting and the resume you
+            sent, from why you want the role to how you&rsquo;d design for it.
+            Answer out loud against the clock, then see a score for every
+            answer and the reason it got it. Included with Pro.
           </Feature>
         </ol>
       </div>
