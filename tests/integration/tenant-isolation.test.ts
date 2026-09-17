@@ -16,6 +16,8 @@ const TABLES = [
   "Attempt",
   "AttemptQuestion",
   "InterviewQuota",
+  "PracticeRound",
+  "PracticeQuestion",
 ] as const;
 
 /** Seeds one row in every application table for `userId`, returning the ids. */
@@ -58,6 +60,12 @@ async function seedEverything(tx: TenantClient, userId: string) {
     },
   });
   await tx.interviewQuota.create({ data: { userId, weekStart: new Date("2026-07-20"), used: 1 } });
+  await tx.practiceRound.create({
+    data: {
+      userId,
+      questions: { create: { userId, category: "personal", order: 0, text: "What drains you at work?" } },
+    },
+  });
   return { job, contact, document };
 }
 
@@ -74,6 +82,8 @@ async function countAll(db: TenantClient | typeof prisma) {
     Attempt: await db.attempt.count(),
     AttemptQuestion: await db.attemptQuestion.count(),
     InterviewQuota: await db.interviewQuota.count(),
+    PracticeRound: await db.practiceRound.count(),
+    PracticeQuestion: await db.practiceQuestion.count(),
   };
 }
 
@@ -150,6 +160,8 @@ describe("ticket 04: tenant isolation, proven", () => {
       Attempt: 1,
       AttemptQuestion: 1,
       InterviewQuota: 1,
+      PracticeRound: 1,
+      PracticeQuestion: 1,
     });
 
     const asB = await withTenant(userB, (tx) => countAll(tx));

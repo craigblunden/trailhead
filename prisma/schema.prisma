@@ -307,3 +307,42 @@ model InterviewQuota {
 
   @@id([userId, weekStart])
 }
+
+/// A Practice round (CONTEXT.md; practice round ticket 03): a short, general, unscored run of the
+/// Interview Simulator for a Tenant whose Plan cannot start an Attempt. Stored apart from Attempt on
+/// purpose (ADR-0006): it has no Job, no length, no quota, and no Scorecard. Its countdown is fixed
+/// (`PRACTICE_SECONDS`), so only the seconds answered for are stored.
+model PracticeRound {
+  id            String              @id @default(cuid(2))
+  userId        String              @db.Uuid
+  startedAt     DateTime            @default(now())
+  /// Seconds this round has been answered for. The countdown is `PRACTICE_SECONDS` less this.
+  activeSeconds Int                 @default(0)
+  /// Set once every question has an Answer, or the countdown ran out mid-question.
+  completedAt   DateTime?
+  questions     PracticeQuestion[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  /// The unfinished round, the previous round's questions, and the hub's list all read newest first.
+  @@index([userId, startedAt(sort: Desc)])
+}
+
+/// One question in a Practice round, with its Answer on the same row. Its text is stored rather than a
+/// reference into the fixed question set, so editing the set never rewrites a round already taken.
+model PracticeQuestion {
+  id         String        @id @default(cuid(2))
+  userId     String        @db.Uuid
+  roundId    String
+  round      PracticeRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  category   Category
+  /// Position in the round, from 0.
+  order      Int
+  text       String
+  /// What the Tenant said, spoken or typed. Empty until answered.
+  transcript String        @default("")
+  answeredAt DateTime?
+
+  @@unique([roundId, order])
+  @@index([userId])
+}

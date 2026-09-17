@@ -1,0 +1,183 @@
+import { act } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { axe } from "vitest-axe";
+
+import { InterviewPanel } from "@/components/interview/interview-panel";
+import type { InterviewClient } from "@/components/interview/interview-client";
+import { PracticePanel } from "@/components/interview/practice-panel";
+import type { PracticeClient } from "@/components/interview/practice-client";
+import type { Job } from "@/lib/jobs";
+import type { Plan } from "@/lib/plans";
+import { PRACTICE_FAILURES, type PracticeCategory, type PracticeRound } from "@/lib/practice";
+import { SEED_JOBS } from "../fixtures/jobs";
+import { renderWithJobs, screen, userEvent } from "../test-utils";
+
+/**
+ * The Practice round's screens (practice round ticket 03), against a faked client — the seam the page
+ * takes to its Route Handlers. The run screen itself is the Attempt's, tested in `interview.test.tsx`;
+ * what is tested here is that a Practice round reaches it, and everything around it.
+ */
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn(), refresh: vi.fn() }),
+  usePathname: () => "/interview/practice",
+  useSelectedLayoutSegment: () => null,
+}));
+
+const AXE_OPTIONS = { rules: { "color-contrast": { enabled: false } } } as const;
+
+const client = vi.hoisted(() => ({ start: vi.fn(), answer: vi.fn(), timeUp: vi.fn() }));
+
+const CATEGORIES: PracticeCategory[] = ["personal", "personal", "behavioural", "behavioural"];
+
+/** A round with `answered` of its four questions answered, `activeSeconds` spent, and ended when `completed`. */
+function roundOf({ answered = 0, activeSeconds = 0, completed = false, id = "round-1" } = {}): PracticeRound {
+  return {
+    id,
+    countdownSeconds: 480,
+    activeSeconds,
+    startedAt: "2026-09-17T10:00:00.000Z",
+    completedAt: completed ? "2026-09-17T10:08:00.000Z" : null,
+    questions: CATEGORIES.map((category, order) => ({
+      id: `${id}-q${order}`,
+      category,
+      order,
+      text: `Practice ${category} question ${order + 1}?`,
+      ...(order < answered ? { answer: { transcript: `My answer ${order + 1}.` } } : {}),
+    })),
+  };
+}
+
+function renderPractice({ round = null as PracticeRound | null } = {}) {
+  return renderWithJobs(<PracticePanel round={round} client={client as unknown as PracticeClient} />, {
+    initialJobs: SEED_JOBS as Job[],
+  });
+}
+
+const go = () => screen.getByRole("button", { name: "Go" });
+
+beforeEach(() => {
+  for (const mock of Object.values(client)) mock.mockReset();
+  delete (window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition;
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe("the hub offers a Practice round (practice round ticket 03)", () => {
+  const renderHub = (plan: Plan, practice: { unfinished: boolean } | null) =>
+    renderWithJobs(
+      <InterviewPanel
+        job={null}
+        plan={plan}
+        attempt={null}
+        quota={null}
+        available
+        practice={practice}
+        client={{} as InterviewClient}
+      />,
+      { initialJobs: SEED_JOBS as Job[] },
+    );
+
+  it.each(["free", "basic"] as const)("PR-U1: a %s Tenant is offered a Practice round beside the locked preview", (plan) => {
+    renderHub(plan, { unfinished: false });
+
+    const offer = screen.getByRole("region", { name: "Try a practice round" });
+    expect(offer).toHaveTextContent(/4 general questions · 8 minutes · not scored/);
+    expect(screen.getByRole("link", { name: "Start a practice round" })).toHaveAttribute("href", "/interview/practice");
+    expect(screen.getByText(/Interview Simulator is a Pro feature/)).toBeInTheDocument();
+  });
+
+  it("PR-U2: with a round unfinished, the offer is to resume it", () => {
+    renderHub("free", { unfinished: true });
+
+    expect(screen.getByRole("link", { name: "Resume your practice round" })).toHaveAttribute("href", "/interview/practice");
+  });
+
+  it("PR-U3: a pro Tenant is offered none", () => {
+    renderHub("pro", null);
+
+    expect(screen.queryByRole("region", { name: "Try a practice round" })).not.toBeInTheDocument();
+  });
+});
+
+describe("taking a Practice round (practice round ticket 03)", () => {
+  it("PR-U4: the set-up says what a round is, and Go puts its first question up on the eight-minute clock", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderPractice();
+    client.start.mockResolvedValue({ ok: true, round: roundOf() });
+
+    expect(screen.getByRole("heading", { level: 1, name: "Practice round" })).toBeInTheDocument();
+    expect(screen.getByText(/4 general questions · 8 minutes · not scored/)).toBeInTheDocument();
+    await user.click(go());
+
+    expect(client.start).toHaveBeenCalledWith(false);
+    expect(await screen.findByRole("heading", { level: 1, name: "Practice personal question 1?" })).toBeInTheDocument();
+    expect(screen.getByText("Practice round")).toBeInTheDocument();
+    expect(screen.getByText(/Question 1 of 4/)).toBeInTheDocument();
+    expect(screen.getByRole("timer")).toHaveTextContent("8:00 left");
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
+    expect(screen.getByRole("timer")).toHaveTextContent("7:50 left");
+  });
+
+  it("PR-U5: an Answer goes to the round's own route, and the next question comes up", async () => {
+    const round = roundOf();
+    const { user } = renderPractice({ round });
+    client.answer.mockResolvedValue({ ok: true, round: roundOf({ answered: 1, activeSeconds: 12 }) });
+
+    await user.click(screen.getByRole("button", { name: "Resume" }));
+    await user.type(screen.getByRole("textbox"), "I like building things.");
+    await user.click(screen.getByRole("button", { name: "Submit answer" }));
+
+    expect(client.answer).toHaveBeenCalledWith(round.id, expect.objectContaining({ questionId: "round-1-q0", transcript: "I like building things." }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Practice personal question 2?" })).toBeInTheDocument();
+  });
+
+  it("PR-U6: an unfinished round says where it got to; Resume picks it up, and Start over begins a fresh one", async () => {
+    const { user } = renderPractice({ round: roundOf({ answered: 1, activeSeconds: 30 }) });
+    client.start.mockResolvedValue({ ok: true, round: roundOf({ id: "round-2" }) });
+
+    expect(screen.getByText(/1 of 4 answered, with 7:30 left/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Start over" }));
+
+    expect(client.start).toHaveBeenCalledWith(true);
+    expect(await screen.findByRole("heading", { level: 1, name: "Practice personal question 1?" })).toBeInTheDocument();
+    expect(screen.getByRole("timer")).toHaveTextContent("8:00 left");
+  });
+
+  it("PR-U7: a round already in progress elsewhere is offered to resume rather than reported as a failure", async () => {
+    const { user } = renderPractice();
+    client.start.mockResolvedValue({
+      ok: false,
+      error: "in-progress",
+      message: PRACTICE_FAILURES["in-progress"],
+      round: roundOf({ answered: 2, activeSeconds: 200 }),
+    });
+
+    await user.click(go());
+
+    expect(await screen.findByRole("button", { name: "Resume" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("PR-U8: a refusal is shown in the page's own words, and nothing starts", async () => {
+    const { user } = renderPractice();
+    client.start.mockResolvedValue({ ok: false, error: "has-simulator", message: PRACTICE_FAILURES["has-simulator"] });
+
+    await user.click(go());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(PRACTICE_FAILURES["has-simulator"]);
+    expect(screen.queryByRole("timer")).not.toBeInTheDocument();
+  });
+
+  it("PR-U9: the set-up and a resumable round have no accessibility violations", async () => {
+    const setUp = renderPractice();
+    expect(await axe(setUp.container, AXE_OPTIONS)).toHaveNoViolations();
+    setUp.unmount();
+
+    const resumable = renderPractice({ round: roundOf({ answered: 1 }) });
+    expect(await axe(resumable.container, AXE_OPTIONS)).toHaveNoViolations();
+  });
+});

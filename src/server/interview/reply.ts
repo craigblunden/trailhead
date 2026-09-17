@@ -7,6 +7,7 @@ import {
   type ScoreAttemptResponse,
   type StartAttemptResponse,
 } from "@/lib/interview";
+import { PRACTICE_FAILURES, type PracticeFailure, type PracticeRound, type PracticeRoundResponse } from "@/lib/practice";
 import { ACTION_MESSAGES } from "@/server/action-result";
 import { NotFoundError } from "@/server/data/errors";
 
@@ -62,3 +63,24 @@ export const badBody = {
   message: INTERVIEW_FAILURES["bad-answer"],
   refunded: false,
 } as const;
+
+/** The status each Practice round failure means (practice round ticket 03). */
+export const PRACTICE_STATUS: Record<PracticeFailure, number> = {
+  "has-simulator": 403,
+  "in-progress": 409,
+  "no-round": 404,
+  "bad-answer": 400,
+  failed: 500,
+};
+
+/** Every Practice round reply is its response type, for the same reason every interview reply is. */
+export const practiceReply = (status: number, body: PracticeRoundResponse) => NextResponse.json(body, { status });
+
+/** A Practice round refusal in the page's shape, with the words it is shown in. */
+export const practiceFailure = (reason: PracticeFailure, round?: PracticeRound) =>
+  practiceReply(PRACTICE_STATUS[reason], {
+    ok: false,
+    error: reason,
+    message: PRACTICE_FAILURES[reason],
+    ...(round ? { round } : {}),
+  });

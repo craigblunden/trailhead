@@ -12,13 +12,14 @@ import type {
  * How the Interview Simulator reaches the server: three plain POSTs to the Route Handlers, never
  * Server Actions. Starting and scoring take 10–25 seconds each, and an Answer lands while a clock is
  * running — as actions, Next would dispatch them one at a time and queue the page's other work
- * behind them. Component tests replace this module, or mock `fetch` under it.
+ * behind them. Component tests replace this module, or mock `fetch` under it. A Practice round's client
+ * (`practice-client.ts`) sends the same way.
  */
 
 const UNREACHABLE = "We couldn’t reach the server. Check your connection and try again.";
 const UNREADABLE = "Something went wrong on our side. Try again in a minute.";
 
-async function send<T extends { ok: boolean }>(url: string, body?: unknown): Promise<T> {
+export async function send<T extends { ok: boolean }>(url: string, body?: unknown): Promise<T> {
   let response: Response;
   try {
     response = await fetch(url, {

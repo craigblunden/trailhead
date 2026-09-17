@@ -46,7 +46,7 @@ export function invalid(fields: FieldErrors): ActionFailure {
 }
 
 /** What an id is meant to name, for the answer a malformed one gets. */
-export type IdOf = "job" | "contact" | "document" | "attempt";
+export type IdOf = "job" | "contact" | "document" | "attempt" | "practice round";
 
 /**
  * The one way an action reads an id it was sent. Ids are opaque, so a malformed one is nothing the

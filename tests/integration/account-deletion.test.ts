@@ -78,13 +78,16 @@ const TENANT_TABLES = [
   "Attempt",
   "AttemptQuestion",
   "InterviewQuota",
+  "PracticeRound",
+  "PracticeQuestion",
 ] as const;
 
 type Counts = Record<(typeof TENANT_TABLES)[number], number>;
 
 /**
  * One row in every tenant table for `userId`: a Job with its Activity, a linked Contact, a Document,
- * a cover-letter quota week, and an Attempt with a question and its own quota week.
+ * a cover-letter quota week, an Attempt with a question and its own quota week, and a Practice round
+ * with a question.
  */
 async function seedTenant(userId: string) {
   await withTenant(userId, async (tx: TenantClient) => {
@@ -122,6 +125,12 @@ async function seedTenant(userId: string) {
       },
     });
     await tx.interviewQuota.create({ data: { userId, weekStart: new Date("2026-07-20"), used: 1 } });
+    await tx.practiceRound.create({
+      data: {
+        userId,
+        questions: { create: { userId, category: "behavioural", order: 0, text: "Tell me about a mistake." } },
+      },
+    });
   });
   await setPlan(userId, "pro");
 }

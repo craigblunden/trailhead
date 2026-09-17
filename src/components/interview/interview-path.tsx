@@ -272,29 +272,47 @@ export function RehearsalChoices({
         {" — every length covers all five areas."}
       </p>
 
-      {speechSupported ? (
-        <fieldset disabled={locked}>
-          <legend className="text-sm font-medium">How will you answer?</legend>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <Choice selected={mode === "speak"} disabled={locked} onClick={() => onModeChange("speak")}>
-              <span className="flex items-center justify-center gap-1.5">
-                <Mic aria-hidden="true" className="size-4" />
-                Speaking
-              </span>
-            </Choice>
-            <Choice selected={mode === "type"} disabled={locked} onClick={() => onModeChange("type")}>
-              <span className="flex items-center justify-center gap-1.5">
-                <Keyboard aria-hidden="true" className="size-4" />
-                Typing
-              </span>
-            </Choice>
-          </div>
-          {mode === "speak" && <p className="mt-3 text-sm text-muted-foreground">{SPEAK_RECOMMENDED}</p>}
-        </fieldset>
-      ) : (
-        <p className="text-sm text-muted-foreground">{SPEAK_UNSUPPORTED}</p>
-      )}
+      <AnswerModeChoice locked={locked} mode={mode} onModeChange={onModeChange} speechSupported={speechSupported} />
     </div>
+  );
+}
+
+/**
+ * How the Tenant will answer: speaking (recommended, with the reason) or typing — or, where the browser
+ * cannot transcribe, a note saying typing is the way. Shared by an Attempt's set-up and a Practice
+ * round's (practice round ticket 03).
+ */
+export function AnswerModeChoice({
+  locked = false,
+  mode,
+  onModeChange,
+  speechSupported,
+}: {
+  locked?: boolean;
+  mode: InputMode;
+  onModeChange: (mode: InputMode) => void;
+  speechSupported: boolean;
+}) {
+  if (!speechSupported) return <p className="text-sm text-muted-foreground">{SPEAK_UNSUPPORTED}</p>;
+  return (
+    <fieldset disabled={locked}>
+      <legend className="text-sm font-medium">How will you answer?</legend>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <Choice selected={mode === "speak"} disabled={locked} onClick={() => onModeChange("speak")}>
+          <span className="flex items-center justify-center gap-1.5">
+            <Mic aria-hidden="true" className="size-4" />
+            Speaking
+          </span>
+        </Choice>
+        <Choice selected={mode === "type"} disabled={locked} onClick={() => onModeChange("type")}>
+          <span className="flex items-center justify-center gap-1.5">
+            <Keyboard aria-hidden="true" className="size-4" />
+            Typing
+          </span>
+        </Choice>
+      </div>
+      {mode === "speak" && <p className="mt-3 text-sm text-muted-foreground">{SPEAK_RECOMMENDED}</p>}
+    </fieldset>
   );
 }
 

@@ -32,3 +32,11 @@ See `spec.md` → Who gets what, A Practice round, The fixed question set. Stora
       when one is unfinished. Waits follow the shared loading vocabulary.
 - [ ] End-to-end: a free Tenant starts a round, answers one question, reloads and resumes on the second,
       starts over; a pro Tenant's start request is refused.
+
+## Comments
+
+- Built 2026-09-17. The hub offers the round as a card (what it is, and a link that says Start or Resume);
+  the speak-or-type choice, Go, Resume, and Start over are on the round's own page at
+  `/interview/practice`, so a reload lands back on the round the way `/interview/<job>` does for an
+  Attempt. `sweep_accountless()` does not cover the new tables — it does not cover the Attempt tables
+  either — so a round written by a stale token after Account deletion would outlive it.

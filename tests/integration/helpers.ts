@@ -10,6 +10,8 @@ const APPLICATION_TABLES = [
   "ActivityEntry",
   "AttemptQuestion",
   "Attempt",
+  "PracticeQuestion",
+  "PracticeRound",
   "Job",
   "Contact",
   "Document",

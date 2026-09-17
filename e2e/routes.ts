@@ -18,6 +18,8 @@ export const PRIVATE_ROUTES = [
   // The hub, not a Job's start screen: the latter needs a Job the test created, like the job detail
   // and contact pages, so `e2e/interview.spec.ts` opens that one for itself.
   { name: "interview", path: "/interview", heading: "Interview Simulator" },
+  // A new account is on `free`, which is offered a Practice round (practice round ticket 03).
+  { name: "practice-round", path: "/interview/practice", heading: "Practice round" },
   { name: "account", path: "/account", heading: "Account" },
 ] as const;
 

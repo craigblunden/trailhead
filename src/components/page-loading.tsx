@@ -45,6 +45,7 @@ export function PageLoading() {
   if (pathname.startsWith("/contacts")) return <ContactsLoading selectedId={contactIdIn(pathname)} />;
   if (pathname.startsWith("/documents")) return <DocumentsLoading />;
   if (pathname === "/interview") return <InterviewLoading id={null} />;
+  if (pathname === "/interview/practice") return <PracticeLoading />;
   if (pathname.startsWith("/interview/")) {
     const [jobId, attemptId] = pathname.slice("/interview/".length).split("/");
     return attemptId ? <PastInterviewLoading jobId={jobId} /> : <InterviewLoading id={jobId} />;
@@ -670,6 +671,36 @@ function InterviewLoading({ id }: { id: string | null }) {
             <OutlineStep title="Ready when you are" last>
               {picked && <Bar className="h-12 w-full max-w-sm rounded-md" />}
             </OutlineStep>
+          </div>
+        </div>
+      </PageMain>
+    </div>
+  );
+}
+
+/**
+ * `/interview/practice`: a Practice round's set-up, in outline (practice round ticket 03). The way back
+ * is live, as on the page; the title is fixed words, so it is written; the choice and Go are bars.
+ */
+function PracticeLoading() {
+  return (
+    <div className="flex flex-1 flex-col">
+      <AppHeader leading={<BrandLogo href="/board" />} loading />
+      <PageWait>Loading your practice round…</PageWait>
+
+      <PageMain>
+        <div className="mx-auto max-w-2xl">
+          <Button asChild variant="ghost" size="sm" className="-ml-2 mb-3">
+            <Link href="/interview">
+              <ArrowLeft aria-hidden="true" />
+              Interview Simulator
+            </Link>
+          </Button>
+          <SectionTitle>Practice round</SectionTitle>
+          <Bar className="mt-2 h-4 w-full max-w-md" />
+          <div className="mt-8 max-w-sm space-y-5">
+            <Bar className="h-14 w-full rounded-md" />
+            <Bar className="h-12 w-full rounded-md" />
           </div>
         </div>
       </PageMain>

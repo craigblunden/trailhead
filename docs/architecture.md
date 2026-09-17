@@ -258,6 +258,13 @@ to a status, and the same four test seams. What differs is worth saying:
   which would have meant opening a second microphone stream.
 - **Gated on the Plan this phase, not a Limit** (ADR-0005): free and basic see the real start screen
   locked, and their recorded Limits are not yet enforced.
+- **Questions asked aloud.** Answering by speaking, the browser's own speech synthesis reads each
+  question first; its clock and the microphone start once the voice is done, skipped, or overruns a
+  guard, so a stuck voice can never freeze an Attempt.
+- **Practice rounds beside it, not inside it** (ADR-0006). Free and basic can take a Practice round —
+  four questions from a fixed set, unscored, no model call, no quota — stored in `PracticeRound` and
+  `PracticeQuestion` rather than as an Attempt without a Job. The two share the run screen and the
+  timing rules over `TimedRun`, and nothing else.
 
 ## The data model
 
@@ -270,6 +277,7 @@ erDiagram
   Document |o--o{ Job : "cover letter of"
   Job ||--o{ Attempt : "rehearsed for"
   Attempt ||--o{ AttemptQuestion : "asks"
+  PracticeRound ||--o{ PracticeQuestion : "asks"
 
   Job {
     string id
@@ -344,6 +352,21 @@ erDiagram
     uuid userId
     date weekStart
     int used
+  }
+  PracticeRound {
+    string id
+    uuid userId
+    int activeSeconds
+    timestamp completedAt
+  }
+  PracticeQuestion {
+    string id
+    uuid userId
+    string roundId
+    enum category
+    int order
+    string text
+    string transcript
   }
 ```
 

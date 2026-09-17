@@ -258,6 +258,62 @@ test.describe("interview simulator: a pro Tenant rehearses and is scored", () =>
   });
 });
 
+test.describe("interview simulator: a Practice round (practice round ticket 03)", () => {
+  test.use({ storageState: SIGNED_OUT });
+
+  test("a free Tenant starts a Practice round from the hub, leaves mid-way, resumes, and starts over", async ({ page }) => {
+    test.setTimeout(180_000);
+    await signUpAndVerify(page); // A new account has no Plan row, so it is on `free`.
+
+    await page.goto("/interview");
+    const offer = page.getByRole("region", { name: "Try a practice round" });
+    await expect(offer).toContainText("4 general questions · 8 minutes · not scored");
+    await offer.getByRole("link", { name: "Start a practice round" }).click();
+
+    await expect(page.getByRole("heading", { level: 1, name: "Practice round" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Speaking/ })).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Go" }).click();
+
+    // No questions to write: the first is up at once, on the eight-minute clock.
+    await expect(page.getByText("Practice round", { exact: true })).toBeVisible();
+    await expect(page.getByText(/Question 1 of 4/)).toBeVisible();
+    await expect(page.getByText("Personal", { exact: true })).toBeVisible();
+    await answerOne(page, "I came to design through support work.", 2_000);
+    await expect(page.getByText(/Question 2 of 4/)).toBeVisible();
+
+    // The tab closes mid-question two. Coming back offers the same round, with the time it had left.
+    await page.goto("/interview");
+    await page.getByRole("link", { name: "Resume your practice round" }).click();
+    await expect(page.getByRole("heading", { name: "Pick up where you left off" })).toBeVisible();
+    await expect(page.getByText(/1 of 4 answered, with 7:5\d left/)).toBeVisible();
+    await page.getByRole("button", { name: "Resume" }).click();
+    await expect(page.getByText(/Question 2 of 4/)).toBeVisible();
+
+    // Starting over throws that round away for a fresh one.
+    await page.reload();
+    await page.getByRole("button", { name: "Start over" }).click();
+    await expect(page.getByText(/Question 1 of 4/)).toBeVisible();
+    await expect(page.getByRole("timer")).toHaveText(/^(8:00|7:5\d) left$/);
+  });
+
+  test("a pro Tenant has the full Simulator, so has no Practice round to start", async ({ page }) => {
+    test.setTimeout(120_000);
+    const account = await signUpAndVerify(page);
+    await putOnPlan(account.email, "pro");
+
+    await page.goto("/interview");
+    await expect(page.getByRole("heading", { level: 1, name: "Interview Simulator" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Try a practice round" })).toHaveCount(0);
+
+    await page.goto("/interview/practice");
+    await expect(page).toHaveURL(/\/interview$/);
+
+    const refused = await page.request.post("/api/practice-rounds", { data: { reset: false } });
+    expect(refused.status()).toBe(403);
+    expect(await refused.json()).toMatchObject({ ok: false, error: "has-simulator" });
+  });
+});
+
 test.describe("interview simulator: questions asked aloud (practice round ticket 02)", () => {
   test.use({ storageState: SIGNED_OUT });
 

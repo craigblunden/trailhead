@@ -6,12 +6,15 @@ import type {
   Document as DocumentRow,
   Job as JobModel,
   JobContact as JobContactRow,
+  PracticeQuestion as PracticeQuestionRow,
+  PracticeRound as PracticeRoundModel,
 } from "@/generated/prisma/client";
 import type { ContactDetail, ContactListItem } from "@/lib/contacts";
 import { isoDate } from "@/lib/dates";
 import type { DocumentSummary } from "@/lib/documents";
 import { ATTEMPT_LENGTHS, isKnownLength, type Attempt, type TakeawayPoint } from "@/lib/interview";
 import { STAGES, type ActivityEntry, type Contact, type Job } from "@/lib/jobs";
+import { PRACTICE_MIX, PRACTICE_SECONDS, type PracticeCategory, type PracticeRound } from "@/lib/practice";
 
 /**
  * Pure functions from database rows to the DTOs `src/lib/jobs.ts` defines. This is the boundary:
@@ -271,4 +274,34 @@ function takeawayFrom(value: unknown): TakeawayPoint[] {
       ? [{ point: item.point, from: item.from }]
       : [],
   );
+}
+
+/** A Practice round row with its questions — what a Practice round DTO is built from. */
+export type PracticeRoundRow = PracticeRoundModel & { questions: PracticeQuestionRow[] };
+
+/**
+ * A Practice round as the page holds it (practice round ticket 03). Its countdown is the fixed
+ * `PRACTICE_SECONDS`, never stored. As with an Attempt, a question carries an Answer only once one was
+ * recorded, so a question left mid-answer resumes rather than reads as answered, and one the countdown
+ * ran out before is unreached.
+ */
+export function toPracticeRoundDto(row: PracticeRoundRow): PracticeRound {
+  return {
+    id: row.id,
+    countdownSeconds: PRACTICE_SECONDS,
+    activeSeconds: row.activeSeconds,
+    startedAt: row.startedAt.toISOString(),
+    completedAt: row.completedAt?.toISOString() ?? null,
+    questions: [...row.questions]
+      .sort((a, b) => a.order - b.order)
+      .map((question) => ({
+        id: question.id,
+        // Only the app writes these rows, and only practice Categories; anything else reads as personal
+        // rather than as a round the page cannot label.
+        category: question.category in PRACTICE_MIX ? (question.category as PracticeCategory) : "personal",
+        order: question.order,
+        text: question.text,
+        ...(question.answeredAt ? { answer: { transcript: question.transcript } } : {}),
+      })),
+  };
 }

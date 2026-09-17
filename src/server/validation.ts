@@ -344,6 +344,14 @@ export const startAttemptSchema = z.strictObject({
   reset: z.preprocess((value) => value ?? false, z.boolean("Reset must be true or false")),
 });
 
+/**
+ * Starting a Practice round (practice round ticket 03): only whether an unfinished round should be
+ * discarded for a fresh one. There is no length to choose.
+ */
+export const startPracticeSchema = z.strictObject({
+  reset: z.preprocess((value) => value ?? false, z.boolean("Reset must be true or false")),
+});
+
 /** An Answer's words as they cross the boundary: absent is empty, stripped, trimmed, and bounded. */
 const transcriptSchema = z.preprocess(
   (value) => (value === null || value === undefined ? "" : value),

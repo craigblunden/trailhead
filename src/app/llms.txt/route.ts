@@ -76,6 +76,7 @@ The Interview Simulator page rehearses for one job. Pick the job from its search
 - If the clock runs out mid-answer, what was said so far is kept and scored. Questions the clock never reached show as not reached and count for less than a poor answer would.
 - The Interview Simulator page lists past interviews, newest first; each scored one opens its own scorecard, and one still in progress can be resumed. Rehearsing the same job again asks about different things.
 - Each interview started counts toward the week's interviews, counted separately from cover letters. It is a Pro feature; other plans see the same screen with an explanation of what Pro unlocks.
+- Plans without the full simulator can take a practice round instead, as often as they like: four general questions (two about the user, two about how they have handled work) that suit any role, on an eight-minute clock, answered the same way. It needs no job or resume. The answers are kept, but a practice round is never scored — scoring is part of Pro.
 
 ## Documents
 

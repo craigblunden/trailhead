@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import { AppHeader } from "@/components/app-header";
@@ -43,6 +44,7 @@ import {
 } from "@/lib/interview";
 import { pluralize } from "@/lib/jobs";
 import { limitsOf, type Plan } from "@/lib/plans";
+import { PRACTICE_SUMMARY } from "@/lib/practice";
 
 /**
  * The Interview Simulator: one path from choosing a job to Go, the interview itself, and the
@@ -72,6 +74,11 @@ export type InterviewPanelProps = {
    * Not shown with a job chosen, nor on the locked preview.
    */
   history?: PastAttempt[];
+  /**
+   * The Practice round on offer (practice round ticket 03): present for a Plan that may take one — whether
+   * it has one unfinished decides the offer's words — and null or absent for one that may not.
+   */
+  practice?: { unfinished: boolean } | null;
   /** Replaced in component tests. */
   client?: InterviewClient;
 };
@@ -83,6 +90,7 @@ export function InterviewPanel({
   quota: initialQuota,
   available,
   history = [],
+  practice = null,
   client = interviewClient,
 }: InterviewPanelProps) {
   const locked = !canStartAttempt(plan);
@@ -205,6 +213,8 @@ export function InterviewPanel({
             and doesn’t pause between them.
           </p>
 
+          {!job && practice && <PracticeOffer unfinished={practice.unfinished} />}
+
           <Path>
             <Step number={1} title="Which job?" done={job !== null} open>
               {job ? <PickedJob job={job} /> : <JobPicker />}
@@ -285,6 +295,31 @@ export function InterviewPanel({
         </div>
       </PageMain>
     </div>
+  );
+}
+
+/**
+ * A Practice round, offered on the hub to a Plan that cannot start an Attempt (practice round ticket 03):
+ * what one is, and a way into it — or back into the one left unfinished.
+ */
+function PracticeOffer({ unfinished }: { unfinished: boolean }) {
+  return (
+    <section
+      aria-labelledby="practice-offer"
+      className="mt-6 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-lg border border-primary/30 bg-card/70 p-4"
+    >
+      <div className="min-w-0 basis-64">
+        <h2 id="practice-offer" className="text-lg">
+          Try a practice round
+        </h2>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          Answer against the clock the way the full simulator runs. {PRACTICE_SUMMARY}.
+        </p>
+      </div>
+      <Button asChild className="h-10 px-5">
+        <Link href="/interview/practice">{unfinished ? "Resume your practice round" : "Start a practice round"}</Link>
+      </Button>
+    </section>
   );
 }
 

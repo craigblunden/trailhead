@@ -55,6 +55,7 @@ describe("where the wait stands", () => {
     ["/interview", "Loading the Interview Simulator…"],
     [`/interview/${SEED_JOBS[0].id}`, "Loading your interview…"],
     [`/interview/${SEED_JOBS[0].id}/attempt-1`, "Loading this interview…"],
+    ["/interview/practice", "Loading your practice round…"],
   ])("on %s it is in the header, beside the account menu, and nowhere in the page", (path, message) => {
     pathname = path;
     renderLoading(<PageLoading />);
@@ -76,6 +77,18 @@ describe("a past interview's Scorecard (interview second pass ticket 06)", () =>
     expect(screen.getByText(`${job.role} at ${job.company}`)).toBeInTheDocument();
     for (const title of ["Overall", "By area", "Answer by answer"]) expect(screen.getByText(title)).toBeInTheDocument();
     // The Interview Simulator's own path is not what is on its way.
+    expect(screen.queryByText("Which job?")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+    expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
+  });
+});
+
+describe("a Practice round (practice round ticket 03)", () => {
+  it("outlines the round's set-up under its written title, not the Interview Simulator's path", async () => {
+    pathname = "/interview/practice";
+    const { container } = renderLoading(<PageLoading />);
+
+    expect(screen.getByText("Practice round")).toBeInTheDocument();
     expect(screen.queryByText("Which job?")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading")).not.toBeInTheDocument();
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
