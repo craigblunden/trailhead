@@ -484,6 +484,22 @@ describe("ticket 02: answering, the clock, and completion", () => {
     // The four unanswered questions stay unanswered rather than being recorded empty.
     expect(ended.attempt.questions.slice(1).every((question) => !question.answer)).toBe(true);
   });
+
+  it("the countdown running out drops a part-written answer aimed at an already-answered question, and still ends the Attempt", async () => {
+    const { jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+    const [first] = started.attempt.questions;
+    await answerQuestion(started.attempt.id, { questionId: first.id, transcript: "Once.", elapsedSeconds: 30 });
+
+    const overwrite = await endAttempt(started.attempt.id, { questionId: first.id, transcript: "Twice." });
+
+    expect(overwrite.ok).toBe(true);
+    if (!overwrite.ok) return;
+    expect(overwrite.attempt.completedAt).not.toBeNull();
+    expect(overwrite.attempt.questions[0].answer?.transcript).toBe("Once.");
+    expect(overwrite.attempt.questions.filter((question) => question.answer)).toHaveLength(1);
+  });
 });
 
 describe("ticket 04: resuming an interrupted Attempt, or resetting it", () => {

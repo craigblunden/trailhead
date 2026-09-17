@@ -370,8 +370,10 @@ export async function recordAnswer(
  * budget, so the Attempt reads as having no time left rather than however much had been accounted
  * when the last Answer landed.
  *
- * Completing an already-completed Attempt changes nothing and returns it as it stands, so a tab that
- * reports the expiry twice cannot move the finish line or add a late Answer.
+ * The half-said answer is dropped rather than refused when it is empty, or names a question that is
+ * not this Attempt's or already has its Answer: the clock has run out either way, and the Attempt must
+ * still end. Completing an already-completed Attempt changes nothing and returns it as it stands, so a
+ * tab that reports the expiry twice cannot move the finish line or add a late Answer.
  */
 export async function completeAttempt(
   attemptId: string,

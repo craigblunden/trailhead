@@ -185,7 +185,7 @@ describe("recording an Answer (ticket 02)", () => {
     const outcome = await post(answerRoute, "attempt-1");
 
     expect(outcome.status).toBe(200);
-    expect(orchestration.endAttempt).toHaveBeenCalledWith("attempt-1", undefined);
+    expect(orchestration.endAttempt).toHaveBeenCalledWith("attempt-1");
     expect(orchestration.answerQuestion).not.toHaveBeenCalled();
   });
 
@@ -203,14 +203,14 @@ describe("recording an Answer (ticket 02)", () => {
     expect(orchestration.answerQuestion).not.toHaveBeenCalled();
   });
 
-  it("IV-R8c: a time-up body that cannot be read, or carries an elapsed time, is a 400 before any work", async () => {
+  it("IV-R8c: a time-up body that is not one — no question, a transcript over the cap, extra fields, or timeUp not true — is a 400", async () => {
     for (const body of [
-      { timeUp: true, transcript: "No question." },
+      { timeUp: true, transcript: "No question named." },
       { timeUp: true, questionId: "q1", transcript: "x".repeat(TRANSCRIPT_MAX_CHARS + 1) },
-      { timeUp: true, questionId: "q1", transcript: "Sneaky.", elapsedSeconds: 10 },
-      { timeUp: false, questionId: "q1", transcript: "Not a time-up." },
+      { timeUp: true, questionId: "q1", transcript: "Sneaky.", elapsedSeconds: 0 },
+      { timeUp: false, questionId: "q1", transcript: "Not time up." },
     ]) {
-      expect((await post(answerRoute, "attempt-1", ...json(body))).status).toBe(400);
+      expect(await post(answerRoute, "attempt-1", ...json(body))).toMatchObject({ status: 400, body: { error: "bad-answer" } });
     }
     expect(orchestration.endAttempt).not.toHaveBeenCalled();
     expect(orchestration.answerQuestion).not.toHaveBeenCalled();

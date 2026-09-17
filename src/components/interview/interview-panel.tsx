@@ -30,6 +30,7 @@ import {
   isAttemptLength,
   isComplete,
   isScored,
+  isUnreached,
   questionCount,
   remainingSeconds,
   type Attempt,
@@ -221,8 +222,8 @@ export function InterviewPanel({
                 />
               </Step>
             ) : job && finished && !isScored(attempt!) ? (
-              <Step number={2} title="That’s the interview" open last>
-                <ScoreStep onScore={score} busy={busy} failure={failure} />
+              <Step number={2} title={isComplete(attempt!) ? "That’s the interview" : "Time’s up"} open last>
+                <ScoreStep attempt={attempt!} onScore={score} busy={busy} failure={failure} />
               </Step>
             ) : job && finished ? (
               <Step number={2} title="How it went" open last>
@@ -405,10 +406,38 @@ function ResumeStep({
   );
 }
 
-/** Every question answered, or the clock ran out: what is left is the Scorecard. */
-function ScoreStep({ onScore, busy, failure }: { onScore: () => void; busy: boolean; failure: string | null }) {
+/**
+ * Every question answered, or the clock ran out: what is left is the Scorecard. When the clock ran out
+ * first, that is said before scoring rather than discovered in it — questions that were never shown
+ * otherwise look like questions the app lost.
+ */
+function ScoreStep({
+  attempt,
+  onScore,
+  busy,
+  failure,
+}: {
+  attempt: Attempt;
+  onScore: () => void;
+  busy: boolean;
+  failure: string | null;
+}) {
+  const total = attempt.questions.length;
+  const unreached = attempt.questions.filter(isUnreached).length;
   return (
     <div className="max-w-md space-y-3">
+      {unreached > 0 && (
+        <div className="rounded-md bg-warning/10 px-3 py-2 text-sm ring-1 ring-warning/40">
+          <p className="font-medium">
+            You reached {total - unreached} of {total} questions before the clock ran out.
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            The {pluralize(unreached, "question")} you didn’t reach will show as Not reached. They count for less than
+            an answer would, but still pull your overall score down. The clock is shared by every question, so keep
+            to the time shown under each one next time.
+          </p>
+        </div>
+      )}
       <p className="text-muted-foreground">
         Scoring reads every answer you gave and marks it against what this role asks for. It takes a few seconds,
         and it doesn’t use another of this week’s interviews.

@@ -31,8 +31,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (raw === null) return reply(400, badBody);
 
   try {
-    // No body at all is the countdown expiring with nothing to record.
-    const outcome = raw.trim() === "" ? await endAttempt(attempt.id, undefined) : await recordFrom(raw, attempt.id);
+    // No body at all is the countdown expiring with nothing said: there is no Answer to record.
+    const outcome = raw.trim() === "" ? await endAttempt(attempt.id) : await recordFrom(raw, attempt.id);
     if (outcome === null) return reply(400, badBody);
     if (outcome.ok) return reply(200, { ok: true, attempt: outcome.attempt } satisfies RecordAnswerResponse);
 

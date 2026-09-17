@@ -541,17 +541,28 @@ describe("the interview runs without a pause (ticket 02)", () => {
   it("IV-U20c: spoken, what the browser had heard — the settled words and the phrase still settling — is what is kept", async () => {
     vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
     const clicking = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    const nearlyOut: Attempt = { ...attemptOf(), activeSeconds: 299 };
+    const nearlyOut: Attempt = { ...attemptOf({ answered: 3 }), activeSeconds: 299 };
     renderPanel({ attempt: nearlyOut, speech: true });
     client.timeUp.mockResolvedValue({ ok: true, attempt: { ...nearlyOut, completedAt: "2026-09-16T10:00:00.000Z" } });
 
     await clicking.click(screen.getByRole("button", { name: "Resume" }));
-    hear("I led the reporting redesign");
+    hear("I led the reporting redesign.");
+    act(() => {
+      latestRecogniser().onresult?.({
+        resultIndex: 1,
+        results: [
+          Object.assign([{ transcript: "I led the reporting redesign." }], { isFinal: true }),
+          Object.assign([{ transcript: "and then we" }], { isFinal: false }),
+        ],
+      });
+    });
     await act(() => vi.advanceTimersByTimeAsync(2_000));
 
-    await waitFor(() =>
-      expect(client.timeUp).toHaveBeenCalledWith(nearlyOut.id, { questionId: "q0", transcript: "I led the reporting redesign" }),
-    );
+    await waitFor(() => expect(client.timeUp).toHaveBeenCalledTimes(1));
+    expect(client.timeUp.mock.calls[0][1]).toEqual({
+      questionId: "q3",
+      transcript: "I led the reporting redesign. and then we",
+    });
   });
 
   it("IV-U21: a failed submission keeps the answer and the seconds it cost, so a retry resumes rather than starts over", async () => {
@@ -844,6 +855,24 @@ describe("the Scorecard (ticket 03; interview second pass tickets 02, 03, 05)", 
 
     expect(await screen.findByRole("alert")).toHaveTextContent(INTERVIEW_FAILURES.failed);
     expect(screen.getByRole("button", { name: "Score my interview" })).toBeEnabled();
+  });
+
+  it("IV-U33b: when the clock ran out first, scoring says how many were answered before it is run", () => {
+    renderPanel({ attempt: { ...attemptOf({ answered: 2 }), completedAt: "2026-09-16T10:00:00.000Z" } });
+
+    expect(screen.getByText("Time’s up")).toBeInTheDocument();
+    expect(screen.getByText("You reached 2 of 5 questions before the clock ran out.")).toBeInTheDocument();
+    expect(screen.getByText(/The 3 questions you didn’t reach will show as Not reached/)).toHaveTextContent(
+      "keep to the time shown under each one",
+    );
+    expect(screen.getByRole("button", { name: "Score my interview" })).toBeEnabled();
+  });
+
+  it("IV-U33c: an interview answered to the end says nothing about running out", () => {
+    renderPanel({ attempt: attemptOf({ answered: 5 }) });
+
+    expect(screen.getByText("That’s the interview")).toBeInTheDocument();
+    expect(screen.queryByText(/before the clock ran out/)).not.toBeInTheDocument();
   });
 
   it("IV-U34: the Scorecard, the briefing, and the running interview have no accessibility violations", async () => {
