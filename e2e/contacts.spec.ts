@@ -46,11 +46,13 @@ test.describe("ticket 14: contacts", () => {
     await expect(roles.getByRole("link", { name: first.role })).toBeVisible();
     await expect(roles.getByRole("link", { name: second.role })).toBeVisible();
 
-    // Changing the kind edits this contact; it does not create a second one.
-    await page.getByRole("combobox", { name: "Kind" }).click();
+    // Changing the kind edits this contact; it does not create a second one. The page's inline "Add a
+    // contact" card has fields of its own, so these are the ones in Details.
+    const details = page.getByRole("region", { name: "Details" });
+    await details.getByRole("combobox", { name: "Kind" }).click();
     await page.getByRole("option", { name: "Hiring manager" }).click();
-    await page.getByLabel("Agency").fill("Northstar Talent");
-    await page.getByRole("button", { name: "Save changes" }).click();
+    await details.getByLabel("Agency").fill("Northstar Talent");
+    await details.getByRole("button", { name: "Save changes" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Saved." })).toBeVisible();
     await page.reload();
     await expect(page.getByText("Hiring manager · Northstar Talent").first()).toBeVisible();
