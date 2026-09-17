@@ -13,7 +13,9 @@ import { useSpeech, useSpeechSupported } from "@/components/interview/use-speech
 import { rememberTutorialSeen, useTutorialSeen } from "@/components/interview/use-tutorial-seen";
 import { PageMain } from "@/components/page-main";
 import { Button } from "@/components/ui/button";
+import { pluralize } from "@/lib/jobs";
 import type { Plan } from "@/lib/plans";
+import { PRACTICE_QUESTION_COUNT, canStartPracticeRound } from "@/lib/practice";
 import { TUTORIAL_RUN, TUTORIAL_SECONDS, afterTutorial } from "@/lib/tutorial";
 import { cn } from "@/lib/utils";
 
@@ -22,7 +24,7 @@ import { cn } from "@/lib/utils";
  * clock runs, it points out, one at a time, how many questions there are, the clock, and the microphone —
  * whose button is the tap that asks the browser for it, so the permission prompt comes up here, explained,
  * rather than in the middle of a first real answer. Then the question is read and answered as any is, with
- * Submit pointed out once there is something to submit. Nothing is sent anywhere: the Answer ends the
+ * Submit pointed out once there is something to submit. Nothing is sent anywhere: submitting ends the
  * Tutorial in the page, read back, and this device remembers it was done.
  */
 
@@ -108,13 +110,16 @@ export function TutorialPanel({ plan }: { plan: Plan }) {
       <HeldRunScreen run={TUTORIAL_RUN} caption="Tutorial">
         {step === "count" && (
           <Callout onNext={() => setStep("clock")}>
-            Questions come one at a time. This tutorial has one; a practice round has four.
+            Questions come one at a time. This tutorial has one;{" "}
+            {canStartPracticeRound(plan)
+              ? `a practice round has ${PRACTICE_QUESTION_COUNT}.`
+              : "an interview has several, across five areas."}
           </Callout>
         )}
         {step === "clock" && (
           <Callout align="end" onNext={() => setStep("microphone")}>
-            There is one countdown for the whole run — {TUTORIAL_SECONDS / 60} minute here — and it only runs while
-            you’re answering.
+            There is one countdown for the whole run — {pluralize(TUTORIAL_SECONDS / 60, "minute")} here — and it only
+            runs while you’re answering.
           </Callout>
         )}
         {step === "microphone" && (
@@ -214,7 +219,10 @@ function Callout({
 export function TutorialOffer({ newToSimulator, linkOtherwise = false }: { newToSimulator: boolean; linkOtherwise?: boolean }) {
   const speechSupported = useSpeechSupported();
   const [seen, remember] = useTutorialSeen();
-  if (!speechSupported) return null;
+  if (!speechSupported) {
+    // The Tutorial needs a browser that can hear the Tenant, so the link says why there is none.
+    return linkOtherwise ? <p className="mt-2 text-sm text-muted-foreground">The tutorial needs a browser that can hear you.</p> : null;
+  }
   if (!newToSimulator || seen) {
     return linkOtherwise ? (
       <p className="mt-2 text-sm">

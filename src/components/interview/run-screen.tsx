@@ -49,7 +49,7 @@ export type RunScreenProps = {
   run: TimedRun;
   /** What is being rehearsed, above the question trail: "Rehearsing for Product Designer at Fernwood". */
   caption: string;
-  /** Whether the transcript is on show while speaking. Hidden unless the Tenant asks for it. */
+  /** Whether the transcript is on show. Shown unless the Tenant hides it (practice feedback ticket 04). */
   transcriptShown: boolean;
   onTranscriptShownChange: (shown: boolean) => void;
   /** Records one Answer. Resolves with null once it has landed, or a message saying why it hasn't. */
@@ -239,8 +239,8 @@ function QuestionRun({
         <p role="status" className="sr-only">
           {yourTurn ? "Your turn. Start speaking." : ""}
         </p>
-        {/* Hidden by default: while speaking, the words scrolling past pull the eye away from the
-            question. The Tenant can open it to check what the browser caught. */}
+        {/* Shown by default — with nothing typed, it is the only sign the microphone is hearing — and
+            hidden by the Tenant who finds the words scrolling past pull the eye from the question. */}
         {transcriptShown && <SpokenNotepad id={notepadId} settled={speech.transcript} pending={speech.interim} />}
         {/* The microphone gave up: the clock has stopped with it, what was heard stays, and the Tenant can
             try again or leave to fix it and resume (practice feedback ticket 05). */}

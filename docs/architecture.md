@@ -249,7 +249,8 @@ to a status, and the same four test seams. What differs is worth saying:
   actually been answered for, and each Answer's request carries what that question cost — including
   any submissions of it that failed, so a retry can't hand time back. There is no pause between
   questions: Go puts the first up with its clock running, and each submission puts the next one up
-  the same way; the clock stands still only while an Answer is on its way to the server. Closing the
+  the same way; the clock stands still only while an Answer is on its way to the server, or while the
+  microphone has failed and the Tenant is fixing it. Closing the
   tab drains nothing, and returning resumes on the question that was reached — never inside the one
   abandoned mid-way, because an Answer is only ever recorded whole.
 - **No audio anywhere.** A spoken Answer is transcribed by the browser's own speech recognition;
@@ -258,9 +259,16 @@ to a status, and the same four test seams. What differs is worth saying:
   which would have meant opening a second microphone stream.
 - **Gated on the Plan this phase, not a Limit** (ADR-0005): free and basic see the real start screen
   locked, and their recorded Limits are not yet enforced.
-- **Questions asked aloud.** Answering by speaking, the browser's own speech synthesis reads each
-  question first; its clock and the microphone start once the voice is done, skipped, or overruns a
-  guard, so a stuck voice can never freeze an Attempt.
+- **Spoken answers only.** There is no typing an Answer; a browser that cannot transcribe cannot
+  start or resume a run.
+- **Questions asked aloud.** The browser's own speech synthesis reads each question first; its clock
+  and the microphone start once the voice is done, skipped, hasn't begun within 1.5 s, or overruns a
+  guard, so a silent or stuck voice can never freeze a run. Every tap that leads to a question being
+  read primes the voice first, because iPhone Safari only speaks once speech has begun inside a tap.
+- **The Tutorial is kept nowhere.** One guided question on the same run screen, run entirely in the
+  page. Whether to offer it is read from the data — no finished Practice round or Attempt — and from
+  a flag in the browser's localStorage once finished or skipped; nothing about it is stored on the
+  server.
 - **Practice rounds beside it, not inside it** (ADR-0006). Free and basic can take a Practice round —
   four questions from a fixed set, unscored, no model call, no quota — stored in `PracticeRound` and
   `PracticeQuestion` rather than as an Attempt without a Job. The two share the run screen and the
