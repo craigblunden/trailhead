@@ -11,7 +11,7 @@ import type { Job } from "@/lib/jobs";
 import type { Plan } from "@/lib/plans";
 import { SPEAK_UNSUPPORTED } from "@/lib/interview";
 import { PRACTICE_FAILURES, type PracticeCategory, type PracticeRound } from "@/lib/practice";
-import { hear, setSpeechSupport } from "../fakes/speech-recognition";
+import { hear, refuse, setSpeechSupport } from "../fakes/speech-recognition";
 import { SEED_JOBS } from "../fixtures/jobs";
 import { renderWithJobs, screen, userEvent, within } from "../test-utils";
 
@@ -160,6 +160,17 @@ describe("taking a Practice round (practice round ticket 03)", () => {
     renderPractice({ round: roundOf({ answered: 1 }) });
     expect(screen.queryByRole("button", { name: "Resume" })).not.toBeInTheDocument();
     expect(screen.getByText(SPEAK_UNSUPPORTED)).toBeInTheDocument();
+  });
+
+  it("PR-U6c: a microphone that fails mid-round offers leaving, back to where Resume waits (practice feedback ticket 05)", async () => {
+    const { user } = renderPractice({ round: roundOf() });
+
+    await user.click(screen.getByRole("button", { name: "Resume" }));
+    refuse("not-allowed");
+    await user.click(within(screen.getByRole("alert")).getByRole("button", { name: "Leave and resume later" }));
+
+    expect(screen.getByRole("heading", { name: "Pick up where you left off" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Resume" })).toBeInTheDocument();
   });
 
   it("PR-U7: a round already in progress elsewhere is offered to resume rather than reported as a failure", async () => {

@@ -67,5 +67,11 @@ export function hear(text: string) {
 
 /** Plays the browser refusing the microphone, or failing some other way the Tenant must hear about. */
 export function refuse(error: string) {
-  act(() => latestRecogniser().onerror?.({ error }));
+  const recogniser = latestRecogniser();
+  act(() => {
+    recogniser.onerror?.({ error });
+    // As in a browser, an error ends recognition.
+    recogniser.started = false;
+    recogniser.onend?.();
+  });
 }

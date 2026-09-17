@@ -25,6 +25,7 @@ import { SIGNED_OUT, createJob, expect, signUpAndVerify, test } from "./fixtures
 type FakeRecogniser = {
   started: boolean;
   onresult: ((event: unknown) => void) | null;
+  onerror: ((event: { error: string }) => void) | null;
   onend: (() => void) | null;
 };
 type VoiceWindow = Window & { __voiceHolds?: boolean; __voiceSilent?: boolean; __spoken?: string[]; __recognisers?: FakeRecogniser[] };
@@ -78,6 +79,17 @@ test.beforeEach(async ({ page }) => {
     }
   });
 });
+
+/** Plays the browser refusing the microphone it has on — as a Tenant tapping "Don't Allow" would. */
+async function refuseMicrophone(page: Page, error = "not-allowed") {
+  await page.evaluate((code) => {
+    const live = (window as VoiceWindow).__recognisers!.filter((recogniser) => recogniser.started);
+    const recogniser = live[live.length - 1];
+    recogniser.onerror?.({ error: code });
+    recogniser.started = false;
+    recogniser.onend?.();
+  }, error);
+}
 
 /** Plays the browser hearing `text`, once the page has its microphone on. */
 async function say(page: Page, text: string) {
@@ -429,6 +441,30 @@ test.describe("interview simulator: a Practice round (practice round ticket 03)"
     await expect(page.getByRole("timer")).toBeInViewport();
     await expect(page.getByText(/Question 1 of 4/)).toBeInViewport();
     await expect(page.getByRole("button", { name: "Submit answer" })).toBeInViewport();
+  });
+
+  test("a microphone refused mid-question stops the clock; leaving goes back to Resume with the time that was left (practice feedback ticket 05)", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await signUpAndVerify(page);
+
+    await page.goto("/interview/practice");
+    await page.getByRole("button", { name: "Go" }).click();
+    await answerOne(page, "I came to design through support work.", 2_000);
+    await expect(page.getByText(/Question 2 of 4/)).toBeVisible();
+    await say(page, "Half of it");
+    await refuseMicrophone(page);
+
+    const alert = page.getByRole("alert");
+    await expect(alert).toContainText("won’t let the page use your microphone");
+    const stopped = await page.getByRole("timer").textContent();
+    await page.waitForTimeout(2_000);
+    await expect(page.getByRole("timer")).toHaveText(stopped!);
+
+    await alert.getByRole("button", { name: "Leave and resume later" }).click();
+    await expect(page.getByRole("heading", { name: "Pick up where you left off" })).toBeVisible();
+    await expect(page.getByText(/1 of 4 answered, with 7:5d left/)).toBeVisible();
   });
 
   test("a pro Tenant has the full Simulator, so has no Practice round to start", async ({ page }) => {

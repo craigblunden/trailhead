@@ -100,7 +100,9 @@ const STALLED = "The microphone keeps stopping, so this answer can’t be heard.
 
 const ERRORS: Record<string, string> = {
   "not-allowed": "This browser won’t let the page use your microphone. Allow it in your browser’s settings.",
-  "service-not-allowed": "This browser won’t let the page use your microphone. Allow it in your browser’s settings.",
+  // What an iPhone with Dictation turned off reports, as well as a browser refusing outright.
+  "service-not-allowed":
+    "This browser won’t let the page listen. On an iPhone, turn on Dictation in Settings › General › Keyboard; elsewhere, try Chrome or Edge.",
   "audio-capture": "No microphone was found. Plug one in.",
   network: "Speech recognition needs a connection and couldn’t reach it.",
 };

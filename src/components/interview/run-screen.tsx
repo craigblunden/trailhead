@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { SpokenNotepad } from "@/components/interview/notepad";
 import { Soundwave, type MicState } from "@/components/interview/soundwave";
@@ -59,6 +59,11 @@ export type RunScreenProps = {
    * on this question so far — empty when nothing had.
    */
   onTimeUp: (partial: { questionId: string; transcript: string }) => Promise<string | null>;
+  /**
+   * The Tenant leaves a run whose microphone failed, to fix it and come back (practice feedback ticket 05):
+   * the page goes back to its Resume, where the next unanswered question waits with the time that was left.
+   */
+  onLeave: () => void;
 };
 
 export function RunScreen(props: RunScreenProps) {
@@ -80,6 +85,7 @@ function QuestionRun({
   onTranscriptShownChange,
   onAnswer,
   onTimeUp,
+  onLeave,
 }: RunScreenProps & { question: RunQuestion }) {
   const questionId = useId();
   const notepadId = useId();
@@ -91,36 +97,49 @@ function QuestionRun({
   // The question is read aloud before it is answered.
   const ask = useAskAloud(question.text);
   const answering = status === "answering" && !ask.asking;
+  // Whether the question can be answered right now: asked, not on its way to the server, and with a
+  // microphone that hasn't given up (practice feedback ticket 05). The clock and microphone run only then.
+  const live = answering && !speech.error;
 
-  /** When this try at the question began. Set as the clock starts, so it is never read before. */
+  /** When the clock last started on this question. Set as it starts, so it is never read before. */
   const startedAt = useRef(0);
-  const [spent, setSpent] = useState(0);
   /**
-   * Seconds this question already consumed on submissions that failed. The server only banks an
-   * Answer's time when the Answer lands, so without this a failed submission would hand the Tenant
-   * those seconds back — retry often enough and the countdown never moves.
+   * Seconds this question had already cost when the clock last started. The clock stops for a submission
+   * that fails and for a microphone that fails, and picks up from here: the server only banks an Answer's
+   * time when the Answer lands, so starting from nothing would hand the Tenant those seconds back — retry
+   * often enough and the countdown never moves.
    */
-  const [spentOnFailedTries, setSpentOnFailedTries] = useState(0);
-  const left = Math.max(secondsLeft(run) - spentOnFailedTries - spent, 0);
+  const spentBefore = useRef(0);
+  const [spent, setSpent] = useState(0);
+  const left = Math.max(secondsLeft(run) - spent, 0);
+  /** Everything this question has cost so far, to the second. */
+  const spentNow = useCallback(
+    () => spentBefore.current + Math.max(Math.round((Date.now() - startedAt.current) / 1_000), 0),
+    [],
+  );
 
-  // The clock, running whenever the question is being answered — which, from the moment it has been
-  // asked, it is. It stands still while it is read aloud, and while an answer is on its way to the server.
+  // The clock, running whenever the question can be answered — which, from the moment it has been asked,
+  // it can. It stands still while it is read aloud, while an answer is on its way to the server, and while
+  // the microphone has failed.
   useEffect(() => {
-    if (!answering) return;
+    if (!live) return;
     startedAt.current = Date.now();
-    const timer = setInterval(() => setSpent(Math.round((Date.now() - startedAt.current) / 1_000)), 250);
-    return () => clearInterval(timer);
-  }, [answering]);
+    const timer = setInterval(() => setSpent(spentNow()), 250);
+    return () => {
+      clearInterval(timer);
+      spentBefore.current = spentNow();
+    };
+  }, [live, spentNow]);
 
   // The microphone is on while the question is being answered, and off the moment it isn't — so it
   // is off while the question is read, or the recogniser would transcribe the voice. The
   // hook keeps it on through the browser ending recognition in a silence, and gives up — saying why —
   // if it can't (see `use-speech.ts`).
   useEffect(() => {
-    if (!answering) return;
+    if (!live) return;
     listen();
     return () => stopListening();
-  }, [answering, listen, stopListening]);
+  }, [live, listen, stopListening]);
 
   // The answer is what the browser heard — including the phrase still settling, so the last sentence
   // before Submit isn't lost.
@@ -128,7 +147,7 @@ function QuestionRun({
 
   // Out of time, mid-question: the run ends here. What the browser had heard is kept as this question's Answer, so half an answer is still scored; the questions after
   // it are unreached (interview second pass ticket 03).
-  const expired = left === 0 && answering;
+  const expired = left === 0 && live;
   const ending = useRef(false);
   useEffect(() => {
     if (!expired || ending.current) return;
@@ -143,21 +162,20 @@ function QuestionRun({
     if (!answering || !answer) return;
     // In the tap, before the wait on the server: the next question can then be read aloud on a phone.
     primeSpeech();
-    const thisTry = Math.max(Math.round((Date.now() - startedAt.current) / 1_000), 0);
+    // With the microphone failed, the clock already stopped, and what it had counted is the cost.
+    const elapsedSeconds = live ? spentNow() : spentBefore.current;
     setStatus("submitting");
     setFailure(null);
     const message = await onAnswer({
       questionId: question.id,
       transcript: answer.slice(0, TRANSCRIPT_MAX_CHARS),
       // Everything this question has cost, including tries that failed before this one.
-      elapsedSeconds: thisTry + spentOnFailedTries,
+      elapsedSeconds,
     });
     // Landed: the parent puts the next question up, and this one unmounts with its clock.
     if (!message) return;
-    // Didn't land: keep what was said, keep what the time cost, and carry on answering.
+    // Didn't land: keep what was said, and carry on answering — the clock picks up from what it had cost.
     setFailure(message);
-    setSpentOnFailedTries((current) => current + thisTry);
-    setSpent(0);
     setStatus("answering");
   }
 
@@ -235,10 +253,22 @@ function QuestionRun({
         {/* Hidden by default: while speaking, the words scrolling past pull the eye away from the
             question. The Tenant can open it to check what the browser caught. */}
         {transcriptShown && <SpokenNotepad id={notepadId} settled={speech.transcript} pending={speech.interim} />}
+        {/* The microphone gave up: the clock has stopped with it, what was heard stays, and the Tenant can
+            try again or leave to fix it and resume (practice feedback ticket 05). */}
         {speech.error && (
-          <p role="alert" className="text-sm text-destructive">
-            {speech.error}
-          </p>
+          <div role="alert" className="space-y-3 rounded-md border border-destructive/40 bg-card px-3 py-3 text-sm">
+            <p>
+              {speech.error} Your clock has stopped{answer ? ", and what you said so far is kept" : ""}.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" className="h-9 px-3" onClick={listen}>
+                Try again
+              </Button>
+              <Button type="button" variant="ghost" className="h-9 px-3" onClick={onLeave}>
+                Leave and resume later
+              </Button>
+            </div>
+          </div>
         )}
       </div>
 

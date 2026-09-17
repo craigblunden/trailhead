@@ -187,6 +187,7 @@ export function InterviewPanel({
             onTranscriptShownChange={setTranscriptShown}
             onAnswer={recordAnswer}
             onTimeUp={timeUp}
+            onLeave={() => setRunning(false)}
           />
         </PageMain>
       </div>

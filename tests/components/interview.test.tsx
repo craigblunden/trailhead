@@ -21,7 +21,7 @@ import {
 } from "@/lib/interview";
 import type { Job } from "@/lib/jobs";
 import type { Plan } from "@/lib/plans";
-import { hear, latestRecogniser, setSpeechSupport, speech as fakeSpeech } from "../fakes/speech-recognition";
+import { hear, latestRecogniser, refuse, setSpeechSupport, speech as fakeSpeech } from "../fakes/speech-recognition";
 import { SEED_JOBS } from "../fixtures/jobs";
 import { render, renderWithJobs, screen, userEvent, waitFor, within } from "../test-utils";
 
@@ -613,6 +613,74 @@ describe("speaking an answer (ticket 06)", () => {
     await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
     expect(fakeSpeech.recognisers.length).toBe(made);
     expect(made).toBeLessThanOrEqual(4);
+  });
+});
+
+describe("the microphone failing mid-question (practice feedback ticket 05)", () => {
+  it("IV-U59: the clock stops, the page says why without offering typing, and what was heard stays and can still be submitted", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
+    const clicking = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const attempt = attemptOf();
+    renderPanel({ attempt });
+    client.answer.mockReturnValue(new Promise(() => {}));
+
+    await clicking.click(screen.getByRole("button", { name: "Resume" }));
+    hear("I led the reporting redesign.");
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
+    refuse("not-allowed");
+    await act(() => vi.advanceTimersByTimeAsync(30_000));
+
+    expect(screen.getByRole("timer")).toHaveTextContent("4:50 left");
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(/won’t let the page use your microphone/);
+    expect(alert).not.toHaveTextContent(/type/i);
+    expect(within(alert).getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    expect(within(alert).getByRole("button", { name: "Leave and resume later" })).toBeInTheDocument();
+    expect(screen.getByText("I led the reporting redesign.")).toBeInTheDocument();
+
+    await clicking.click(submitButton());
+    expect(client.answer).toHaveBeenCalledWith(attempt.id, expect.objectContaining({ transcript: "I led the reporting redesign.", elapsedSeconds: 10 }));
+  });
+
+  it("IV-U60: Try again turns the microphone back on and the clock picks up where it stopped", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
+    const clicking = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderPanel({ attempt: attemptOf() });
+
+    await clicking.click(screen.getByRole("button", { name: "Resume" }));
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
+    refuse("audio-capture");
+    const before = fakeSpeech.recognisers.length;
+    await clicking.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(fakeSpeech.recognisers.length).toBeGreaterThan(before);
+    expect(latestRecogniser().started).toBe(true);
+    await act(() => vi.advanceTimersByTimeAsync(5_000));
+    expect(screen.getByRole("timer")).toHaveTextContent("4:45 left");
+  });
+
+  it("IV-U61b: Leave and resume later goes back to Resume, with nothing of this question kept", async () => {
+    const { user } = renderPanel({ attempt: attemptOf({ answered: 1 }) });
+
+    await user.click(screen.getByRole("button", { name: "Resume" }));
+    hear("Half an answer.");
+    refuse("not-allowed");
+    await user.click(screen.getByRole("button", { name: "Leave and resume later" }));
+
+    expect(screen.getByRole("button", { name: "Resume" })).toBeInTheDocument();
+    expect(screen.getByText(/1 of 5 answered, with 4:40 left/)).toBeInTheDocument();
+    expect(client.answer).not.toHaveBeenCalled();
+    expect(fakeSpeech.recognisers.every((recogniser) => !recogniser.started)).toBe(true);
+  });
+
+  it("IV-U61: a phone with dictation turned off is told to turn it on, or try another browser", async () => {
+    const { user } = renderPanel({ attempt: attemptOf() });
+
+    await user.click(screen.getByRole("button", { name: "Resume" }));
+    refuse("service-not-allowed");
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/dictation/i);
   });
 });
 

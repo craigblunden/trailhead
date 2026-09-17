@@ -97,6 +97,7 @@ export function PracticePanel({ round: initial, client = practiceClient }: Pract
             onTranscriptShownChange={setTranscriptShown}
             onAnswer={recordAnswer}
             onTimeUp={timeUp}
+            onLeave={() => setRunning(false)}
           />
         </PageMain>
       </div>
