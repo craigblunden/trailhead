@@ -376,6 +376,43 @@ describe("ticket 02: answering, the clock, and completion", () => {
     // The four unanswered questions stay unanswered rather than being recorded empty.
     expect(ended.attempt.questions.slice(1).every((question) => !question.answer)).toBe(true);
   });
+
+  it("the countdown running out mid-answer records what was said by then as that question's Answer", async () => {
+    const { jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+    const [first, second] = started.attempt.questions;
+    await answerQuestion(started.attempt.id, { questionId: first.id, transcript: "Finished this one.", elapsedSeconds: 30 });
+
+    const ended = await endAttempt(started.attempt.id, { questionId: second.id, transcript: "I was halfway through" });
+
+    expect(ended.ok).toBe(true);
+    if (!ended.ok) return;
+    expect(ended.attempt.completedAt).not.toBeNull();
+    expect(remainingSeconds(ended.attempt)).toBe(0);
+    expect(ended.attempt.questions[1].answer?.transcript).toBe("I was halfway through");
+    expect(ended.attempt.questions.slice(2).every((question) => !question.answer)).toBe(true);
+
+    // Reported again, the expiry changes nothing: no second Answer, no rewrite of the first.
+    const again = await endAttempt(started.attempt.id, { questionId: started.attempt.questions[2].id, transcript: "Late." });
+    expect(again.ok && again.attempt.questions[2].answer).toBeFalsy();
+  });
+
+  it("the countdown running out drops a part-written answer aimed at an already-answered question, and still ends the Attempt", async () => {
+    const { jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+    const [first] = started.attempt.questions;
+    await answerQuestion(started.attempt.id, { questionId: first.id, transcript: "Once.", elapsedSeconds: 30 });
+
+    const overwrite = await endAttempt(started.attempt.id, { questionId: first.id, transcript: "Twice." });
+
+    expect(overwrite.ok).toBe(true);
+    if (!overwrite.ok) return;
+    expect(overwrite.attempt.completedAt).not.toBeNull();
+    expect(overwrite.attempt.questions[0].answer?.transcript).toBe("Once.");
+    expect(overwrite.attempt.questions.filter((question) => question.answer)).toHaveLength(1);
+  });
 });
 
 describe("ticket 04: resuming an interrupted Attempt, or resetting it", () => {

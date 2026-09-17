@@ -347,13 +347,7 @@ export const startAttemptSchema = z.strictObject({
  */
 export const recordAnswerSchema = z.strictObject({
   questionId: idSchema,
-  transcript: z.preprocess(
-    (value) => (value === null || value === undefined ? "" : value),
-    z
-      .string("An answer must be text")
-      .transform((text) => stripInvisible(text).trim())
-      .pipe(z.string().max(TRANSCRIPT_MAX_CHARS, `Keep an answer under ${TRANSCRIPT_MAX_CHARS} characters`)),
-  ),
+  transcript: transcriptSchema(),
   /**
    * The browser's own count of the seconds this answer took. Bounded by the longest Attempt, so a
    * tab reporting a nonsense number cannot make the countdown jump; the server adds it to the
@@ -368,3 +362,25 @@ export const recordAnswerSchema = z.strictObject({
       .max(attemptSeconds(ATTEMPT_LENGTHS[ATTEMPT_LENGTHS.length - 1])),
   ),
 });
+
+/**
+ * The countdown running out mid-answer (ticket 02): the question being answered and what had been
+ * said or typed by then, recorded as that question's Answer as the Attempt ends. No elapsed time —
+ * running out spends the whole budget. With nothing written, the browser sends no body at all.
+ */
+export const timeUpSchema = z.strictObject({
+  timeUp: z.literal(true),
+  questionId: idSchema,
+  transcript: transcriptSchema(),
+});
+
+/** An Answer's text, spoken or typed: stripped, trimmed, and bounded. */
+function transcriptSchema() {
+  return z.preprocess(
+    (value) => (value === null || value === undefined ? "" : value),
+    z
+      .string("An answer must be text")
+      .transform((text) => stripInvisible(text).trim())
+      .pipe(z.string().max(TRANSCRIPT_MAX_CHARS, `Keep an answer under ${TRANSCRIPT_MAX_CHARS} characters`)),
+  );
+}

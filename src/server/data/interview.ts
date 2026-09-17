@@ -260,15 +260,21 @@ export async function recordAnswer(
 }
 
 /**
- * The countdown ran out mid-question: the Attempt ends where it stands. Whatever was being typed is
- * not recorded, and the remaining questions are simply left unanswered — nothing is force-submitted
- * or retried. The active time is set to the whole budget, so the Attempt reads as having no time
- * left rather than however much had been accounted when the last Answer landed.
+ * The countdown ran out mid-question: the Attempt ends where it stands. What had been said or typed
+ * for the question on screen is recorded as its Answer — the Tenant was mid-sentence, not silent —
+ * in the same transaction that ends the Attempt. The remaining questions are left unanswered. The
+ * active time is set to the whole budget, so the Attempt reads as having no time left rather than
+ * however much had been accounted when the last Answer landed.
  *
- * Completing an already-completed Attempt changes nothing and returns it as it stands, so a tab that
- * reports the expiry twice cannot move the finish line.
+ * The part-written answer is dropped rather than refused when it is empty, or names a question that
+ * is not this Attempt's or already has its Answer: the clock has run out either way, and the Attempt
+ * must still end. Completing an already-completed Attempt changes nothing and returns it as it
+ * stands, so a tab that reports the expiry twice cannot move the finish line or add an Answer.
  */
-export async function completeAttempt(attemptId: string, now: Date = new Date()): Promise<Attempt> {
+export async function completeAttempt(
+  attemptId: string,
+  { inProgress, now = new Date() }: { inProgress?: { questionId: string; transcript: string }; now?: Date } = {},
+): Promise<Attempt> {
   const { userId } = await requireSession();
   const row = await withTenant(userId, async (tx) => {
     const attempt = await tx.attempt.findFirst({
@@ -277,6 +283,14 @@ export async function completeAttempt(attemptId: string, now: Date = new Date())
     });
     if (!attempt) throw new RuleError("no-attempt", INTERVIEW_FAILURES["no-attempt"]);
     if (attempt.completedAt) return attempt;
+
+    const question = attempt.questions.find((candidate) => candidate.id === inProgress?.questionId);
+    if (inProgress?.transcript && question && !question.answeredAt) {
+      await tx.attemptQuestion.update({
+        where: { id: question.id, userId },
+        data: { transcript: inProgress.transcript, answeredAt: now },
+      });
+    }
     return tx.attempt.update({
       where: { id: attempt.id, userId },
       data: { completedAt: now, activeSeconds: budgetOf(attempt.length) },

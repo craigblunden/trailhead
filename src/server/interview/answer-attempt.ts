@@ -70,14 +70,17 @@ export async function answerQuestion(
 }
 
 /**
- * The countdown ran out mid-question: the Attempt ends where it stands, with whatever was typed
- * unrecorded and the remaining questions unanswered. Nothing is force-submitted, and the Attempt can
- * then be scored on the Answers it does have.
+ * The countdown ran out mid-question: the Attempt ends where it stands, with what had been said or
+ * typed for that question recorded as its Answer and the remaining questions unanswered. The Attempt
+ * can then be scored on the Answers it does have.
  */
-export async function endAttempt(attemptId: string): Promise<AnswerOutcome> {
+export async function endAttempt(
+  attemptId: string,
+  inProgress?: { questionId: string; transcript: string },
+): Promise<AnswerOutcome> {
   const { userId: tenant } = await requireSession();
   try {
-    return { ok: true, attempt: await completeAttempt(attemptId) };
+    return { ok: true, attempt: await completeAttempt(attemptId, { inProgress }) };
   } catch (error) {
     return failure(error, { tenant, operation: "interview.end" });
   }

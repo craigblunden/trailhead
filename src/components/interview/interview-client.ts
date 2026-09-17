@@ -47,9 +47,18 @@ export const interviewClient = {
     answer: { questionId: string; transcript: string; elapsedSeconds: number },
   ): Promise<RecordAnswerResponse> => send(`/api/attempts/${encodeURIComponent(attemptId)}/answer`, answer),
 
-  /** The countdown ran out: no body, so nothing half-typed is recorded. */
-  timeUp: (attemptId: string): Promise<RecordAnswerResponse> =>
-    send(`/api/attempts/${encodeURIComponent(attemptId)}/answer`),
+  /**
+   * The countdown ran out. What had been said or typed goes with it, to be recorded as that
+   * question's Answer; with nothing written there is no body, and nothing is recorded.
+   */
+  timeUp: (
+    attemptId: string,
+    inProgress?: { questionId: string; transcript: string },
+  ): Promise<RecordAnswerResponse> =>
+    send(
+      `/api/attempts/${encodeURIComponent(attemptId)}/answer`,
+      inProgress?.transcript ? { timeUp: true, ...inProgress } : undefined,
+    ),
 
   score: (attemptId: string): Promise<ScoreAttemptResponse> =>
     send(`/api/attempts/${encodeURIComponent(attemptId)}/score`),

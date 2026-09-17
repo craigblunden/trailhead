@@ -465,7 +465,7 @@ describe("the interview runs without a pause (ticket 02)", () => {
     expect(screen.queryByRole("timer")).not.toBeInTheDocument();
   });
 
-  it("IV-U20: the countdown reaching zero ends the Attempt, and what was typed is never sent", async () => {
+  it("IV-U20: the countdown reaching zero ends the Attempt, and what was typed by then goes with it as that question's answer", async () => {
     // Only the test moves the clock: real time leaking in makes exact seconds flaky on a busy machine.
     vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
     const typing = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -477,8 +477,37 @@ describe("the interview runs without a pause (ticket 02)", () => {
     await typing.type(screen.getByRole("textbox"), "Half an answ");
     await act(() => vi.advanceTimersByTimeAsync(2_000));
 
-    await waitFor(() => expect(client.timeUp).toHaveBeenCalledWith(nearlyOut.id));
+    await waitFor(() =>
+      expect(client.timeUp).toHaveBeenCalledWith(nearlyOut.id, { questionId: "q0", transcript: "Half an answ" }),
+    );
     expect(client.answer).not.toHaveBeenCalled();
+  });
+
+  it("IV-U20b: running out mid-sentence while speaking sends what the browser heard, including the phrase still settling", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
+    const clicking = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const nearlyOut: Attempt = { ...attemptOf({ answered: 3 }), activeSeconds: 299 };
+    renderPanel({ attempt: nearlyOut, speech: true });
+    client.timeUp.mockResolvedValue({ ok: true, attempt: { ...nearlyOut, completedAt: "2026-09-16T10:00:00.000Z" } });
+
+    await clicking.click(screen.getByRole("button", { name: "Resume" }));
+    hear("I led the reporting redesign.");
+    act(() => {
+      latestRecogniser().onresult?.({
+        resultIndex: 1,
+        results: [
+          Object.assign([{ transcript: "I led the reporting redesign." }], { isFinal: true }),
+          Object.assign([{ transcript: "and then we" }], { isFinal: false }),
+        ],
+      });
+    });
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+
+    await waitFor(() => expect(client.timeUp).toHaveBeenCalledTimes(1));
+    expect(client.timeUp.mock.calls[0][1]).toEqual({
+      questionId: "q3",
+      transcript: "I led the reporting redesign. and then we",
+    });
   });
 
   it("IV-U21: a failed submission keeps the answer and the seconds it cost, so a retry resumes rather than starts over", async () => {
@@ -662,6 +691,24 @@ describe("the Scorecard (ticket 03)", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(INTERVIEW_FAILURES.failed);
     expect(screen.getByRole("button", { name: "Score my interview" })).toBeEnabled();
+  });
+
+  it("IV-U33b: when the clock ran out first, scoring says how many were answered before it is run", () => {
+    renderPanel({ attempt: { ...attemptOf({ answered: 2 }), completedAt: "2026-09-16T10:00:00.000Z" } });
+
+    expect(screen.getByText("Time’s up")).toBeInTheDocument();
+    expect(screen.getByText("You answered 2 of 5 questions before the clock ran out.")).toBeInTheDocument();
+    expect(screen.getByText(/The 3 questions you didn’t reach will score as unanswered/)).toHaveTextContent(
+      "about a minute an answer",
+    );
+    expect(screen.getByRole("button", { name: "Score my interview" })).toBeEnabled();
+  });
+
+  it("IV-U33c: an interview answered to the end says nothing about running out", () => {
+    renderPanel({ attempt: attemptOf({ answered: 5 }) });
+
+    expect(screen.getByText("That’s the interview")).toBeInTheDocument();
+    expect(screen.queryByText(/before the clock ran out/)).not.toBeInTheDocument();
   });
 
   it("IV-U34: the Scorecard, the briefing, and the running interview have no accessibility violations", async () => {
