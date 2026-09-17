@@ -10,6 +10,7 @@ import { SpeechUnsupported, SpokenAnswers } from "@/components/interview/intervi
 import { practiceClient, type PracticeClient } from "@/components/interview/practice-client";
 import { PracticeAnswers, ScoringOnPro } from "@/components/interview/practice-read-back";
 import { RunScreen } from "@/components/interview/run-screen";
+import { primeSpeech } from "@/components/interview/use-ask-aloud";
 import { useSpeechSupported } from "@/components/interview/use-speech";
 import { LoadingTrail } from "@/components/loading-trail";
 import { PageMain } from "@/components/page-main";
@@ -45,6 +46,8 @@ export function PracticePanel({ round: initial, client = practiceClient }: Pract
   const unfinished = round !== null && !round.completedAt && !isComplete(round);
 
   async function start(reset: boolean) {
+    // In the tap, before the wait on the server: the first question can then be read aloud on a phone.
+    primeSpeech();
     setBusy(true);
     setFailure(null);
     const answer = await client.start(reset);
@@ -119,7 +122,16 @@ export function PracticePanel({ round: initial, client = practiceClient }: Pract
 
           <div className={round && !unfinished ? "mt-8 space-y-5" : "mt-8 max-w-sm space-y-5"}>
             {round && unfinished ? (
-              <ResumeRound round={round} speechSupported={speechSupported} busy={busy} onResume={() => setRunning(true)} onStartOver={() => start(true)} />
+              <ResumeRound
+                round={round}
+                speechSupported={speechSupported}
+                busy={busy}
+                onResume={() => {
+                  primeSpeech();
+                  setRunning(true);
+                }}
+                onStartOver={() => start(true)}
+              />
             ) : round ? (
               <RoundEnd round={round} busy={busy} onPractiseAgain={practiseAgain} />
             ) : (

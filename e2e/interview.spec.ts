@@ -27,7 +27,7 @@ type FakeRecogniser = {
   onresult: ((event: unknown) => void) | null;
   onend: (() => void) | null;
 };
-type VoiceWindow = Window & { __voiceHolds?: boolean; __spoken?: string[]; __recognisers?: FakeRecogniser[] };
+type VoiceWindow = Window & { __voiceHolds?: boolean; __voiceSilent?: boolean; __spoken?: string[]; __recognisers?: FakeRecogniser[] };
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -37,8 +37,12 @@ test.beforeEach(async ({ page }) => {
       speaking: false,
       pending: false,
       speak(utterance: SpeechSynthesisUtterance) {
-        voiced.__spoken!.push(utterance.text);
-        if (!voiced.__voiceHolds) queueMicrotask(() => utterance.onend?.(new Event("end") as SpeechSynthesisEvent));
+        // The primer each tap speaks (practice feedback ticket 03) is nothing to record, and ends at once.
+        if (utterance.text) voiced.__spoken!.push(utterance.text);
+        // A silent voice never begins; a held one begins and never ends.
+        if (voiced.__voiceSilent) return;
+        queueMicrotask(() => utterance.onstart?.(new Event("start") as SpeechSynthesisEvent));
+        if (!voiced.__voiceHolds || !utterance.text) queueMicrotask(() => utterance.onend?.(new Event("end") as SpeechSynthesisEvent));
       },
       cancel() {},
     };
@@ -451,6 +455,26 @@ test.describe("interview simulator: questions asked aloud (practice round ticket
     await page.getByRole("button", { name: "Skip" }).click();
     await expect(page.getByText(/Reading the question aloud/)).toHaveCount(0);
     await expect(clock).not.toHaveText("15:00 left", { timeout: 5_000 });
+  });
+});
+
+test.describe("interview simulator: a voice that never begins (practice feedback ticket 03)", () => {
+  test.use({ storageState: SIGNED_OUT });
+
+  test("the question counts as asked within a couple of seconds, and it is the Tenant's turn", async ({ page }) => {
+    test.setTimeout(120_000);
+    await signUpAndVerify(page);
+
+    await page.goto("/interview/practice");
+    // A phone that won't speak says nothing at all: no start, no end, no error.
+    await page.evaluate(() => ((window as VoiceWindow).__voiceSilent = true));
+    await page.getByRole("button", { name: "Go" }).click();
+
+    const clock = page.getByRole("timer");
+    await expect(clock).toBeVisible();
+    await expect(page.getByText("Your turn — start speaking")).toBeVisible({ timeout: 2_500 });
+    await expect(page.getByText(/Reading the question aloud/)).toHaveCount(0);
+    await expect(clock).not.toHaveText("8:00 left", { timeout: 3_000 });
   });
 });
 

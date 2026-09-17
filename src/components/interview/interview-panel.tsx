@@ -20,6 +20,7 @@ import { PastInterviews } from "@/components/interview/past-interviews";
 import { PracticeRounds } from "@/components/interview/practice-rounds";
 import { RunScreen } from "@/components/interview/run-screen";
 import { Scorecard } from "@/components/interview/scorecard";
+import { primeSpeech } from "@/components/interview/use-ask-aloud";
 import { useSpeechSupported } from "@/components/interview/use-speech";
 import { LoadingTrail } from "@/components/loading-trail";
 import { PageMain } from "@/components/page-main";
@@ -122,6 +123,8 @@ export function InterviewPanel({
 
   async function start(reset: boolean, startLength: AttemptLength) {
     if (!job) return;
+    // In the tap, before the wait for questions: the first one can then be read aloud on a phone.
+    primeSpeech();
     setBusy(true);
     setFailure(null);
     const answer = await client.start(job.id, startLength, reset);
@@ -222,7 +225,10 @@ export function InterviewPanel({
               <Step number={2} title="Pick up where you left off" open last>
                 <ResumeStep
                   attempt={attempt!}
-                  onResume={() => setRunning(true)}
+                  onResume={() => {
+                    primeSpeech();
+                    setRunning(true);
+                  }}
                   // An Attempt started at a retired length starts over at the shortest length offered now.
                   onStartOver={() => start(true, isAttemptLength(attempt!.length) ? attempt!.length : lengths[0])}
                   outOfAttempts={outOfAttempts}

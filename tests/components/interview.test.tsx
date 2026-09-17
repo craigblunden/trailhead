@@ -561,14 +561,17 @@ describe("speaking an answer (ticket 06)", () => {
     const wave = () => document.querySelector("[data-mic]")!;
 
     expect(wave()).toHaveAttribute("data-mic", "listening");
-    expect(screen.getByText("Listening. Say your answer out loud.")).toBeInTheDocument();
+    // Nothing heard yet: it is the Tenant's turn (practice feedback ticket 03).
+    expect(screen.getByText("Your turn — start speaking")).toBeInTheDocument();
 
     act(() => latestRecogniser().onspeechstart?.());
     expect(wave()).toHaveAttribute("data-mic", "hearing");
     expect(screen.getByText("Hearing you")).toBeInTheDocument();
 
+    hear("I led the redesign.");
     act(() => latestRecogniser().onspeechend?.());
     expect(wave()).toHaveAttribute("data-mic", "listening");
+    expect(screen.getByText("Listening. Say your answer out loud.")).toBeInTheDocument();
   });
 
   it("IV-U24: a spoken answer is sent as the words the browser heard — and no audio is touched", async () => {
@@ -614,17 +617,26 @@ describe("speaking an answer (ticket 06)", () => {
 });
 
 describe("questions asked aloud (practice round ticket 02)", () => {
-  type Utterance = { text: string; onend: (() => void) | null; onerror: (() => void) | null };
+  type Utterance = { text: string; onstart: (() => void) | null; onend: (() => void) | null; onerror: (() => void) | null };
   let utterances: Utterance[] = [];
+  /** When set, the voice never begins — a phone that refused to speak outside a tap. */
+  let silent = false;
   const voice = { speaking: false, pending: false, speak: vi.fn(), cancel: vi.fn() };
   const holder = window as unknown as { speechSynthesis?: unknown; SpeechSynthesisUtterance?: unknown };
 
   beforeEach(() => {
     utterances = [];
-    voice.speak.mockReset().mockImplementation((utterance: Utterance) => utterances.push(utterance));
+    silent = false;
+    voice.speak.mockReset().mockImplementation((utterance: Utterance) => {
+      utterances.push(utterance);
+      // The primer is an empty utterance; only questions are kept as what was read.
+      if (!utterance.text) utterances.pop();
+      else if (!silent) utterance.onstart?.();
+    });
     voice.cancel.mockReset();
     holder.speechSynthesis = voice;
     holder.SpeechSynthesisUtterance = class {
+      onstart = null;
       onend = null;
       onerror = null;
       constructor(public text: string) {}
@@ -688,6 +700,62 @@ describe("questions asked aloud (practice round ticket 02)", () => {
     // The next question is read in its turn.
     expect(await screen.findByRole("heading", { level: 1, name: "A behavioural question?" })).toBeInTheDocument();
     expect(utterances.map((utterance) => utterance.text)).toEqual(["A personal question?", "A behavioural question?"]);
+  });
+
+  it("IV-U55: Go and Resume start the voice inside the tap, before anything waits on the network (practice feedback ticket 03)", async () => {
+    const { user, unmount } = renderPanel();
+    client.start.mockReturnValue(new Promise(() => {}));
+
+    await user.click(go());
+    expect(voice.speak).toHaveBeenCalledWith(expect.objectContaining({ text: "" }));
+    unmount();
+
+    voice.speak.mockClear();
+    const resumed = renderPanel({ attempt: attemptOf({ answered: 1 }) });
+    await resumed.user.click(screen.getByRole("button", { name: "Resume" }));
+    expect(voice.speak.mock.calls[0][0]).toMatchObject({ text: "" });
+  });
+
+  it("IV-U56: Submit starts the voice inside the tap too, for the question that comes after the server", async () => {
+    const { user } = renderPanel({ attempt: attemptOf() });
+    client.answer.mockReturnValue(new Promise(() => {}));
+
+    await user.click(screen.getByRole("button", { name: "Resume" }));
+    finishReading();
+    hear("I led the reporting redesign.");
+    voice.speak.mockClear();
+    await user.click(submitButton());
+
+    expect(voice.speak).toHaveBeenCalledWith(expect.objectContaining({ text: "" }));
+  });
+
+  it("IV-U57: a voice that never begins is given up on after a second and a half — the clock and microphone start (practice feedback ticket 03)", async () => {
+    silent = true;
+    const { user } = renderPanel({ attempt: attemptOf() });
+
+    await user.click(screen.getByRole("button", { name: "Resume" }));
+    expect(screen.getByText(/Reading the question aloud/)).toBeInTheDocument();
+
+    // Real time: the page's own timers are what is under test.
+    await waitFor(() => expect(screen.queryByText(/Reading the question aloud/)).not.toBeInTheDocument(), {
+      timeout: 2_500,
+    });
+    expect(voice.cancel).toHaveBeenCalled();
+    expect(latestRecogniser().started).toBe(true);
+  });
+
+  it("IV-U58: once the question has been asked, the page says it is the Tenant's turn, until they are heard (practice feedback ticket 03)", async () => {
+    const { user } = renderPanel({ attempt: attemptOf() });
+
+    await user.click(screen.getByRole("button", { name: "Resume" }));
+    expect(screen.queryByText("Your turn — start speaking")).not.toBeInTheDocument();
+
+    finishReading();
+    expect(screen.getByText("Your turn — start speaking")).toBeInTheDocument();
+    expect(screen.getAllByRole("status").some((status) => /Your turn/.test(status.textContent ?? ""))).toBe(true);
+
+    hear("I led the reporting redesign.");
+    expect(screen.queryByText("Your turn — start speaking")).not.toBeInTheDocument();
   });
 });
 

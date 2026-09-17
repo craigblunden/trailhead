@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 import { SpokenNotepad } from "@/components/interview/notepad";
 import { Soundwave, type MicState } from "@/components/interview/soundwave";
-import { useAskAloud } from "@/components/interview/use-ask-aloud";
+import { primeSpeech, useAskAloud } from "@/components/interview/use-ask-aloud";
 import { useSpeech } from "@/components/interview/use-speech";
 import { Button } from "@/components/ui/button";
 import {
@@ -141,6 +141,8 @@ function QuestionRun({
 
   async function submit() {
     if (!answering || !answer) return;
+    // In the tap, before the wait on the server: the next question can then be read aloud on a phone.
+    primeSpeech();
     const thisTry = Math.max(Math.round((Date.now() - startedAt.current) / 1_000), 0);
     setStatus("submitting");
     setFailure(null);
@@ -164,6 +166,9 @@ function QuestionRun({
   const last = run.questions.every((candidate) => candidate.id === question.id || candidate.answer);
   const submitting = status === "submitting";
   const micState: MicState = !speech.listening || submitting ? "off" : speech.hearing ? "hearing" : "listening";
+  // The handover (practice feedback ticket 03): the question has been asked, the clock and microphone are
+  // on, and nothing has been heard yet. Said plainly, so no one is left wondering when to start talking.
+  const yourTurn = micState === "listening" && !answer && !speech.error;
 
   return (
     // Centred, unlike every other page's content: while the clock runs this is a stage, not a section
@@ -206,7 +211,7 @@ function QuestionRun({
               </Button>
             </div>
           ) : (
-            <Soundwave state={micState} />
+            <Soundwave state={micState} words={yourTurn ? "Your turn — start speaking" : undefined} />
           )}
           <Button
             type="button"
@@ -219,6 +224,10 @@ function QuestionRun({
             {transcriptShown ? "Hide transcript" : "Show transcript"}
           </Button>
         </div>
+        {/* Always in the page, so the moment it fills is announced — once, not with every change of the soundwave. */}
+        <p role="status" className="sr-only">
+          {yourTurn ? "Your turn. Start speaking." : ""}
+        </p>
         {/* Hidden by default: while speaking, the words scrolling past pull the eye away from the
             question. The Tenant can open it to check what the browser caught. */}
         {transcriptShown && <SpokenNotepad id={notepadId} settled={speech.transcript} pending={speech.interim} />}

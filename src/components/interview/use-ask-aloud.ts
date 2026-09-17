@@ -7,7 +7,10 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
  * clock and microphone start — only once the voice is done with it.
  *
  * Asked is a one-way latch per question: the voice finishing, failing, being skipped, or overrunning its
- * guard all end it, and nothing starts it again. Where the browser has no speech synthesis,
+ * guard all end it, and nothing starts it again. So does a voice that hasn't begun within
+ * `ASK_START_MS` (practice feedback ticket 03): a phone that refuses to speak says nothing at all — no
+ * error, no end — and the Tenant was left watching "Reading the question aloud" in silence for up to
+ * twenty seconds. Where the browser has no speech synthesis,
  * the question is asked from the start, exactly as before there was a voice; no message, because there
  * is nothing the Tenant can do about it.
  */
@@ -30,6 +33,32 @@ export function useSpeechSynthesisSupported(): boolean {
 /** How long the voice is given, in ms, before the question counts as asked anyway: 80 ms a character plus 2 s, at most 20 s. */
 export function askGuardMs(text: string): number {
   return Math.min(text.length * 80 + 2_000, 20_000);
+}
+
+/** How long a voice has to begin, in ms, before the question counts as asked without it. */
+export const ASK_START_MS = 1_500;
+
+/** Whether the empty utterance `primeSpeech` spoke is still settling — it is queued behind, never cancelled. */
+let primerSettling = false;
+
+/**
+ * Speaks nothing, at once (practice feedback ticket 03). iPhone Safari only lets a page speak once speech
+ * has begun inside a tap, and every question is read after a wait on the server — Go, Resume, Submit —
+ * by which time the tap no longer counts. So each of those calls this first, synchronously in its click
+ * handler, and the question read after the network is allowed. A no-op where there is no speech synthesis.
+ */
+export function primeSpeech() {
+  if (!synthesisAvailable()) return;
+  try {
+    const primer = new SpeechSynthesisUtterance("");
+    primerSettling = true;
+    primer.onend = primer.onerror = () => {
+      primerSettling = false;
+    };
+    window.speechSynthesis.speak(primer);
+  } catch {
+    primerSettling = false;
+  }
 }
 
 export type AskAloud = {
@@ -58,20 +87,28 @@ export function useAskAloud(text: string): AskAloud {
       if (settled) return;
       settled = true;
       window.clearTimeout(guard);
+      window.clearTimeout(unstarted);
       setPending(false);
     };
     const utterance = new SpeechSynthesisUtterance(text);
     // The page's language, which is the questions' language — not the browser's, which may be another.
     utterance.lang = document.documentElement.lang || navigator.language || "en";
+    utterance.onstart = () => window.clearTimeout(unstarted);
     utterance.onend = asked;
     utterance.onerror = asked;
+    // A voice that never begins: cancelled, and the question asked without it.
+    const unstarted = window.setTimeout(() => {
+      synth.cancel();
+      asked();
+    }, ASK_START_MS);
     const guard = window.setTimeout(() => {
       synth.cancel();
       asked();
     }, askGuardMs(text));
     try {
       // Only cancel what is actually playing: Chrome can drop an utterance spoken straight after a cancel.
-      if (synth.speaking || synth.pending) synth.cancel();
+      // The primer is left to finish, and the question queues behind it.
+      if ((synth.speaking || synth.pending) && !primerSettling) synth.cancel();
       synth.speak(utterance);
     } catch {
       asked();
@@ -81,6 +118,7 @@ export function useAskAloud(text: string): AskAloud {
       // `error` from the cancel is ignored.
       settled = true;
       window.clearTimeout(guard);
+      window.clearTimeout(unstarted);
       synth.cancel();
     };
   }, [asking, text]);

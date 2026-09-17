@@ -28,7 +28,16 @@ const WORDS: Record<MicState, string> = {
   hearing: "Hearing you",
 };
 
-export function Soundwave({ state, className }: { state: MicState; className?: string }) {
+export function Soundwave({
+  state,
+  words,
+  className,
+}: {
+  state: MicState;
+  /** Said in place of the state's own words — "Your turn" before anything has been heard. */
+  words?: string;
+  className?: string;
+}) {
   return (
     <div data-mic={state} className={cn("flex items-center gap-3", className)}>
       <span
@@ -50,7 +59,7 @@ export function Soundwave({ state, className }: { state: MicState; className?: s
         ))}
       </span>
       <span className={cn("text-[0.9375rem]", state === "off" ? "text-muted-foreground" : "font-medium")}>
-        {WORDS[state]}
+        {words ?? WORDS[state]}
       </span>
     </div>
   );
