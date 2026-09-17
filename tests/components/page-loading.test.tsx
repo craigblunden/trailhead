@@ -57,6 +57,7 @@ describe("where the wait stands", () => {
     [`/interview/${SEED_JOBS[0].id}/attempt-1`, "Loading this interview…"],
     ["/interview/practice", "Loading your practice round…"],
     ["/interview/practice/round-1", "Loading this practice round…"],
+    ["/interview/tutorial", "Loading the tutorial…"],
   ])("on %s it is in the header, beside the account menu, and nowhere in the page", (path, message) => {
     pathname = path;
     renderLoading(<PageLoading />);
@@ -90,6 +91,18 @@ describe("a Practice round (practice round ticket 03)", () => {
     const { container } = renderLoading(<PageLoading />);
 
     expect(screen.getByText("Practice round")).toBeInTheDocument();
+    expect(screen.queryByText("Which job?")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+    expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
+  });
+});
+
+describe("the Tutorial (practice feedback ticket 06)", () => {
+  it("outlines the run's header under its written caption, not the Interview Simulator's path", async () => {
+    pathname = "/interview/tutorial";
+    const { container } = renderLoading(<PageLoading />);
+
+    expect(screen.getByText("Tutorial")).toBeInTheDocument();
     expect(screen.queryByText("Which job?")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading")).not.toBeInTheDocument();
     expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();

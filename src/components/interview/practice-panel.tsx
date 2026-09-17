@@ -10,6 +10,7 @@ import { SpeechUnsupported, SpokenAnswers } from "@/components/interview/intervi
 import { practiceClient, type PracticeClient } from "@/components/interview/practice-client";
 import { PracticeAnswers, ScoringOnPro } from "@/components/interview/practice-read-back";
 import { RunScreen } from "@/components/interview/run-screen";
+import { TutorialOffer } from "@/components/interview/tutorial-panel";
 import { primeSpeech } from "@/components/interview/use-ask-aloud";
 import { useSpeechSupported } from "@/components/interview/use-speech";
 import { LoadingTrail } from "@/components/loading-trail";
@@ -30,11 +31,13 @@ import { PRACTICE_QUESTION_COUNT, PRACTICE_SECONDS, PRACTICE_SUMMARY, type Pract
 export type PracticePanelProps = {
   /** The Tenant's unfinished round, as the server holds it, or null for a fresh set-up. */
   round: PracticeRound | null;
+  /** The Tenant has finished no run of the Simulator, so the Tutorial is offered above Go (practice feedback ticket 06). */
+  newToSimulator?: boolean;
   /** Replaced in component tests. */
   client?: PracticeClient;
 };
 
-export function PracticePanel({ round: initial, client = practiceClient }: PracticePanelProps) {
+export function PracticePanel({ round: initial, newToSimulator = false, client = practiceClient }: PracticePanelProps) {
   const speechSupported = useSpeechSupported();
   const [round, setRound] = useState<PracticeRound | null>(initial);
   const [transcriptShown, setTranscriptShown] = useState(true);
@@ -137,6 +140,7 @@ export function PracticePanel({ round: initial, client = practiceClient }: Pract
               <RoundEnd round={round} busy={busy} onPractiseAgain={practiseAgain} />
             ) : (
               <>
+                <TutorialOffer newToSimulator={newToSimulator} />
                 <SpokenAnswers />
                 {!speechSupported ? (
                   <SpeechUnsupported />

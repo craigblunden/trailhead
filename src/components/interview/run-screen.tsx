@@ -64,6 +64,11 @@ export type RunScreenProps = {
    * the page goes back to its Resume, where the next unanswered question waits with the time that was left.
    */
   onLeave: () => void;
+  /**
+   * Said beside Submit once there is something to submit — the Tutorial's pointer to it (practice
+   * feedback ticket 06). Nothing on a real run.
+   */
+  submitCallout?: React.ReactNode;
 };
 
 export function RunScreen(props: RunScreenProps) {
@@ -86,6 +91,7 @@ function QuestionRun({
   onAnswer,
   onTimeUp,
   onLeave,
+  submitCallout,
 }: RunScreenProps & { question: RunQuestion }) {
   const questionId = useId();
   const notepadId = useId();
@@ -179,8 +185,6 @@ function QuestionRun({
     setStatus("answering");
   }
 
-  const position = run.questions.findIndex((candidate) => candidate.id === question.id);
-  const total = run.questions.length;
   const last = run.questions.every((candidate) => candidate.id === question.id || candidate.answer);
   const submitting = status === "submitting";
   const micState: MicState = !speech.listening || submitting ? "off" : speech.hearing ? "hearing" : "listening";
@@ -192,25 +196,7 @@ function QuestionRun({
     // Centred, unlike every other page's content: while the clock runs this is a stage, not a section
     // of the app, and there is no page title at the frame's edge for it to line up with.
     <div className="mx-auto max-w-3xl">
-      <p className="text-sm text-muted-foreground">{caption}</p>
-      {/* On a phone this bar sticks under the header, so how long is left and how far through never scroll
-          out of sight while an answer grows (practice feedback ticket 04). From sm up, it sits in place. */}
-      <div className="sticky top-[calc(3.75rem+1px)] z-20 -mx-4 mt-1 flex items-center justify-between gap-6 border-b border-border bg-background/95 px-4 py-2 backdrop-blur sm:static sm:mx-0 sm:mt-3 sm:items-start sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
-        <div className="min-w-0 space-y-3">
-          <div className="hidden sm:block">
-            <QuestionTrail questions={run.questions} current={position} />
-          </div>
-          <p className="flex flex-wrap items-center gap-2 text-sm">
-            <span>
-              Question {position + 1} of {total}
-            </span>
-            <span className="rounded-full bg-chip px-2 py-0.5 text-xs font-medium text-chip-foreground">
-              {CATEGORY_LABEL[question.category]}
-            </span>
-          </p>
-        </div>
-        <Clock seconds={left} />
-      </div>
+      <RunHeader run={run} caption={caption} question={question} seconds={left} />
 
       {/* The question is the page's heading: it is what the Tenant is here to answer, and a screen
           reader moving by headings lands on it first. */}
@@ -219,7 +205,10 @@ function QuestionRun({
       </h1>
       {/* A guide to pace against, never a cut-off: the one countdown above is still the only clock
           (interview second pass ticket 04). */}
-      <p className="mt-3 text-sm text-muted-foreground">Aim for about {formatMinutes(ANSWER_MINUTES[question.category])} min</p>
+      {/* Left out where the whole countdown is shorter than the guide — the Tutorial's one minute. */}
+      {ANSWER_MINUTES[question.category] * 60 <= run.countdownSeconds && (
+        <p className="mt-3 text-sm text-muted-foreground">Aim for about {formatMinutes(ANSWER_MINUTES[question.category])} min</p>
+      )}
 
       <div className="mt-8 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
@@ -280,6 +269,7 @@ function QuestionRun({
 
       {/* On a phone, Submit sticks to the bottom of the screen: the one thing to press is never below the fold. */}
       <div className="sticky bottom-0 z-20 -mx-4 mt-8 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border bg-background/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+        {submitCallout && answer && !submitting && <div className="basis-full">{submitCallout}</div>}
         <Button type="button" className="h-11 px-6 text-base" disabled={submitting || ask.asking || !answer} onClick={submit}>
           {submitting ? "Saving your answer…" : last ? "Submit final answer" : "Submit answer"}
         </Button>
@@ -287,6 +277,62 @@ function QuestionRun({
           {last ? "This is the last question." : "The next question starts as soon as you submit."}
         </p>
       </div>
+    </div>
+  );
+}
+
+/**
+ * What is above every question: what is being rehearsed, how far through, and the clock. On a phone the
+ * last two sit in a bar that sticks under the header, so they never scroll out of sight while an answer
+ * grows (practice feedback ticket 04); from sm up, it sits in place.
+ */
+function RunHeader({
+  run,
+  caption,
+  question,
+  seconds,
+}: {
+  run: TimedRun;
+  caption: string;
+  question: RunQuestion;
+  seconds: number;
+}) {
+  const position = run.questions.findIndex((candidate) => candidate.id === question.id);
+  return (
+    <>
+      <p className="text-sm text-muted-foreground">{caption}</p>
+      <div className="sticky top-[calc(3.75rem+1px)] z-20 -mx-4 mt-1 flex items-center justify-between gap-6 border-b border-border bg-background/95 px-4 py-2 backdrop-blur sm:static sm:mx-0 sm:mt-3 sm:items-start sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+        <div className="min-w-0 space-y-3">
+          <div className="hidden sm:block">
+            <QuestionTrail questions={run.questions} current={position} />
+          </div>
+          <p className="flex flex-wrap items-center gap-2 text-sm">
+            <span>
+              Question {position + 1} of {run.questions.length}
+            </span>
+            <span className="rounded-full bg-chip px-2 py-0.5 text-xs font-medium text-chip-foreground">
+              {CATEGORY_LABEL[question.category]}
+            </span>
+          </p>
+        </div>
+        <Clock seconds={seconds} />
+      </div>
+    </>
+  );
+}
+
+/**
+ * A run on its first question with nothing yet running: the header as the run will show it — how many
+ * questions, and the whole countdown standing still — with `children` where the question will be. The
+ * Tutorial's steps point at it before the clock ever starts (practice feedback ticket 06).
+ */
+export function HeldRunScreen({ run, caption, children }: { run: TimedRun; caption: string; children: React.ReactNode }) {
+  const question = nextQuestion(run);
+  if (!question) return null;
+  return (
+    <div className="mx-auto max-w-3xl">
+      <RunHeader run={run} caption={caption} question={question} seconds={secondsLeft(run)} />
+      <div className="mt-6 sm:mt-12">{children}</div>
     </div>
   );
 }

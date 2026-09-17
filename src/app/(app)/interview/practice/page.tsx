@@ -7,6 +7,7 @@ import { canStartPracticeRound } from "@/lib/practice";
 import { requirePageSession } from "@/server/auth/session";
 import { currentPlan } from "@/server/data/plans";
 import { unfinishedPracticeRound } from "@/server/data/practice";
+import { hasFinishedARun } from "@/server/data/tutorial";
 
 export const metadata: Metadata = { title: "Practice round" };
 
@@ -22,10 +23,14 @@ export default async function PracticeRoundPage() {
   const plan = await currentPlan();
   if (!canStartPracticeRound(plan)) redirect("/interview");
 
-  const round = await unfinishedPracticeRound();
+  const [round, finishedARun] = await Promise.all([
+    unfinishedPracticeRound(),
+    // Whether to offer the Tutorial above Go (practice feedback ticket 06); failing to read it offers nothing.
+    hasFinishedARun().catch(() => true),
+  ]);
   return (
     <PageArrive>
-      <PracticePanel round={round} />
+      <PracticePanel round={round} newToSimulator={!finishedARun} />
     </PageArrive>
   );
 }

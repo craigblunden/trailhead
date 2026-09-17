@@ -29,6 +29,8 @@ type SpeechRecognitionLike = {
   /** The recogniser detected speech — not just sound — and stopped detecting it. */
   onspeechstart: (() => void) | null;
   onspeechend: (() => void) | null;
+  /** The recogniser has the microphone: the browser asked for it, if it had to, and was allowed. */
+  onaudiostart: (() => void) | null;
 };
 
 type SpeechRecognitionEventLike = {
@@ -124,6 +126,8 @@ type Recogniser = {
    * that into a tight loop. After a few quick ends in a row, `run` gives up and says so.
    */
   quickEnds: React.RefObject<number>;
+  /** Told the first time the microphone opens — how the Tutorial knows permission was given. */
+  onAudioStart: React.RefObject<(() => void) | undefined>;
   setListening: (listening: boolean) => void;
   setHearing: (hearing: boolean) => void;
   setTranscript: React.Dispatch<React.SetStateAction<string>>;
@@ -177,6 +181,9 @@ function run(r: Recogniser) {
   };
   instance.onspeechstart = () => isLive() && r.setHearing(true);
   instance.onspeechend = () => isLive() && r.setHearing(false);
+  instance.onaudiostart = () => {
+    if (isLive()) r.onAudioStart.current?.();
+  };
   instance.onend = () => {
     if (!isLive()) return;
     r.setHearing(false);
@@ -198,8 +205,16 @@ function run(r: Recogniser) {
   }
 }
 
-export function useSpeech(): Speech {
+/**
+ * `onAudioStart` is called whenever a recogniser gets the microphone: for the Tutorial (practice feedback
+ * ticket 06), the sign that the browser's permission prompt, if there was one, was answered yes.
+ */
+export function useSpeech({ onAudioStart }: { onAudioStart?: () => void } = {}): Speech {
   const recognition = useRef<SpeechRecognitionLike | null>(null);
+  const audioStarted = useRef(onAudioStart);
+  useEffect(() => {
+    audioStarted.current = onAudioStart;
+  });
   const wanted = useRef(false);
   const quickEnds = useRef(0);
   const [listening, setListening] = useState(false);
@@ -209,7 +224,7 @@ export function useSpeech(): Speech {
   const [error, setError] = useState<string | null>(null);
 
   const recogniser = useMemo<Recogniser>(
-    () => ({ recognition, wanted, quickEnds, setListening, setHearing, setTranscript, setInterim, setError }),
+    () => ({ recognition, wanted, quickEnds, onAudioStart: audioStarted, setListening, setHearing, setTranscript, setInterim, setError }),
     [],
   );
 

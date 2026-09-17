@@ -10,6 +10,7 @@ import { interviewQuota, latestAttempt } from "@/server/data/interview";
 import { getJob } from "@/server/data/jobs";
 import { interviewAvailable } from "@/server/interview/claude";
 import { currentPlan } from "@/server/data/plans";
+import { hasFinishedARun } from "@/server/data/tutorial";
 
 export const metadata: Metadata = { title: "Interview Simulator" };
 
@@ -28,13 +29,15 @@ export default async function JobInterviewPage({ params }: { params: Promise<{ j
 
   // A Tenant with no Attempt for this Job has nothing to read back; that is the set-up, not a failure.
   // The quota is read alongside it so the path can say what this week leaves.
-  const [plan, attempt, quota] = await Promise.all([
+  const [plan, attempt, quota, finishedARun] = await Promise.all([
     currentPlan(),
     latestAttempt(jobId).catch((error) => {
       if (error instanceof NotFoundError) throw error;
       return null;
     }),
     interviewQuota().catch(() => null),
+    // Whether to offer the Tutorial (practice feedback ticket 06); failing to read it offers nothing.
+    hasFinishedARun().catch(() => true),
   ]);
 
   return (
@@ -54,6 +57,7 @@ export default async function JobInterviewPage({ params }: { params: Promise<{ j
         attempt={attempt}
         quota={quota}
         available={interviewAvailable()}
+        newToSimulator={!finishedARun}
       />
     </PageArrive>
   );

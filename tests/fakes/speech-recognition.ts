@@ -12,6 +12,7 @@ export type FakeRecognition = {
   onerror: ((event: { error?: string }) => void) | null;
   onspeechstart: (() => void) | null;
   onspeechend: (() => void) | null;
+  onaudiostart: (() => void) | null;
 };
 
 export const speech = {
@@ -39,6 +40,7 @@ export function setSpeechSupport(supported: boolean) {
     onerror: FakeRecognition["onerror"] = null;
     onspeechstart: FakeRecognition["onspeechstart"] = null;
     onspeechend: FakeRecognition["onspeechend"] = null;
+    onaudiostart: FakeRecognition["onaudiostart"] = null;
     constructor() {
       speech.recognisers.push(this);
     }
@@ -63,6 +65,11 @@ export function hear(text: string) {
   act(() => {
     latestRecogniser().onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: text }], { isFinal: true })] });
   });
+}
+
+/** Plays the browser opening the microphone — what follows the Tenant allowing it. */
+export function allowMicrophone() {
+  act(() => latestRecogniser().onaudiostart?.());
 }
 
 /** Plays the browser refusing the microphone, or failing some other way the Tenant must hear about. */

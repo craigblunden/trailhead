@@ -59,12 +59,15 @@ test.beforeEach(async ({ page }) => {
       onerror = null;
       onspeechstart = null;
       onspeechend = null;
+      onaudiostart: (() => void) | null = null;
       onend: (() => void) | null = null;
       constructor() {
         voiced.__recognisers!.push(this);
       }
       start() {
         this.started = true;
+        // As a browser does once its microphone is allowed.
+        queueMicrotask(() => this.onaudiostart?.());
       }
       stop() {
         this.started = false;
@@ -531,6 +534,53 @@ test.describe("interview simulator: a voice that never begins (practice feedback
     await expect(page.getByText("Your turn — start speaking")).toBeVisible({ timeout: 2_500 });
     await expect(page.getByText(/Reading the question aloud/)).toHaveCount(0);
     await expect(clock).not.toHaveText("8:00 left", { timeout: 3_000 });
+  });
+});
+
+test.describe("interview simulator: the Tutorial (practice feedback ticket 06)", () => {
+  test.use({ storageState: SIGNED_OUT });
+
+  test("a new Tenant is offered it on the hub; skipping it is remembered, and it is still a link away", async ({ page }) => {
+    test.setTimeout(120_000);
+    await signUpAndVerify(page);
+
+    await page.goto("/interview");
+    const offer = page.getByRole("region", { name: "New to the Interview Simulator?" });
+    await expect(offer.getByRole("link", { name: "Take the tutorial" })).toHaveAttribute("href", "/interview/tutorial");
+    await offer.getByRole("button", { name: "Skip" }).click();
+    await expect(offer).toHaveCount(0);
+
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 1, name: "Interview Simulator" })).toBeVisible();
+    await expect(offer).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Take the tutorial" })).toBeVisible();
+  });
+
+  test("one question, step by step, to its end — and then on to a practice round", async ({ page }) => {
+    test.setTimeout(120_000);
+    await signUpAndVerify(page);
+
+    await page.goto("/interview");
+    await page.getByRole("region", { name: "New to the Interview Simulator?" }).getByRole("link", { name: "Take the tutorial" }).click();
+    await expect(page.getByText("Question 1 of 1")).toBeVisible();
+    await expect(page.getByRole("timer")).toHaveText("1:00 left");
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Turn on my microphone" }).click();
+
+    await expect(page.getByRole("heading", { level: 1, name: "Tell me about a job you’d love to land next." })).toBeVisible();
+    await expect(page.getByText("Your turn — start speaking")).toBeVisible();
+    await say(page, "A design lead at a small studio.");
+    await expect(page.getByText("Press Submit when you’ve finished answering.")).toBeVisible();
+    await expectNoAxeViolations(page);
+    await page.getByRole("button", { name: "Submit final answer" }).click();
+
+    await expect(page.getByText("That’s how every question works.")).toBeVisible();
+    await expect(page.getByText("A design lead at a small studio.")).toBeVisible();
+    await page.getByRole("link", { name: "Start a practice round" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Practice round" })).toBeVisible();
+    // Done on this device, so not offered again.
+    await expect(page.getByRole("region", { name: "New to the Interview Simulator?" })).toHaveCount(0);
   });
 });
 

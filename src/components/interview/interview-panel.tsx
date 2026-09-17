@@ -20,6 +20,7 @@ import { PastInterviews } from "@/components/interview/past-interviews";
 import { PracticeRounds } from "@/components/interview/practice-rounds";
 import { RunScreen } from "@/components/interview/run-screen";
 import { Scorecard } from "@/components/interview/scorecard";
+import { TutorialOffer } from "@/components/interview/tutorial-panel";
 import { primeSpeech } from "@/components/interview/use-ask-aloud";
 import { useSpeechSupported } from "@/components/interview/use-speech";
 import { LoadingTrail } from "@/components/loading-trail";
@@ -83,6 +84,11 @@ export type InterviewPanelProps = {
   practice?: { unfinished: boolean } | null;
   /** The Tenant's finished Practice rounds, listed on the hub on any Plan that has some (practice round ticket 05). */
   practiceRounds?: PastPracticeRound[];
+  /**
+   * The Tenant has finished no Practice round and no Attempt, so the Tutorial is offered (practice feedback
+   * ticket 06) — unless this device has finished or skipped it.
+   */
+  newToSimulator?: boolean;
   /** Replaced in component tests. */
   client?: InterviewClient;
 };
@@ -96,6 +102,7 @@ export function InterviewPanel({
   history = [],
   practice = null,
   practiceRounds = [],
+  newToSimulator = false,
   client = interviewClient,
 }: InterviewPanelProps) {
   const locked = !canStartAttempt(plan);
@@ -215,6 +222,8 @@ export function InterviewPanel({
             and doesn’t pause between them.
           </p>
 
+          {/* On the hub the Tutorial is always a link away, when it isn't offered outright. */}
+          {(!job || newToSimulator) && <TutorialOffer newToSimulator={newToSimulator} linkOtherwise={!job} />}
           {!job && practice && <PracticeOffer unfinished={practice.unfinished} />}
 
           <Path>

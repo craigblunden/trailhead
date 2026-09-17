@@ -47,6 +47,7 @@ export function PageLoading() {
   if (pathname === "/interview") return <InterviewLoading id={null} />;
   if (pathname === "/interview/practice") return <PracticeLoading />;
   if (pathname.startsWith("/interview/practice/")) return <PracticeLoading saved />;
+  if (pathname === "/interview/tutorial") return <TutorialLoading />;
   if (pathname.startsWith("/interview/")) {
     const [jobId, attemptId] = pathname.slice("/interview/".length).split("/");
     return attemptId ? <PastInterviewLoading jobId={jobId} /> : <InterviewLoading id={jobId} />;
@@ -712,6 +713,31 @@ function PracticeLoading({ saved = false }: { saved?: boolean }) {
               <Bar className="h-12 w-full rounded-md" />
             </div>
           )}
+        </div>
+      </PageMain>
+    </div>
+  );
+}
+
+/**
+ * `/interview/tutorial`: the Tutorial's first step, in outline (practice feedback ticket 06) — the run's
+ * header with its caption written, and bars for the count, the clock, and the first pointer.
+ */
+function TutorialLoading() {
+  return (
+    <div className="flex flex-1 flex-col">
+      <AppHeader leading={<BrandLogo href="/board" />} loading />
+      <PageWait>Loading the tutorial…</PageWait>
+
+      <PageMain className="pt-4 sm:pt-16">
+        <div className="mx-auto max-w-3xl">
+          <div className="mb-4 h-8" />
+          <p className="text-sm text-muted-foreground">Tutorial</p>
+          <div className="mt-3 flex items-start justify-between gap-6">
+            <Bar className="mt-2 h-4 w-40" />
+            <Bar className="h-12 w-24 rounded-md" />
+          </div>
+          <Bar className="mt-6 h-28 w-full max-w-sm rounded-md sm:mt-12" />
         </div>
       </PageMain>
     </div>
