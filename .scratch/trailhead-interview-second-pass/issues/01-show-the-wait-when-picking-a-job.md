@@ -26,3 +26,20 @@ shimmer, no slide, exactly one status region.
       Simulator…").
 - [ ] Exactly one `role="status"` is present during the wait.
 - [ ] An end-to-end test asserts the outline appears on picking a Job before the page's content does.
+
+## Comments
+
+**2026-09-17, cause confirmed before the fix.** Reproduced on a production build against the local
+stack: with each navigation's server render held 8 s (`e2e/loading-states.spec.ts`), clicking a Job in
+the hub's picker showed no `role="status"` at all within 2 s, while a Job's own "Practice interview"
+link from `/board/<id>` showed "Loading your interview…" at once.
+
+Why: `src/app/(app)/loading.tsx` is the only loading boundary above the Interview Simulator, and it
+wraps the `interview` segment from outside `interview/layout.tsx`. Per the installed Next.js docs
+(`03-file-conventions/loading.md`), `loading.js` wraps the pages and nested layouts *below* its own
+folder, never the layout in the same folder. Moving from `/interview` to `/interview/<job>` stays inside
+the `interview` segment, whose layout persists, so nothing above it suspends and the `/interview/<job>`
+branch `PageLoading` already has is never shown. From `/board/<id>` the navigation crosses from the
+`board` layout to the `interview` one, so the `(app)` boundary does suspend — which is why that way in
+already waited. The board has the same shape and already solves it with `board/loading.tsx`; the fix is
+the same file under `interview/`.

@@ -58,6 +58,51 @@ test.describe("performance ticket 02: loading states", () => {
     await expect(page.getByRole("heading", { level: 1, name: job.role })).toBeVisible({ timeout: HOLD_MS + 10_000 });
   });
 
+  test("picking a Job in the Interview Simulator: the interview's outline and the header's hiker at once, then the page (interview second pass ticket 01)", async ({
+    page,
+  }) => {
+    const job = await createJob(page);
+    const jobId = job.href.split("/").pop()!;
+    await page.goto("/interview");
+    const search = page.getByRole("searchbox", { name: "Search your jobs by role or company" });
+    await search.fill(job.role);
+    await page.waitForLoadState("networkidle");
+    await holdNavigations(page);
+
+    await page.getByRole("list", { name: "Matching jobs" }).getByRole("link", { name: new RegExp(job.role) }).click();
+
+    // The outline comes before the page: the wait is named, and it is the only status on the page.
+    const interviewWait = page.getByRole("status").filter({ hasText: /^Loading your interview…$/ });
+    await expect(interviewWait).toBeVisible({ timeout: 2_000 });
+    await expect(page.getByRole("banner").getByRole("status")).toHaveText("Loading your interview…");
+    await expect(page.getByRole("status")).toHaveCount(1);
+    await expect(page.getByRole("link", { name: "Change job" })).toHaveCount(0);
+    await expectAccessible(page);
+    await expect(page.getByRole("link", { name: "Change job" })).toBeVisible({ timeout: HOLD_MS + 10_000 });
+    await expect(page).toHaveURL(new RegExp(`/interview/${jobId}$`));
+
+    // Back to the hub: its own outline, and its own words.
+    await page.getByRole("link", { name: "Change job" }).click();
+    const hubWait = page.getByRole("status").filter({ hasText: /^Loading the Interview Simulator…$/ });
+    await expect(hubWait).toBeVisible({ timeout: 2_000 });
+    await expect(page.getByRole("status")).toHaveCount(1);
+    await expect(page.getByRole("searchbox", { name: "Search your jobs by role or company" })).toBeVisible({
+      timeout: HOLD_MS + 10_000,
+    });
+  });
+
+  test("a Job's own Practice interview link shows the same wait", async ({ page }) => {
+    await createJob(page);
+    await page.waitForLoadState("networkidle");
+    await holdNavigations(page);
+
+    await page.getByRole("link", { name: "Practice interview" }).click();
+
+    await expect(page.getByRole("status").filter({ hasText: /^Loading your interview…$/ })).toBeVisible({ timeout: 2_000 });
+    await expect(page.getByRole("status")).toHaveCount(1);
+    await expect(page.getByRole("link", { name: "Change job" })).toBeVisible({ timeout: HOLD_MS + 10_000 });
+  });
+
   test("between Contacts: the list stays, and only the detail side waits", async ({ page }) => {
     const name = `Loading Lee ${Math.random().toString(36).slice(2, 6)}`;
     await page.goto("/contacts");
