@@ -87,7 +87,10 @@ const questionsFor = (prompt, company) =>
     ],
   });
 
-/** One score per answer, in order, so the app can say which Answer each belongs to. */
+/**
+ * One score per answer, in order, so the app can say which Answer each belongs to — each with what
+ * landed and its Missed points — and a Takeaway for them all (interview second pass ticket 05).
+ */
 const scoresFor = (prompt) => {
   const answers = prompt.match(/<answer index="\d+"/g)?.length ?? 0;
   return message({
@@ -97,8 +100,13 @@ const scoresFor = (prompt) => {
         text: JSON.stringify({
           scores: Array.from({ length: answers }, (_, index) => ({
             score: 60 + ((index * 7) % 30),
-            rationale: `Answer ${index + 1}: you named the work but not what came of it.`,
+            whatLanded: `Answer ${index + 1}: you named the work you led.`,
+            missedPoints: ["What came of the Meridian reporting redesign, in numbers.", "The referral loop the posting leads with."],
           })),
+          takeaway: [
+            { point: "Say what came of the work, not only what you did.", from: "every answer you gave" },
+            { point: "Tie each answer back to the referral loop the posting leads with.", from: "your personal and design answers" },
+          ],
         }),
       },
     ],

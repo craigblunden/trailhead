@@ -72,6 +72,20 @@ const questionSet = (length: AttemptLength) =>
 
 const QUESTIONS = (length: AttemptLength = 15) => answer({ questions: questionSet(length) });
 
+/** The scorer's answer: per Answer a score, what landed, and Missed points, and a Takeaway for them all. */
+const SCORES = (values: number[]) =>
+  answer({
+    scores: values.map((score, index) => ({
+      score,
+      whatLanded: `Answer ${index + 1} landed.`,
+      missedPoints: [`Missed point ${index + 1}.`],
+    })),
+    takeaway: [
+      { point: "Say what came of the work.", from: "every answer" },
+      { point: "Lead with the referral loop.", from: "your design answer" },
+    ],
+  });
+
 beforeAll(async () => {
   server = createServer((request, response) => {
     let raw = "";
@@ -496,7 +510,10 @@ describe("ticket 04: resuming an interrupted Attempt, or resetting it", () => {
     expect(resumed.questions[1].answer).toBeUndefined();
     expect(resumed.questions).toEqual(started.attempt.questions.map((question, index) =>
       index === 0
-        ? { ...question, answer: { transcript: "Answered before the phone rang.", score: null, rationale: "" } }
+        ? {
+            ...question,
+            answer: { transcript: "Answered before the phone rang.", score: null, whatLanded: "", missedPoints: [], rationale: "" },
+          }
         : question,
     ));
   });
@@ -562,7 +579,7 @@ describe("interview second pass ticket 04: an Attempt started at a retired lengt
     expect(resumed?.questions.map((question) => question.id)).toEqual(started.attempt.questions.map((question) => question.id));
 
     await answerAll(started.attempt.id, started.attempt.questions.slice(1), 20);
-    reply = { body: answer({ scores: Array.from({ length: 5 }, () => ({ score: 70, rationale: "Fine." })) }) };
+    reply = { body: SCORES([70, 70, 70, 70, 70]) };
     const scored = await scoreAttempt(started.attempt.id, { client: claude() });
 
     expect(scored).toMatchObject({ ok: true, attempt: { length: 5, overallScore: 70 } });
@@ -570,8 +587,7 @@ describe("interview second pass ticket 04: an Attempt started at a retired lengt
 });
 
 describe("ticket 03: scoring a completed Attempt", () => {
-  const scores = (count: number, score = 70) =>
-    answer({ scores: Array.from({ length: count }, (_, index) => ({ score: score + index, rationale: `Because ${index}.` })) });
+  const scores = (count: number, score = 70) => SCORES(Array.from({ length: count }, (_, index) => score + index));
 
   it("scores every Answer, rolls them up per Category and overall, and stores the lot", async () => {
     const { jobId } = await proTenantWithJob();
@@ -589,14 +605,23 @@ describe("ticket 03: scoring a completed Attempt", () => {
     expect(scored.scorecard.categories).toHaveLength(CATEGORIES.length);
     for (const question of scored.attempt.questions) {
       expect(question.answer?.score).toBeGreaterThanOrEqual(70);
-      expect(question.answer?.rationale).toMatch(/^Because \d\.$/);
+      expect(question.answer?.whatLanded).toMatch(/^Answer \d landed\.$/);
+      expect(question.answer?.missedPoints).toEqual([expect.stringMatching(/^Missed point \d\.$/)]);
+      expect(question.answer?.rationale).toBe("");
     }
     expect(scored.attempt.overallScore).toBe(72);
+    expect(scored.attempt.takeaway).toHaveLength(2);
 
     // Stored, not just returned: reloading the Attempt shows the same Scorecard.
     const reloaded = await latestAttempt(jobId);
     expect(reloaded?.overallScore).toBe(72);
     expect(reloaded?.questions[0].answer?.score).toBe(70);
+    // What landed, Missed points, and the Takeaway read back identically (interview second pass ticket 05).
+    expect(reloaded?.questions).toEqual(scored.attempt.questions);
+    expect(reloaded?.takeaway).toEqual([
+      { point: "Say what came of the work.", from: "every answer" },
+      { point: "Lead with the referral loop.", from: "your design answer" },
+    ]);
   });
 
   it("refuses to score an Attempt that is not finished", async () => {
@@ -626,7 +651,7 @@ describe("ticket 03: scoring a completed Attempt", () => {
     await answerQuestion(started.attempt.id, { questionId: second.id, transcript: "", elapsedSeconds: 30 });
     await endAttempt(started.attempt.id, { questionId: third.id, transcript: "Half an answ" });
 
-    reply = { body: answer({ scores: [80, 80, 80].map((score) => ({ score, rationale: "Good." })) }) };
+    reply = { body: SCORES([80, 80, 80]) };
     prompts = [];
     const scored = await scoreAttempt(started.attempt.id, { client: claude() });
 
@@ -685,6 +710,9 @@ describe("ticket 03: scoring a completed Attempt", () => {
     expect(prompts).toHaveLength(0);
     // The two silences carry no Answer, so they are unreached — no score, no rationale on show.
     expect(stored?.questions.slice(3).every((question) => !question.answer)).toBe(true);
+    // The answered ones keep their single rationale, with no What landed, Missed points, or Takeaway.
+    expect(stored?.questions[0].answer).toMatchObject({ rationale: "Good.", whatLanded: "", missedPoints: [] });
+    expect(stored?.takeaway).toEqual([]);
     expect(rollUp(stored!.questions).overall).toBe(60);
   });
 

@@ -116,14 +116,23 @@ test.describe("interview simulator: a pro Tenant rehearses and is scored", () =>
     await score.click();
 
     await expect(page.getByText("Overall")).toBeVisible({ timeout: 60_000 });
-    // A score and a rationale for every Answer, grouped by Category with each Category's rollup.
+    // For next time comes first: the Takeaway, each point saying what it is drawn from (interview
+    // second pass ticket 05).
+    const next = page.getByRole("region", { name: "For next time" });
+    await expect(next).toContainText("Say what came of the work, not only what you did.");
+    await expect(next).toContainText("From every answer you gave");
+    // Each area as stars and a band word, never a number out of 100 (ticket 02).
+    const areas = page.getByRole("region", { name: "By area" });
     for (const category of ["Personal", "Behavioural", "Stakeholder", "Technical", "Design"]) {
-      const section = page.getByRole("region", { name: category });
-      await expect(section).toBeVisible();
-      // Stars and a band word, never a number out of 100 (interview second pass ticket 02).
-      await expect(section.getByRole("img", { name: /^\S+ of 5 stars, / }).first()).toBeVisible();
-      await expect(section).not.toContainText("/ 100");
-      await expect(section).toContainText("you named the work but not what came of it");
+      await expect(areas.getByRole("listitem").filter({ hasText: category }).getByRole("img", { name: /^\S+ of 5 stars, / })).toBeVisible();
+    }
+    await expect(page.getByRole("main")).not.toContainText("/ 100");
+    // A card per Answer, with what landed and its Missed points.
+    const cards = page.getByRole("article");
+    await expect(cards).toHaveCount(5);
+    for (const card of await cards.all()) {
+      await expect(card).toContainText("you named the work you led");
+      await expect(card.getByRole("list", { name: "Missed points" }).getByRole("listitem")).toHaveCount(2);
     }
     await expectNoAxeViolations(page);
 
@@ -159,12 +168,20 @@ test.describe("interview simulator: a pro Tenant rehearses and is scored", () =>
     await expect(page.getByText("Overall")).toBeVisible({ timeout: 60_000 });
 
     // What was half-said was kept and scored; the three questions after it were never reached.
-    await expect(page.getByText("Half of my second answ")).toBeVisible();
     await expect(page.getByText("3 of which you didn’t get to")).toBeVisible();
+    const cards = page.getByRole("article");
+    await expect(cards).toHaveCount(5);
+    const halfSaid = cards.nth(1);
+    await expect(halfSaid.getByRole("img", { name: /^\S+ of 5 stars, / })).toBeVisible();
+    await halfSaid.getByText("What you said").click();
+    await expect(halfSaid.getByText("Half of my second answ")).toBeVisible();
+    for (const index of [2, 3, 4]) {
+      await expect(cards.nth(index)).toContainText("Not reached");
+      await expect(cards.nth(index).getByRole("img")).toHaveCount(0);
+    }
+    const areas = page.getByRole("region", { name: "By area" });
     for (const category of ["Stakeholder", "Technical", "Design"]) {
-      const section = page.getByRole("region", { name: category });
-      await expect(section.getByText("Not reached").first()).toBeVisible();
-      await expect(section.getByRole("img")).toHaveCount(0);
+      await expect(areas.getByRole("listitem").filter({ hasText: category })).toContainText("Not reached");
     }
   });
 

@@ -54,6 +54,7 @@ const attempt: Attempt = {
   activeSeconds: 0,
   completedAt: null,
   overallScore: null,
+  takeaway: [],
   questions: [{ id: "q1", category: "personal", order: 0, text: "Why this role?" }],
 };
 

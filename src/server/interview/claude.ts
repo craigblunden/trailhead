@@ -6,13 +6,21 @@ import { z } from "zod";
 import {
   CATEGORIES,
   CATEGORY_MIX,
-  RATIONALE_MAX_CHARS,
+  MISSED_POINTS_MAX,
+  MISSED_POINTS_MIN,
+  MISSED_POINT_MAX_CHARS,
   SCORE_MAX,
   SCORE_MIN,
+  TAKEAWAY_FROM_MAX_CHARS,
+  TAKEAWAY_MAX,
+  TAKEAWAY_MIN,
+  TAKEAWAY_POINT_MAX_CHARS,
+  WHAT_LANDED_MAX_CHARS,
   questionCount,
   type AttemptLength,
   type Category,
   type InterviewFailure,
+  type TakeawayPoint,
 } from "@/lib/interview";
 import { stripInvisible } from "@/lib/invisible";
 import { logError } from "@/server/log";
@@ -83,9 +91,11 @@ export const QUESTIONS_OUTPUT_SCHEMA = {
 } as const;
 
 /**
- * The object the scorer answers with. The API refuses `minimum`/`maximum` on an integer (a 400 on
- * every call), so the scale is stated in the prompt and a score outside it is refused by
- * `scoresAnswer` below, as a malformed answer.
+ * The object the scorer answers with: per Answer a score, what landed, and its Missed points, and a
+ * Takeaway for the whole Attempt (interview second pass ticket 05). The API refuses `minimum`/`maximum`
+ * on an integer (a 400 on every call), so the scale — and, the same way, how many Missed points and
+ * Takeaway points there are — is stated in the prompt and checked by `scoresAnswer` below, where
+ * anything outside it is a malformed answer.
  */
 export const SCORES_OUTPUT_SCHEMA = {
   type: "object",
@@ -96,14 +106,27 @@ export const SCORES_OUTPUT_SCHEMA = {
         type: "object",
         properties: {
           score: { type: "integer" },
-          rationale: { type: "string", maxLength: RATIONALE_MAX_CHARS },
+          whatLanded: { type: "string", maxLength: WHAT_LANDED_MAX_CHARS },
+          missedPoints: { type: "array", items: { type: "string", maxLength: MISSED_POINT_MAX_CHARS } },
         },
-        required: ["score", "rationale"],
+        required: ["score", "whatLanded", "missedPoints"],
+        additionalProperties: false,
+      },
+    },
+    takeaway: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          point: { type: "string", maxLength: TAKEAWAY_POINT_MAX_CHARS },
+          from: { type: "string", maxLength: TAKEAWAY_FROM_MAX_CHARS },
+        },
+        required: ["point", "from"],
         additionalProperties: false,
       },
     },
   },
-  required: ["scores"],
+  required: ["scores", "takeaway"],
   additionalProperties: false,
 } as const;
 
@@ -111,11 +134,22 @@ const questionsAnswer = z.object({
   questions: z.array(z.object({ category: z.enum(CATEGORIES), text: z.string() })),
 });
 
+/** Text that says something once stripped: a blank Missed point is a missing one. */
+const said = z.string().refine((text) => stripInvisible(text).trim().length > 0);
+
 const scoresAnswer = z.object({
   scores: z.array(
-    z.object({ score: z.number().int().min(SCORE_MIN).max(SCORE_MAX), rationale: z.string() }),
+    z.object({
+      score: z.number().int().min(SCORE_MIN).max(SCORE_MAX),
+      whatLanded: said,
+      missedPoints: z.array(said).min(MISSED_POINTS_MIN).max(MISSED_POINTS_MAX),
+    }),
   ),
+  takeaway: z.array(z.object({ point: said, from: said })).min(TAKEAWAY_MIN).max(TAKEAWAY_MAX),
 });
+
+/** Stripped of invisible characters, trimmed, and cut to its bound: how scorer text is stored and shown. */
+const clean = (text: string, max: number) => stripInvisible(text).trim().slice(0, max);
 
 export type GeneratedQuestion = { category: Category; text: string };
 
@@ -123,9 +157,11 @@ export type QuestionsOutcome =
   | { ok: true; questions: GeneratedQuestion[] }
   | { ok: false; reason: InterviewFailure };
 
-export type ScoredAnswer = { score: number; rationale: string };
+export type ScoredAnswer = { score: number; whatLanded: string; missedPoints: string[] };
 
-export type ScoresOutcome = { ok: true; scores: ScoredAnswer[] } | { ok: false; reason: InterviewFailure };
+export type ScoresOutcome =
+  | { ok: true; scores: ScoredAnswer[]; takeaway: TakeawayPoint[] }
+  | { ok: false; reason: InterviewFailure };
 
 type CallOptions = { client?: Anthropic | null; tenant?: string | null };
 
@@ -222,8 +258,10 @@ function mixIsRight(questions: GeneratedQuestion[], length: AttemptLength): bool
 }
 
 /**
- * A score and a rationale for every Answer, in the order they were given. A set of the wrong length
- * is malformed rather than padded: a Scorecard has to be able to say which Answer each score is for.
+ * A score, what landed, and Missed points for every Answer, in the order they were given, and a Takeaway
+ * for them all. A set of the wrong length is malformed rather than padded: a Scorecard has to be able
+ * to say which Answer each score is for. So is a missing part, or too few or too many points — a
+ * failure that spends nothing, since scoring never touches the quota.
  */
 export async function scoreAnswers(
   inputs: ScoreInputs,
@@ -246,9 +284,14 @@ export async function scoreAnswers(
   }
   return {
     ok: true,
-    scores: answer.scores.map(({ score, rationale }) => ({
+    scores: answer.scores.map(({ score, whatLanded, missedPoints }) => ({
       score,
-      rationale: stripInvisible(rationale).trim().slice(0, RATIONALE_MAX_CHARS),
+      whatLanded: clean(whatLanded, WHAT_LANDED_MAX_CHARS),
+      missedPoints: missedPoints.map((missed) => clean(missed, MISSED_POINT_MAX_CHARS)),
+    })),
+    takeaway: answer.takeaway.map(({ point, from }) => ({
+      point: clean(point, TAKEAWAY_POINT_MAX_CHARS),
+      from: clean(from, TAKEAWAY_FROM_MAX_CHARS),
     })),
   };
 }

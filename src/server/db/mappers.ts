@@ -10,7 +10,7 @@ import type {
 import type { ContactDetail, ContactListItem } from "@/lib/contacts";
 import { isoDate } from "@/lib/dates";
 import type { DocumentSummary } from "@/lib/documents";
-import { ATTEMPT_LENGTHS, isKnownLength, type Attempt } from "@/lib/interview";
+import { ATTEMPT_LENGTHS, isKnownLength, type Attempt, type TakeawayPoint } from "@/lib/interview";
 import { STAGES, type ActivityEntry, type Contact, type Job } from "@/lib/jobs";
 
 /**
@@ -236,6 +236,7 @@ export function toAttemptDto(row: AttemptRow): Attempt {
     activeSeconds: row.activeSeconds,
     completedAt: row.completedAt?.toISOString() ?? null,
     overallScore: row.overallScore,
+    takeaway: takeawayFrom(row.takeaway),
     questions: [...row.questions]
       .sort((a, b) => a.order - b.order)
       .map((question) => ({
@@ -244,8 +245,30 @@ export function toAttemptDto(row: AttemptRow): Attempt {
         order: question.order,
         text: question.text,
         ...(question.answeredAt
-          ? { answer: { transcript: question.transcript, score: question.score, rationale: question.rationale } }
+          ? {
+              answer: {
+                transcript: question.transcript,
+                score: question.score,
+                whatLanded: question.whatLanded,
+                missedPoints: question.missedPoints,
+                rationale: question.rationale,
+              },
+            }
           : {}),
       })),
   };
+}
+
+/**
+ * The Takeaway column is JSON the app wrote itself, but it is read as untrusted all the same: anything
+ * that is not a list of `{ point, from }` strings reads as no Takeaway, rather than as a Scorecard the
+ * page cannot render.
+ */
+function takeawayFrom(value: unknown): TakeawayPoint[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) =>
+    item && typeof item === "object" && typeof item.point === "string" && typeof item.from === "string"
+      ? [{ point: item.point, from: item.from }]
+      : [],
+  );
 }

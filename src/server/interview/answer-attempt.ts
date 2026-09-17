@@ -10,6 +10,7 @@ import {
   type Attempt,
   type InterviewFailure,
   type Scorecard,
+  type TakeawayPoint,
 } from "@/lib/interview";
 import { UnauthenticatedError, requireSession } from "@/server/auth/session";
 import { NotFoundError, RuleError } from "@/server/data/errors";
@@ -92,8 +93,9 @@ export type ScoreOutcome =
   | { ok: false; reason: InterviewFailure; unexpected?: true };
 
 /**
- * The Scorecard for a completed Attempt: every Answer's score and rationale from one scoring call,
- * rolled up per Category and into one overall score, then stored with the Attempt.
+ * The Scorecard for a completed Attempt: every Answer's score, what landed, and Missed points, and a
+ * Takeaway for the whole Attempt, from one scoring call (interview second pass ticket 05) — rolled up
+ * per Category and into one overall score, then stored with the Attempt.
  *
  * An Attempt that is neither finished nor out of time cannot be scored — half a Scorecard would say
  * nothing useful about how the rehearsal went. An Attempt that ran out of time can, and only its
@@ -117,6 +119,7 @@ export async function scoreAttempt(
     const answered = questions.filter((question) => !isUnreached(question));
 
     let scores: ScoredAnswer[] = [];
+    let takeaway: TakeawayPoint[] = [];
     if (answered.length > 0) {
       if (!client) return { ok: false, reason: "unavailable" };
       const sources = await interviewSources(attempt.jobId);
@@ -135,24 +138,28 @@ export async function scoreAttempt(
       // still stored, and scoring it again spends no quota. So a failure is passed on as it is.
       if (!outcome.ok) return { ok: false, reason: outcome.reason };
       scores = outcome.scores;
+      takeaway = outcome.takeaway;
     }
 
     const scoreFor = new Map(answered.map((question, index) => [question.id, scores[index]]));
     const scored = questions.map((question) => {
       const given = scoreFor.get(question.id);
-      return given ? { ...question, answer: { transcript: question.answer?.transcript ?? "", ...given } } : question;
+      return given
+        ? { ...question, answer: { transcript: question.answer?.transcript ?? "", rationale: "", ...given } }
+        : question;
     });
     const scorecard = rollUp(scored);
-    const stored = await storeScores(
-      attemptId,
-      // An unreached question is given 0 and no rationale by the app, never by the scorer.
-      questions.map((question) => ({
+    const stored = await storeScores(attemptId, {
+      // An unreached question is given 0 and nothing to say by the app, never by the scorer.
+      scores: questions.map((question) => ({
         questionId: question.id,
         score: scoreFor.get(question.id)?.score ?? 0,
-        rationale: scoreFor.get(question.id)?.rationale ?? "",
+        whatLanded: scoreFor.get(question.id)?.whatLanded ?? "",
+        missedPoints: scoreFor.get(question.id)?.missedPoints ?? [],
       })),
-      scorecard.overall,
-    );
+      overall: scorecard.overall,
+      takeaway,
+    });
     return { ok: true, attempt: stored, scorecard };
   } catch (error) {
     return failure(error, { tenant, operation: "interview.score" });

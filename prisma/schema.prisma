@@ -256,6 +256,9 @@ model Attempt {
   completedAt   DateTime?
   /// The Scorecard's overall score, 0–100. Null until the Attempt is scored.
   overallScore  Int?
+  /// The Takeaway once scored: two or three { point, from } objects (interview second pass ticket 05).
+  /// Empty on an Attempt scored before there was one, and on one with nothing reached to score.
+  takeaway      Json              @default("[]")
   questions     AttemptQuestion[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -279,9 +282,14 @@ model AttemptQuestion {
   /// answered; a question left mid-answer when the Tenant navigated away stays empty.
   transcript  String    @default("")
   answeredAt  DateTime?
-  /// The Answer's score, 0–100, and why it was marked that way. Null until the Attempt is scored.
-  score       Int?
-  rationale   String    @default("")
+  /// The Answer's score, 0–100. Null until the Attempt is scored.
+  score        Int?
+  /// Why it was marked that way, as Answers were scored before interview second pass ticket 05. Empty since.
+  rationale    String    @default("")
+  /// What landed in the Answer, in one sentence. Empty on an Answer scored before there was one.
+  whatLanded   String    @default("")
+  /// One to three Missed points: specific things from the posting or resume the Answer could have said.
+  missedPoints String[]  @default([])
 
   @@unique([attemptId, order])
   @@index([userId])

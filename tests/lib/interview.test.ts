@@ -49,6 +49,8 @@ const question = (
         answer: {
           transcript: answer.transcript ?? "Said something.",
           score: answer.score ?? null,
+          whatLanded: "",
+          missedPoints: [],
           rationale: answer.rationale ?? "",
         },
       }
@@ -62,6 +64,7 @@ const attempt = (questions: AttemptQuestion[], overrides: Partial<Attempt> = {})
   activeSeconds: 0,
   completedAt: null,
   overallScore: null,
+  takeaway: [],
   questions,
   ...overrides,
 });

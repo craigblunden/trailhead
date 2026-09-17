@@ -65,12 +65,18 @@ const quota = (remaining: number): InterviewQuotaStatus => ({
 
 let nextId = 0;
 
-/** An Attempt of `length`, with one question per Category and `answered` of them answered. */
+/**
+ * An Attempt of `length`, with one question per Category and `answered` of them answered. Scored, each
+ * Answer carries what landed and Missed points and the Attempt a Takeaway — or, `legacy`, the single
+ * rationale an Attempt scored before those carries instead.
+ */
 function attemptOf({
   length = 5,
   answered = 0,
   scored = false,
-}: { length?: KnownLength; answered?: number; scored?: boolean } = {}): Attempt {
+  legacy = false,
+}: { length?: KnownLength; answered?: number; scored?: boolean; legacy?: boolean } = {}): Attempt {
+  const newShape = scored && !legacy;
   const questions = CATEGORIES.map((category, order) => ({
     id: `q${order}`,
     category: category as Category,
@@ -81,7 +87,9 @@ function attemptOf({
           answer: {
             transcript: order < answered ? `My ${category} answer.` : "",
             score: scored ? 60 + order * 5 : null,
-            rationale: scored ? `Because of the ${category} thing.` : "",
+            whatLanded: newShape ? `The ${category} story landed.` : "",
+            missedPoints: newShape ? [`The ${category} figure on your resume.`, "The referral loop the posting names."] : [],
+            rationale: scored && legacy ? `Because of the ${category} thing.` : "",
           },
         }
       : {}),
@@ -93,6 +101,12 @@ function attemptOf({
     activeSeconds: answered * 20,
     completedAt: scored || answered === questions.length ? "2026-09-16T10:00:00.000Z" : null,
     overallScore: scored ? 70 : null,
+    takeaway: newShape
+      ? [
+          { point: "Say what came of the work, not only what you did.", from: "every answer you gave" },
+          { point: "Tie each answer to the referral loop the posting leads with.", from: "your personal and design answers" },
+        ]
+      : [],
     questions,
   };
 }
@@ -671,8 +685,10 @@ describe("resuming or starting over (ticket 04)", () => {
   });
 });
 
-describe("the Scorecard (ticket 03)", () => {
-  it("IV-U31: scoring shows every Answer's score and rationale, by Category, with each rollup and the overall", async () => {
+describe("the Scorecard (ticket 03; interview second pass tickets 02, 03, 05)", () => {
+  const answerCard = (question: string) => screen.getByRole("article", { name: question });
+
+  it("IV-U31: scoring shows the overall stars, then For next time, then each area, then a card per Answer with what landed and its Missed points", async () => {
     const complete = attemptOf({ answered: 5 });
     const { user } = renderPanel({ attempt: complete });
     client.score.mockResolvedValue({
@@ -680,7 +696,12 @@ describe("the Scorecard (ticket 03)", () => {
       attempt: attemptOf({ scored: true }),
       scorecard: {
         overall: 70,
-        categories: CATEGORIES.map((category, index) => ({ category: category as Category, score: 60 + index * 5, questions: 1 })),
+        categories: CATEGORIES.map((category, index) => ({
+          category: category as Category,
+          score: 60 + index * 5,
+          questions: 1,
+          unreached: 0,
+        })),
       },
     });
 
@@ -689,19 +710,58 @@ describe("the Scorecard (ticket 03)", () => {
     const overall = await screen.findByRole("region", { name: "Overall" });
     expect(within(overall).getByRole("img", { name: "3½ of 5 stars, solid" })).toBeInTheDocument();
     expect(client.score).toHaveBeenCalledWith(complete.id);
-    // 60, 65, 70, 75, 80: the Category rollup and its one Answer read the same, as stars and a band word.
+
+    // The Takeaway comes first, each point saying what it is drawn from.
+    const next = screen.getByRole("region", { name: "For next time" });
+    expect(next).toHaveTextContent("Say what came of the work, not only what you did.");
+    expect(next).toHaveTextContent("From every answer you gave");
+    expect(within(next).getAllByRole("listitem")).toHaveLength(2);
+
+    // 60, 65, 70, 75, 80: each area as stars and a band word.
     const labels = ["3 of 5 stars, solid", "3½ of 5 stars, solid", "3½ of 5 stars, solid", "4 of 5 stars, solid", "4 of 5 stars, strong"];
+    const areas = screen.getByRole("region", { name: "By area" });
     for (const [index, category] of CATEGORIES.entries()) {
-      const section = screen.getByRole("region", { name: CATEGORY_LABEL[category] });
-      expect(within(section).getAllByRole("img", { name: labels[index] })).toHaveLength(2);
-      expect(section).toHaveTextContent(`Because of the ${category} thing.`);
+      const row = within(areas).getByText(CATEGORY_LABEL[category]).closest("li")!;
+      expect(within(row).getByRole("img", { name: labels[index] })).toBeInTheDocument();
     }
+
+    // A card per Answer: the question, its stars, what landed, and the Missed points to reach for.
+    for (const [index, category] of CATEGORIES.entries()) {
+      const card = answerCard(`A ${category} question?`);
+      expect(within(card).getByRole("img", { name: labels[index] })).toBeInTheDocument();
+      expect(card).toHaveTextContent(`The ${category} story landed.`);
+      const missed = within(card).getByRole("list", { name: "Missed points" });
+      expect(within(missed).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+        `The ${category} figure on your resume.`,
+        "The referral loop the posting names.",
+      ]);
+      expect(card).not.toHaveTextContent(`Because of the ${category} thing.`);
+    }
+
+    // Top to bottom: overall, For next time, areas, then the Answers.
+    const follows = (a: Element, b: Element) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(follows(overall, next)).toBe(true);
+    expect(follows(next, areas)).toBe(true);
+    expect(follows(areas, answerCard("A personal question?"))).toBe(true);
+
     // No score is shown as a number anywhere on the Scorecard.
     expect(document.body).not.toHaveTextContent(/\/ 100/);
     for (const score of [60, 65, 70, 75, 80]) expect(screen.queryByText(String(score))).not.toBeInTheDocument();
   });
 
-  it("IV-U31d: an unreached question reads \"Not reached\" with no stars and no rationale, and so does a Category with nothing reached (interview second pass ticket 03)", () => {
+  it("IV-U31e: an Attempt scored before Missed points shows its single rationale in their place, and no For next time", () => {
+    renderPanel({ attempt: attemptOf({ scored: true, legacy: true }) });
+
+    expect(screen.queryByRole("region", { name: "For next time" })).not.toBeInTheDocument();
+    for (const category of CATEGORIES) {
+      const card = answerCard(`A ${category} question?`);
+      expect(card).toHaveTextContent(`Because of the ${category} thing.`);
+      expect(within(card).queryByRole("list", { name: "Missed points" })).not.toBeInTheDocument();
+      expect(card).not.toHaveTextContent("What landed");
+    }
+  });
+
+  it("IV-U31d: an unreached question reads \"Not reached\" with no stars and no Missed points, and so does an area with nothing reached (interview second pass ticket 03)", () => {
     const scored = attemptOf({ scored: true });
     // The clock ran out on the technical question with nothing said, before the design one.
     const attempt: Attempt = {
@@ -710,11 +770,16 @@ describe("the Scorecard (ticket 03)", () => {
     };
     renderPanel({ attempt });
 
+    const areas = screen.getByRole("region", { name: "By area" });
     for (const category of ["technical", "design"] as const) {
-      const section = screen.getByRole("region", { name: CATEGORY_LABEL[category] });
-      expect(within(section).queryByRole("img")).not.toBeInTheDocument();
-      expect(within(section).getAllByText("Not reached")).toHaveLength(2);
-      expect(section).not.toHaveTextContent(`Because of the ${category} thing.`);
+      const row = within(areas).getByText(CATEGORY_LABEL[category]).closest("li")!;
+      expect(row).toHaveTextContent("Not reached");
+      expect(within(row).queryByRole("img")).not.toBeInTheDocument();
+
+      const card = answerCard(`A ${category} question?`);
+      expect(card).toHaveTextContent("Not reached");
+      expect(within(card).queryByRole("img")).not.toBeInTheDocument();
+      expect(within(card).queryByRole("list", { name: "Missed points" })).not.toBeInTheDocument();
     }
     // 60, 65, 70 answered; two unreached at half weight: 195 / 4 = 48.75.
     const overall = screen.getByRole("region", { name: "Overall" });

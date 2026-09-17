@@ -119,8 +119,22 @@ export type AttemptAnswer = {
   transcript: string;
   /** Set once the Attempt has been scored. */
   score: number | null;
+  /**
+   * What landed in the Answer, in one sentence (interview second pass ticket 05). Empty on an Answer
+   * scored before then, which carries its single `rationale` instead.
+   */
+  whatLanded: string;
+  /** One to three **Missed points**: specific things from the posting or resume the Answer could have said. */
+  missedPoints: string[];
+  /** The one rationale an Answer scored before What landed and Missed points carries. Empty since. */
   rationale: string;
 };
+
+/**
+ * One point of a **Takeaway** (interview second pass ticket 05): something worth changing next time,
+ * and what across the Attempt's Answers it is drawn from.
+ */
+export type TakeawayPoint = { point: string; from: string };
 
 /** How a Tenant answered: spoken aloud (recommended) or typed. Nothing but the text reaches the server. */
 export const INPUT_MODES = ["speak", "type"] as const;
@@ -147,6 +161,8 @@ export type Attempt = {
   completedAt: string | null;
   /** The Scorecard's overall score, once scored. */
   overallScore: number | null;
+  /** The two or three things most worth changing, once scored. Empty on an Attempt scored before there were any. */
+  takeaway: TakeawayPoint[];
   questions: AttemptQuestion[];
 };
 
@@ -187,8 +203,23 @@ export const SCORE_MAX = 100;
 /** An Answer's transcript is bounded like every other free text crossing the boundary. */
 export const TRANSCRIPT_MAX_CHARS = 6_000;
 
-/** A rationale is a sentence or two about one Answer, and the schema says so. */
-export const RATIONALE_MAX_CHARS = 400;
+/** What landed is one sentence about one Answer, and the schema says so. */
+export const WHAT_LANDED_MAX_CHARS = 300;
+
+/** A Missed point is one specific thing, a sentence at most. */
+export const MISSED_POINT_MAX_CHARS = 240;
+
+/** How many Missed points one Answer carries: at least one, so there is always something to reach for. */
+export const MISSED_POINTS_MIN = 1;
+export const MISSED_POINTS_MAX = 3;
+
+/** A Takeaway point, and what it is drawn from, are each a sentence at most. */
+export const TAKEAWAY_POINT_MAX_CHARS = 300;
+export const TAKEAWAY_FROM_MAX_CHARS = 160;
+
+/** A Takeaway is two or three points: fewer is not a pattern, more is not a priority. */
+export const TAKEAWAY_MIN = 2;
+export const TAKEAWAY_MAX = 3;
 
 /**
  * One Category's part of a Scorecard: its questions' weighted average, how many it covered, and how

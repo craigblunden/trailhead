@@ -11,6 +11,7 @@ import {
   type Attempt,
   type AttemptLength,
   type InterviewQuotaStatus,
+  type TakeawayPoint,
 } from "@/lib/interview";
 import { limitsOf } from "@/lib/plans";
 import { requireSession } from "@/server/auth/session";
@@ -319,25 +320,35 @@ export async function completeAttempt(
 }
 
 /**
- * The Scorecard, stored: every Answer's score and rationale, and the Attempt's overall score, in one
- * transaction — so a Scorecard is never half-written. `scores` is in the order `scorable()` gave the
- * Answers to the scorer.
+ * The Scorecard, stored: every question's score, what landed, and Missed points, the Attempt's overall
+ * score, and its Takeaway, in one transaction — so a Scorecard is never half-written. A first-pass
+ * rationale is cleared as the Answer is scored again, so an Answer never carries both shapes.
  */
 export async function storeScores(
   attemptId: string,
-  scores: { questionId: string; score: number; rationale: string }[],
-  overall: number,
+  {
+    scores,
+    overall,
+    takeaway,
+  }: {
+    scores: { questionId: string; score: number; whatLanded: string; missedPoints: string[] }[];
+    overall: number;
+    takeaway: TakeawayPoint[];
+  },
 ): Promise<Attempt> {
   const { userId } = await requireSession();
   const row = await withTenant(userId, async (tx) => {
     const attempt = await tx.attempt.findFirst({ where: { id: attemptId, userId }, select: { id: true } });
     if (!attempt) throw new RuleError("no-attempt", INTERVIEW_FAILURES["no-attempt"]);
-    for (const { questionId, score, rationale } of scores) {
-      await tx.attemptQuestion.update({ where: { id: questionId, userId }, data: { score, rationale } });
+    for (const { questionId, score, whatLanded, missedPoints } of scores) {
+      await tx.attemptQuestion.update({
+        where: { id: questionId, userId },
+        data: { score, whatLanded, missedPoints, rationale: "" },
+      });
     }
     return tx.attempt.update({
       where: { id: attempt.id, userId },
-      data: { overallScore: overall },
+      data: { overallScore: overall, takeaway },
       include: ATTEMPT_INCLUDE,
     });
   });
