@@ -20,7 +20,7 @@ import {
 } from "@/lib/interview";
 import { PLAN_LIMITS } from "@/lib/plans";
 import { setJobDocument } from "@/server/data/documents";
-import { earlierQuestions, interviewQuota, latestAttempt } from "@/server/data/interview";
+import { earlierQuestions, interviewQuota, latestAttempt, pastAttempts, scoredAttempt } from "@/server/data/interview";
 import { createJob } from "@/server/data/jobs";
 import { withTenant } from "@/server/db/tenant";
 import { answerQuestion, endAttempt, scoreAttempt } from "@/server/interview/answer-attempt";
@@ -730,6 +730,121 @@ describe("ticket 03: scoring a completed Attempt", () => {
     reply = { body: scores(5) };
     expect(await scoreAttempt(started.attempt.id, { client: claude() })).toMatchObject({ ok: true });
     expect(await usedThisWeek(userId)).toBe(1);
+  });
+});
+
+describe("interview second pass ticket 06: past interviews", () => {
+  /** Answers every question of a started Attempt and scores it, each Answer at `score`. */
+  async function finishAndScore(attemptId: string, questions: { id: string }[], score = 70) {
+    await answerAll(attemptId, questions, 20);
+    reply = { body: SCORES(questions.map(() => score)) };
+    const scored = await scoreAttempt(attemptId, { client: claude() });
+    if (!scored.ok) throw new Error("expected a scored Attempt");
+    return scored.attempt;
+  }
+
+  it("lists scored Attempts across every Job and the one in progress, newest first — leaving out reset and never-scored ones", async () => {
+    const { userId, jobId } = await proTenantWithJob();
+    const otherJob = await createJob(
+      { company: "Harvest", role: "Researcher", location: "Remote", salaryMin: null, salaryMax: null, postingUrl: "", description: "A posting." },
+      MONDAY,
+    );
+    const resume = await withTenant(userId, (tx) => tx.document.findFirst({ select: { id: true } }));
+    await setJobDocument(otherJob.id, "resume", resume!.id);
+    const startedAt = (minutes: number) => new Date(Date.UTC(2026, 8, 10, 9, minutes));
+    const stamp = (id: string, minutes: number) =>
+      withTenant(userId, (tx) => tx.attempt.update({ where: { id }, data: { startedAt: startedAt(minutes) } }));
+
+    // Fernwood, oldest: scored.
+    const first = await start(jobId);
+    if (!first.ok) throw new Error("expected a started Attempt");
+    await finishAndScore(first.attempt.id, first.attempt.questions, 80);
+    await stamp(first.attempt.id, 0);
+    // Harvest: finished but never scored — left out.
+    reply = { body: QUESTIONS(20) };
+    const unscored = await start(otherJob.id, 20);
+    if (!unscored.ok) throw new Error("expected a started Attempt");
+    await endAttempt(unscored.attempt.id);
+    await stamp(unscored.attempt.id, 10);
+    // Fernwood again: abandoned for a reset — left out — then the fresh one left in progress.
+    reply = { body: QUESTIONS() };
+    const abandoned = await start(jobId);
+    if (!abandoned.ok) throw new Error("expected a started Attempt");
+    await stamp(abandoned.attempt.id, 20);
+    const inProgress = await start(jobId, 15, true);
+    if (!inProgress.ok) throw new Error("expected a started Attempt");
+    await stamp(inProgress.attempt.id, 30);
+
+    const past = await pastAttempts();
+
+    expect(past).toEqual([
+      {
+        id: inProgress.attempt.id,
+        jobId,
+        company: "Fernwood",
+        role: "Product Designer",
+        accent: expect.any(String),
+        startedOn: "2026-09-10",
+        length: 15,
+        status: "in-progress",
+        overall: null,
+      },
+      {
+        id: first.attempt.id,
+        jobId,
+        company: "Fernwood",
+        role: "Product Designer",
+        accent: expect.any(String),
+        startedOn: "2026-09-10",
+        length: 15,
+        status: "scored",
+        overall: 80,
+      },
+    ]);
+  });
+
+  it("reads an Attempt scored before unreached questions were weighted at its recomputed overall", async () => {
+    const { userId, jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+    const [a, b, c] = started.attempt.questions;
+    for (const question of [a, b, c]) {
+      await answerQuestion(started.attempt.id, { questionId: question.id, transcript: "Answered.", elapsedSeconds: 30 });
+    }
+    await endAttempt(started.attempt.id);
+    await withTenant(userId, async (tx) => {
+      for (const question of started.attempt.questions) {
+        await tx.attemptQuestion.update({ where: { id: question.id }, data: { score: [a.id, b.id, c.id].includes(question.id) ? 80 : 0 } });
+      }
+      await tx.attempt.update({ where: { id: started.attempt.id }, data: { overallScore: 48 } });
+    });
+
+    expect((await pastAttempts())[0]).toMatchObject({ status: "scored", overall: 60 });
+  });
+
+  it("opens one scored Attempt by its Job and id; an unknown, unscored, other Job's, or another Tenant's is not found", async () => {
+    const owner = await proTenantWithJob();
+    const started = await start(owner.jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+    const unscored = await scoredAttempt(owner.jobId, started.attempt.id);
+    expect(unscored).toBeNull();
+
+    const scored = await finishAndScore(started.attempt.id, started.attempt.questions);
+    const opened = await scoredAttempt(owner.jobId, started.attempt.id);
+    expect(opened).toEqual(scored);
+
+    const otherJob = await createJob(
+      { company: "Harvest", role: "Researcher", location: "Remote", salaryMin: null, salaryMax: null, postingUrl: "", description: "" },
+      MONDAY,
+    );
+    expect(await scoredAttempt(otherJob.id, started.attempt.id)).toBeNull();
+    expect(await scoredAttempt(owner.jobId, "c0000000000000000000000000")).toBeNull();
+
+    const intruder = newUserId();
+    await setPlan(intruder, "pro");
+    signInAs(intruder);
+    expect(await scoredAttempt(owner.jobId, started.attempt.id)).toBeNull();
+    expect(await pastAttempts()).toEqual([]);
   });
 });
 

@@ -14,6 +14,7 @@ import {
   Step,
   type PathJob,
 } from "@/components/interview/interview-path";
+import { PastInterviews } from "@/components/interview/past-interviews";
 import { Scorecard } from "@/components/interview/scorecard";
 import { useSpeechSupported } from "@/components/interview/use-speech";
 import { LoadingTrail } from "@/components/loading-trail";
@@ -34,6 +35,7 @@ import {
   type AttemptLength,
   type InputMode,
   type InterviewQuotaStatus,
+  type PastAttempt,
   type Scorecard as ScorecardData,
 } from "@/lib/interview";
 import { pluralize } from "@/lib/jobs";
@@ -62,6 +64,11 @@ export type InterviewPanelProps = {
   quota: InterviewQuotaStatus | null;
   /** False when this deployment has no Anthropic key: the path says so instead of offering Go. */
   available: boolean;
+  /**
+   * The Tenant's past interviews, listed below the picker on the hub (interview second pass ticket 06).
+   * Not shown with a job chosen, nor on the locked preview.
+   */
+  history?: PastAttempt[];
   /** Replaced in component tests. */
   client?: InterviewClient;
 };
@@ -72,6 +79,7 @@ export function InterviewPanel({
   attempt: initial,
   quota: initialQuota,
   available,
+  history = [],
   client = interviewClient,
 }: InterviewPanelProps) {
   const locked = !canStartAttempt(plan);
@@ -264,6 +272,7 @@ export function InterviewPanel({
               </>
             )}
           </Path>
+          {!job && !locked && <PastInterviews attempts={history} />}
         </div>
       </PageMain>
     </div>

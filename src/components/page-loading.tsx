@@ -45,7 +45,10 @@ export function PageLoading() {
   if (pathname.startsWith("/contacts")) return <ContactsLoading selectedId={contactIdIn(pathname)} />;
   if (pathname.startsWith("/documents")) return <DocumentsLoading />;
   if (pathname === "/interview") return <InterviewLoading id={null} />;
-  if (pathname.startsWith("/interview/")) return <InterviewLoading id={pathname.slice("/interview/".length)} />;
+  if (pathname.startsWith("/interview/")) {
+    const [jobId, attemptId] = pathname.slice("/interview/".length).split("/");
+    return attemptId ? <PastInterviewLoading jobId={jobId} /> : <InterviewLoading id={jobId} />;
+  }
   if (pathname.startsWith("/account")) return <AccountLoading />;
   // A section this file does not know yet: say so plainly rather than draw another page's outline.
   return <SectionLoading />;
@@ -667,6 +670,78 @@ function InterviewLoading({ id }: { id: string | null }) {
             <OutlineStep title="Ready when you are" last>
               {picked && <Bar className="h-12 w-full max-w-sm rounded-md" />}
             </OutlineStep>
+          </div>
+        </div>
+      </PageMain>
+    </div>
+  );
+}
+
+/**
+ * `/interview/<job>/<attempt>`: a past interview's Scorecard, in outline (interview second pass ticket
+ * 06). The way back is live, as on the page; the Job is named at once when the board already holds it;
+ * the Scorecard's section titles are fixed words, so they are written.
+ */
+function PastInterviewLoading({ jobId }: { jobId: string }) {
+  const job = useQueryClient()
+    .getQueryData<Job[]>(jobsCache.key)
+    ?.find((candidate) => candidate.id === jobId);
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <AppHeader leading={<BrandLogo href="/board" />} loading />
+      <PageWait>Loading this interview…</PageWait>
+
+      <PageMain>
+        <div className="mx-auto max-w-2xl">
+          <Button asChild variant="ghost" size="sm" className="-ml-2 mb-3">
+            <Link href="/interview">
+              <ArrowLeft aria-hidden="true" />
+              All interviews
+            </Link>
+          </Button>
+          {job ? (
+            <p aria-hidden="true" className="font-heading text-3xl tracking-tight text-balance">
+              {job.role} at {job.company}
+            </p>
+          ) : (
+            <Bar className="h-9 w-80 max-w-full" />
+          )}
+          <SectionLede>An interview you rehearsed, and how it went.</SectionLede>
+
+          <div className="mt-8 space-y-6">
+            <div className="space-y-2.5 rounded-lg bg-accent/70 p-5 ring-1 ring-primary/15">
+              <p aria-hidden="true" className="text-sm font-medium text-muted-foreground">
+                Overall
+              </p>
+              <Bar className="h-7 w-48" />
+            </div>
+            <Bar className="h-28 w-full rounded-lg" />
+            <div>
+              <p aria-hidden="true" className="text-lg font-medium">
+                By area
+              </p>
+              <div className="mt-2 divide-y divide-border border-y border-border">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} className="flex items-center justify-between py-2.5">
+                    <Bar className="h-4 w-24" />
+                    <Bar className="h-4 w-28" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p aria-hidden="true" className="text-lg font-medium">
+                Answer by answer
+              </p>
+              <div className="mt-3 space-y-4">
+                {[0, 1].map((i) => (
+                  <GhostCard key={i}>
+                    <GhostCardBody lines={3} />
+                  </GhostCard>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </PageMain>

@@ -140,6 +140,25 @@ test.describe("interview simulator: a pro Tenant rehearses and is scored", () =>
     await page.reload();
     await expect(page.getByText("Overall")).toBeVisible();
     await expect(page.getByRole("button", { name: "Score my interview" })).toHaveCount(0);
+    const scorecardText = await page.getByRole("region", { name: "For next time" }).textContent();
+
+    // It is on the hub's past interviews, and opens as the same Scorecard at a link of its own
+    // (interview second pass ticket 06).
+    await page.getByRole("link", { name: "Change job" }).click();
+    const past = page.getByRole("region", { name: "Past interviews" });
+    const row = past.getByRole("link").filter({ hasText: job.role });
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText("15 min");
+    await expect(row.getByRole("img", { name: /^\S+ of 5 stars, / })).toBeVisible();
+    await row.click();
+
+    await expect(page).toHaveURL(/\/interview\/[^/]+\/[^/]+$/);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(`${job.role} at Fernwood`);
+    await expect(page.getByRole("region", { name: "For next time" })).toHaveText(scorecardText!);
+    await expect(page.getByRole("article")).toHaveCount(5);
+    await expect(page.getByRole("button", { name: "Score my interview" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Rehearse this job again" })).toBeVisible();
+    await expectNoAxeViolations(page);
   });
 
   test("the clock running out keeps what was half-said, and the questions it never reached read Not reached", async ({

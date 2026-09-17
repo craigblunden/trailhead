@@ -8,16 +8,18 @@ import {
   attemptSeconds,
   interviewQuotaStatus,
   isKnownLength,
+  rollUp,
   type Attempt,
   type AttemptLength,
   type InterviewQuotaStatus,
+  type PastAttempt,
   type TakeawayPoint,
 } from "@/lib/interview";
 import { limitsOf } from "@/lib/plans";
 import { requireSession } from "@/server/auth/session";
 import type { GeneratedQuestion } from "@/server/interview/claude";
 import { EARLIER_ATTEMPTS_MAX, type InterviewContext } from "@/server/interview/prompt";
-import { toAttemptDto, toDateColumn } from "@/server/db/mappers";
+import { toAttemptDto, toDateColumn, toIsoDate } from "@/server/db/mappers";
 import { withTenant, type Tenant, type TenantClient } from "@/server/db/tenant";
 
 import { RuleError } from "./errors";
@@ -195,6 +197,80 @@ export async function latestAttempt(jobId: string): Promise<Attempt | null> {
       orderBy: { startedAt: "desc" },
     });
   });
+  return row ? toAttemptDto(row) : null;
+}
+
+/**
+ * The hub's past interviews, newest first, across every Job (interview second pass ticket 06): every
+ * scored Attempt, and each Job's Attempt still in progress. Left out are Attempts reset for a newer one
+ * (unfinished, and no longer their Job's latest) and finished ones never scored.
+ *
+ * The overall is derived from the Answers under today's rollup rather than read from the stored
+ * column, so an Attempt scored before unreached questions were weighted reads as its Scorecard does.
+ * Only what the rollup needs is read of each question — not the transcripts.
+ */
+export async function pastAttempts(): Promise<PastAttempt[]> {
+  const { userId } = await requireSession();
+  const rows = await withTenant(userId, (tx) =>
+    tx.attempt.findMany({
+      where: { userId },
+      orderBy: [{ startedAt: "desc" }, { id: "desc" }],
+      select: {
+        id: true,
+        jobId: true,
+        length: true,
+        startedAt: true,
+        completedAt: true,
+        overallScore: true,
+        job: { select: { company: true, role: true, accent: true } },
+        questions: { select: { category: true, answeredAt: true, score: true } },
+      },
+    }),
+  );
+
+  const seenJobs = new Set<string>();
+  return rows.flatMap((row) => {
+    const latestForJob = !seenJobs.has(row.jobId);
+    seenJobs.add(row.jobId);
+    const scored = row.overallScore !== null;
+    const inProgress = !row.completedAt && latestForJob;
+    if (!scored && !inProgress) return [];
+    return [
+      {
+        id: row.id,
+        jobId: row.jobId,
+        company: row.job.company,
+        role: row.job.role,
+        accent: row.job.accent,
+        startedOn: toIsoDate(row.startedAt),
+        length: isKnownLength(row.length) ? row.length : ATTEMPT_LENGTHS[0],
+        status: scored ? "scored" : "in-progress",
+        overall: scored
+          ? rollUp(
+              row.questions.map((question) => ({
+                category: question.category,
+                ...(question.answeredAt ? { answer: { score: question.score } } : {}),
+              })),
+            ).overall
+          : null,
+      } satisfies PastAttempt,
+    ];
+  });
+}
+
+/**
+ * One scored Attempt of the Tenant's, opened from the hub at `/interview/<job>/<attempt>`: null when
+ * there is no such Attempt, when it is another Tenant's, when it belongs to a different Job, or when it
+ * was never scored — each the same not-found, so a URL cannot confirm what exists.
+ */
+export async function scoredAttempt(jobId: string, attemptId: string): Promise<Attempt | null> {
+  const { userId } = await requireSession();
+  const row = await withTenant(userId, (tx) =>
+    tx.attempt.findFirst({
+      where: { id: attemptId, jobId, userId, overallScore: { not: null } },
+      include: ATTEMPT_INCLUDE,
+    }),
+  );
   return row ? toAttemptDto(row) : null;
 }
 

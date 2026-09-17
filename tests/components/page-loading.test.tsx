@@ -52,6 +52,9 @@ describe("where the wait stands", () => {
     ["/contacts", "Loading your contacts…"],
     ["/contacts/c1", "Loading this contact…"],
     ["/documents", "Loading your documents…"],
+    ["/interview", "Loading the Interview Simulator…"],
+    [`/interview/${SEED_JOBS[0].id}`, "Loading your interview…"],
+    [`/interview/${SEED_JOBS[0].id}/attempt-1`, "Loading this interview…"],
   ])("on %s it is in the header, beside the account menu, and nowhere in the page", (path, message) => {
     pathname = path;
     renderLoading(<PageLoading />);
@@ -59,6 +62,23 @@ describe("where the wait stands", () => {
     const status = within(screen.getByRole("banner")).getByRole("status");
     expect(status).toHaveTextContent(message);
     expect(screen.getAllByRole("status")).toHaveLength(1);
+  });
+});
+
+describe("a past interview's Scorecard (interview second pass ticket 06)", () => {
+  it("outlines the Scorecard under the Job's name when the browser already holds it", async () => {
+    const job = SEED_JOBS[0];
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(jobsCache.key, SEED_JOBS);
+    pathname = `/interview/${job.id}/attempt-1`;
+    const { container } = renderLoading(<PageLoading />, queryClient);
+
+    expect(screen.getByText(`${job.role} at ${job.company}`)).toBeInTheDocument();
+    for (const title of ["Overall", "By area", "Answer by answer"]) expect(screen.getByText(title)).toBeInTheDocument();
+    // The Interview Simulator's own path is not what is on its way.
+    expect(screen.queryByText("Which job?")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+    expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
   });
 });
 

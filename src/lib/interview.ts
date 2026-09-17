@@ -238,9 +238,12 @@ export type Scorecard = {
  * got to it, or with nothing yet said on it, so no Answer was recorded. Distinct from a question
  * reached and left empty, which is an Answer and scored like any other.
  */
-export function isUnreached(question: Pick<AttemptQuestion, "answer">): boolean {
+export function isUnreached(question: { answer?: unknown }): boolean {
   return !question.answer;
 }
+
+/** All a rollup reads of a question: its Category, and its Answer's score if one was recorded. */
+export type RollUpQuestion = Pick<AttemptQuestion, "category"> & { answer?: Pick<AttemptAnswer, "score"> };
 
 /**
  * How much an unreached question weighs in a rollup, against an Answer's 1. Being cut off costs
@@ -259,7 +262,7 @@ export const UNREACHED_WEIGHT = 0.5;
  * Derived on read, never trusted from storage, so an Attempt scored before unreached questions were
  * weighted this way reads under the same rule (its unreached questions carry no Answer).
  */
-export function rollUp(questions: AttemptQuestion[]): Scorecard {
+export function rollUp(questions: RollUpQuestion[]): Scorecard {
   const counted = questions.flatMap((question) => {
     if (isUnreached(question)) return [{ question, score: 0, weight: UNREACHED_WEIGHT }];
     const score = question.answer?.score;
@@ -283,6 +286,24 @@ export function rollUp(questions: AttemptQuestion[]): Scorecard {
   });
   return { overall: weighted(counted), categories };
 }
+
+/**
+ * One row of the hub's past interviews (interview second pass ticket 06): a scored Attempt, or the one
+ * in progress for a Job. Reset Attempts and finished ones never scored are not past interviews.
+ */
+export type PastAttempt = {
+  id: string;
+  jobId: string;
+  company: string;
+  role: string;
+  accent: Job["accent"];
+  /** ISO `YYYY-MM-DD`, UTC: the day it was started. */
+  startedOn: string;
+  length: KnownLength;
+  status: "scored" | "in-progress";
+  /** The overall score, derived from the Answers under today's rollup; null while in progress. */
+  overall: number | null;
+};
 
 /** Where a score sits, so the Scorecard reads as words and not only stars. */
 export type ScoreBand = "strong" | "solid" | "developing" | "not-there-yet";

@@ -5,6 +5,7 @@ import { axe } from "vitest-axe";
 import { InterviewPanel } from "@/components/interview/interview-panel";
 import type { PathJob } from "@/components/interview/interview-path";
 import type { InterviewClient } from "@/components/interview/interview-client";
+import { PastScorecard } from "@/components/interview/past-interviews";
 import { ScoreStars } from "@/components/interview/score-stars";
 import {
   CATEGORIES,
@@ -16,6 +17,7 @@ import {
   type KnownLength,
   type Category,
   type InterviewQuotaStatus,
+  type PastAttempt,
 } from "@/lib/interview";
 import type { Job } from "@/lib/jobs";
 import type { Plan } from "@/lib/plans";
@@ -178,6 +180,7 @@ function renderPanel({
   remaining = 9,
   available = true,
   speech = true,
+  history = [] as PastAttempt[],
 } = {}) {
   setSpeechSupport(speech);
   return renderWithJobs(
@@ -187,6 +190,7 @@ function renderPanel({
       attempt={attempt}
       quota={quota(remaining)}
       available={available}
+      history={history}
       client={client as unknown as InterviewClient}
     />,
     { initialJobs: jobs },
@@ -849,6 +853,78 @@ describe("the Scorecard (ticket 03; interview second pass tickets 02, 03, 05)", 
     await running.user.click(screen.getByRole("button", { name: "Resume" }));
     await running.user.click(screen.getByRole("button", { name: "Show transcript" }));
     expect(await axe(running.container, AXE_OPTIONS)).toHaveNoViolations();
+  });
+});
+
+describe("past interviews (interview second pass ticket 06)", () => {
+  const past = (overrides: Partial<PastAttempt>): PastAttempt => ({
+    id: "attempt-scored",
+    jobId: job.id,
+    company: job.company,
+    role: job.role,
+    accent: job.accent,
+    startedOn: "2026-09-14",
+    length: 20,
+    status: "scored",
+    overall: 70,
+    ...overrides,
+  });
+
+  it("IV-U40: the hub lists past interviews below the picker, newest first: each scored one opens its own Scorecard, the one in progress offers Resume", () => {
+    renderPanel({
+      job: null,
+      history: [
+        past({ id: "attempt-now", status: "in-progress", overall: null, startedOn: "2026-09-16", length: 30 }),
+        past({ id: "attempt-before", company: "Harvest", role: "Senior UX Researcher", jobId: "job-2", length: 5 }),
+      ],
+    });
+
+    const section = screen.getByRole("region", { name: "Past interviews" });
+    const picker = screen.getByRole("searchbox", { name: "Search your jobs by role or company" });
+    expect(Boolean(picker.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+
+    const [resume, scored] = within(section).getAllByRole("link");
+    expect(resume).toHaveAttribute("href", `/interview/${job.id}`);
+    expect(resume).toHaveTextContent(job.role);
+    expect(resume).toHaveTextContent("Sep 16");
+    expect(resume).toHaveTextContent("30 min");
+    expect(resume).toHaveTextContent("Resume");
+    expect(within(resume).queryByRole("img")).not.toBeInTheDocument();
+
+    expect(scored).toHaveAttribute("href", "/interview/job-2/attempt-before");
+    expect(scored).toHaveTextContent("Senior UX Researcher");
+    expect(scored).toHaveTextContent("Harvest");
+    expect(scored).toHaveTextContent("Sep 14");
+    expect(scored).toHaveTextContent("5 min");
+    expect(within(scored).getByRole("img", { name: "3½ of 5 stars, solid" })).toBeInTheDocument();
+  });
+
+  it("IV-U41: with no past interviews there is no section at all", () => {
+    renderPanel({ job: null, history: [] });
+
+    expect(screen.queryByRole("region", { name: "Past interviews" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Past interviews/)).not.toBeInTheDocument();
+  });
+
+  it("IV-U42: the locked preview shows no history, and a chosen Job's page shows none either", () => {
+    renderPanel({ job: null, plan: "free", history: [past({})] });
+    expect(screen.queryByRole("region", { name: "Past interviews" })).not.toBeInTheDocument();
+  });
+
+  it("IV-U43: a past interview's Scorecard names the Job, is view-only, and leads back to the hub and to rehearsing that Job again", async () => {
+    const { container } = render(<PastScorecard job={job} attempt={attemptOf({ length: 20, scored: true })} />);
+
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(`${job.role} at ${job.company}`);
+    expect(screen.getByRole("region", { name: "For next time" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /All interviews/ })).toHaveAttribute("href", "/interview");
+    expect(screen.getByRole("link", { name: "Rehearse this job again" })).toHaveAttribute("href", `/interview/${job.id}`);
+    expect(screen.queryByRole("button", { name: "Score my interview" })).not.toBeInTheDocument();
+    expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
+  });
+
+  it("IV-U44: the past interviews list has no accessibility violations", async () => {
+    const { container } = renderPanel({ job: null, history: [past({ id: "a", status: "in-progress", overall: null }), past({})] });
+    expect(await axe(container, AXE_OPTIONS)).toHaveNoViolations();
   });
 });
 

@@ -72,7 +72,9 @@ The Interview Simulator page rehearses for one job. Pick the job from its search
 - The questions are written from that job's description and the user's attached resume, so both must be on the job first. They cover five areas every time, whatever the length: personal, behavioural, stakeholder, technical, and design.
 - One countdown runs for the whole interview, not per question, and it doesn't pause between questions. It starts when "Go" is pressed, with the first question on screen, and each later question starts the moment the previous answer is submitted. Closing the tab stops the clock; returning picks up the same questions with the same time left.
 - Answers are spoken aloud by default, transcribed by the browser. No audio is recorded, uploaded, or stored — only the text. Typing instead is always offered, and is the only option on a browser that cannot transcribe speech.
-- Once every question is answered, scoring gives each answer a mark out of 100 and a sentence saying why, rolled up per area and into one overall score.
+- Once every question is answered, or the clock runs out, the interview is scored. Scores show as up to five stars with a word: Strong, Solid, Developing, or Not there yet. Each answer gets what landed and the specific points it missed, drawn from the posting or the resume; the whole interview gets two or three things to change next time, shown first. Scores roll up per area and into one overall score.
+- If the clock runs out mid-answer, what was said so far is kept and scored. Questions the clock never reached show as not reached and count for less than a poor answer would.
+- The Interview Simulator page lists past interviews, newest first; each scored one opens its own scorecard, and one still in progress can be resumed. Rehearsing the same job again asks about different things.
 - Each interview started counts toward the week's interviews, counted separately from cover letters. It is a Pro feature; other plans see the same screen with an explanation of what Pro unlocks.
 
 ## Documents
