@@ -12,8 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { PlanBlaze, PlanMark } from "@/components/plan-mark";
-import { canStartAttempt } from "@/lib/interview";
+import { PlanMark } from "@/components/plan-mark";
 import type { Plan } from "@/lib/plans";
 
 type UserMenuProps = {
@@ -32,6 +31,10 @@ function toInitials(name: string): string {
     .join("");
 }
 
+/**
+ * The account, at md and up (practice feedback ticket 01). The primary nav is always on show there, so the
+ * menu no longer repeats its pages; below md the header's hamburger (`mobile-menu.tsx`) carries both.
+ */
 export function UserMenu({ name, email, plan, signOut }: UserMenuProps) {
   return (
     <DropdownMenu>
@@ -55,29 +58,6 @@ export function UserMenu({ name, email, plan, signOut }: UserMenuProps) {
           <span className="block text-xs text-muted-foreground">{email}</span>
           <PlanMark plan={plan} className="mt-1.5" />
         </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/board">Your trail</Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/contacts">Contacts</Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/documents">Documents</Link>
-        </DropdownMenuItem>
-        {/* On a phone this menu is the only way to the primary nav's routes, so it carries the
-            Interview Simulator too — marked, for the Plans that cannot start one yet. */}
-        <DropdownMenuItem asChild>
-          <Link href="/interview" className="justify-between">
-            Interview Simulator
-            {!canStartAttempt(plan) && (
-              <span className="flex items-center gap-1 text-[0.6875rem] font-medium text-primary">
-                <PlanBlaze plan="pro" />
-                Pro
-              </span>
-            )}
-          </Link>
-        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/account">Account</Link>

@@ -2,6 +2,7 @@
 
 import { AppFeedback, AppFeedbackPlaceholder } from "@/components/app-feedback";
 import { AppNav } from "@/components/app-nav";
+import { MobileMenu } from "@/components/mobile-menu";
 import { PageWaitSlot } from "@/components/page-wait";
 import { useSessionUser } from "@/components/session-provider";
 import { UserMenu } from "@/components/user-menu";
@@ -44,17 +45,25 @@ export function AppHeader({ leading, actions, loading = false }: AppHeaderProps)
             (loading ? (
               <>
                 <AppFeedbackPlaceholder />
-                <span aria-hidden="true" className="size-8 rounded-full bg-muted" />
+                <span aria-hidden="true" className="size-9 rounded-md bg-muted md:hidden" />
+                <span aria-hidden="true" className="hidden size-8 rounded-full bg-muted md:block" />
               </>
             ) : (
               <>
                 <AppFeedback send={sendAppFeedbackAction} />
-                <UserMenu
-                  name={user.name}
-                  email={user.email}
-                  plan={user.plan}
-                  signOut={signOutAction}
-                />
+                {/* Below md the pages have no room in the header, so one hamburger carries them and the
+                    account (practice feedback ticket 01); at md and up the avatar is the account alone. */}
+                <div className="md:hidden">
+                  <MobileMenu name={user.name} email={user.email} plan={user.plan} signOut={signOutAction} />
+                </div>
+                <div className="hidden md:block">
+                  <UserMenu
+                    name={user.name}
+                    email={user.email}
+                    plan={user.plan}
+                    signOut={signOutAction}
+                  />
+                </div>
               </>
             ))}
         </div>

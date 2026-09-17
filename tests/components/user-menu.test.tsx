@@ -30,38 +30,14 @@ describe("UserMenu", () => {
     expect(menu).toHaveTextContent(/sam\.rivera@example\.com\s*Pro plan/);
   });
 
-  it("offers the account page after the sections and before Sign out", async () => {
+  /**
+   * At md and up the primary nav is always on show, so the menu is the account alone (practice feedback
+   * ticket 01); below md the hamburger carries the pages instead.
+   */
+  it("holds the account and Sign out, not the pages the primary nav already shows", async () => {
     const menu = await openMenu("free");
     const items = within(menu).getAllByRole("menuitem").map((item) => item.textContent);
-    expect(items).toEqual([
-      "Your trail",
-      "Contacts",
-      "Documents",
-      "Interview SimulatorPro",
-      "Account",
-      "Sign out",
-    ]);
+    expect(items).toEqual(["Account", "Sign out"]);
     expect(within(menu).getByRole("menuitem", { name: "Account" })).toHaveAttribute("href", "/account");
-  });
-
-  /**
-   * On a phone this menu is the only way to the primary nav's routes, so it carries the Interview
-   * Simulator too — marked for the Plans that cannot start an Attempt yet (interview simulator
-   * ticket 08), and unmarked on `pro`, where the mark would say nothing.
-   */
-  it("carries interview practice, marked as Pro only for the Plans that cannot use it", async () => {
-    for (const plan of ["free", "basic"] as const) {
-      const menu = await openMenu(plan);
-      const item = within(menu).getByRole("menuitem", { name: /Interview Simulator/ });
-      expect(item).toHaveAttribute("href", "/interview");
-      expect(item).toHaveTextContent("Pro");
-      cleanup();
-    }
-
-    const pro = await openMenu("pro");
-    expect(within(pro).getByRole("menuitem", { name: "Interview Simulator" })).toHaveAttribute(
-      "href",
-      "/interview",
-    );
   });
 });

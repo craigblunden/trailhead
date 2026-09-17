@@ -18,8 +18,9 @@ export const PRIMARY_NAV = [
 ] as const;
 
 /**
- * The signed-in application's routes, at md width and up (ticket 13). On a phone the user menu
- * carries the same links, so nothing here is the only way to reach a page.
+ * The signed-in application's routes, at md width and up (ticket 13). On a phone the header's
+ * hamburger (`mobile-menu.tsx`, practice feedback ticket 01) carries the same links, so nothing here is
+ * the only way to reach a page.
  */
 export function AppNav() {
   const pathname = usePathname() ?? "";

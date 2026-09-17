@@ -48,6 +48,25 @@ test.describe("signed in", () => {
     });
   }
 
+  test("RESP-4: on a phone the hamburger reaches every page, and at md the primary nav takes over (practice feedback ticket 01)", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/board");
+    await expect(page.getByRole("heading", { level: 1, name: "Your trail" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Primary" })).toBeHidden();
+    await expect(page.getByRole("button", { name: /Account menu/ })).toBeHidden();
+
+    await page.getByRole("button", { name: "Menu" }).click();
+    await page.getByRole("dialog", { name: "Menu" }).getByRole("link", { name: "Contacts" }).click();
+    await expect(page).toHaveURL(/\/contacts$/);
+    await expect(page.getByRole("dialog", { name: "Menu" })).toBeHidden();
+
+    await page.setViewportSize({ width: 1024, height: 900 });
+    await expect(page.getByRole("button", { name: "Menu" })).toBeHidden();
+    await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
+  });
+
   test("RESP-2: board columns stack on a narrow screen and spread out on a wide one", async ({
     page,
   }) => {
