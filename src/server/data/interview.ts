@@ -280,15 +280,20 @@ export async function recordAnswer(
 }
 
 /**
- * The countdown ran out mid-question: the Attempt ends where it stands. Whatever was being typed is
- * not recorded, and the remaining questions are simply left unanswered — nothing is force-submitted
- * or retried. The active time is set to the whole budget, so the Attempt reads as having no time
- * left rather than however much had been accounted when the last Answer landed.
+ * The countdown ran out mid-question: the Attempt ends where it stands. Whatever had been typed or
+ * transcribed on the question on screen is recorded as its Answer, in the same transaction (interview
+ * second pass ticket 03) — half an answer is still something said. With nothing said yet, nothing is
+ * recorded and that question is unreached, like the ones after it. The active time is set to the whole
+ * budget, so the Attempt reads as having no time left rather than however much had been accounted
+ * when the last Answer landed.
  *
  * Completing an already-completed Attempt changes nothing and returns it as it stands, so a tab that
- * reports the expiry twice cannot move the finish line.
+ * reports the expiry twice cannot move the finish line or add a late Answer.
  */
-export async function completeAttempt(attemptId: string, now: Date = new Date()): Promise<Attempt> {
+export async function completeAttempt(
+  attemptId: string,
+  { partial, now = new Date() }: { partial?: { questionId: string; transcript: string }; now?: Date } = {},
+): Promise<Attempt> {
   const { userId } = await requireSession();
   const row = await withTenant(userId, async (tx) => {
     const attempt = await tx.attempt.findFirst({
@@ -297,6 +302,13 @@ export async function completeAttempt(attemptId: string, now: Date = new Date())
     });
     if (!attempt) throw new RuleError("no-attempt", INTERVIEW_FAILURES["no-attempt"]);
     if (attempt.completedAt) return attempt;
+    const onScreen = partial && attempt.questions.find((question) => question.id === partial.questionId);
+    if (onScreen && !onScreen.answeredAt && partial.transcript.trim()) {
+      await tx.attemptQuestion.update({
+        where: { id: onScreen.id, userId },
+        data: { transcript: partial.transcript, answeredAt: now },
+      });
+    }
     return tx.attempt.update({
       where: { id: attempt.id, userId },
       data: { completedAt: now, activeSeconds: budgetOf(attempt.length) },

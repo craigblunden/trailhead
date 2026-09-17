@@ -127,8 +127,9 @@ export function InterviewPanel({
     return null;
   }
 
-  async function timeUp() {
-    const outcome = await client.timeUp(attempt!.id);
+  async function timeUp(partial: { questionId: string; transcript: string }) {
+    // Nothing said yet: nothing to keep, and the question on screen is unreached.
+    const outcome = await client.timeUp(attempt!.id, partial.transcript ? partial : undefined);
     if (!outcome.ok) return outcome.message;
     setAttempt(outcome.attempt);
     return null;

@@ -220,10 +220,11 @@ export type AttemptRow = AttemptModel & { questions: AttemptQuestionRow[] };
  * away carries no Answer at all — it is never partly recorded — so `nextQuestion()` resumes on it
  * rather than inside it.
  *
- * A question carries an Answer once it has been answered **or** scored. The second half matters for
- * an Attempt the clock ended: its unreached questions were never answered, but they are still scored
- * (the scorer marks the silence), and the Scorecard has to be able to show that. Scores exist only
- * on a completed Attempt, so this can never make an in-progress one look answered.
+ * A question carries an Answer only once one was recorded. One the countdown ran out before is an
+ * **Unreached question** and carries none, whatever its row holds (interview second pass ticket 03):
+ * Attempts scored before then sent their silences to the scorer and stored a score and rationale
+ * for each, and reading those as unreached is what makes an old Scorecard's rollups follow the new
+ * weighting without scoring it again.
  */
 export function toAttemptDto(row: AttemptRow): Attempt {
   return {
@@ -242,7 +243,7 @@ export function toAttemptDto(row: AttemptRow): Attempt {
         category: question.category,
         order: question.order,
         text: question.text,
-        ...(question.answeredAt || question.score !== null
+        ...(question.answeredAt
           ? { answer: { transcript: question.transcript, score: question.score, rationale: question.rationale } }
           : {}),
       })),

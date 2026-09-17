@@ -55,8 +55,11 @@ export type AttemptRunProps = {
   onTranscriptShownChange: (shown: boolean) => void;
   /** Records one Answer. Resolves with null once it has landed, or a message saying why it hasn't. */
   onAnswer: (answer: { questionId: string; transcript: string; elapsedSeconds: number }) => Promise<string | null>;
-  /** The countdown reached zero mid-question: the Attempt ends where it stands. */
-  onTimeUp: () => Promise<string | null>;
+  /**
+   * The countdown reached zero mid-question: the Attempt ends where it stands, with what had been said
+   * on this question so far — empty when nothing had.
+   */
+  onTimeUp: (partial: { questionId: string; transcript: string }) => Promise<string | null>;
 };
 
 export function AttemptRun(props: AttemptRunProps) {
@@ -120,21 +123,24 @@ function QuestionRun({
     return () => stopListening();
   }, [speaking, status, listen, stopListening]);
 
-  // Out of time, mid-question: the Attempt ends here. Whatever is on the notepad is not recorded, and
-  // the remaining questions are simply left unanswered — nothing is force-submitted.
+  // Spoken, the answer is anything typed before switching to speech, then what the browser heard —
+  // including the phrase still settling, so the last sentence before Submit isn't lost.
+  const spoken = [typed, speech.transcript, speech.interim].map((part) => part.trim()).filter(Boolean).join(" ");
+  const answer = speaking ? spoken : typed.trim();
+
+  // Out of time, mid-question: the Attempt ends here. What is on the notepad — or what the browser had
+  // heard — is kept as this question's Answer, so half an answer is still scored; the questions after
+  // it are unreached (interview second pass ticket 03).
   const expired = left === 0 && status === "answering";
   const ending = useRef(false);
   useEffect(() => {
     if (!expired || ending.current) return;
     ending.current = true;
     stopListening();
-    void onTimeUp().then((message) => message && setFailure(message));
-  }, [expired, onTimeUp, stopListening]);
-
-  // Spoken, the answer is anything typed before switching to speech, then what the browser heard —
-  // including the phrase still settling, so the last sentence before Submit isn't lost.
-  const spoken = [typed, speech.transcript, speech.interim].map((part) => part.trim()).filter(Boolean).join(" ");
-  const answer = speaking ? spoken : typed.trim();
+    void onTimeUp({ questionId: question.id, transcript: answer.slice(0, TRANSCRIPT_MAX_CHARS) }).then(
+      (message) => message && setFailure(message),
+    );
+  }, [expired, onTimeUp, stopListening, question.id, answer]);
 
   async function submit() {
     if (status !== "answering" || !answer) return;

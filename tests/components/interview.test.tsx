@@ -481,7 +481,7 @@ describe("the interview runs without a pause (ticket 02)", () => {
     expect(screen.queryByRole("timer")).not.toBeInTheDocument();
   });
 
-  it("IV-U20: the countdown reaching zero ends the Attempt, and what was typed is never sent", async () => {
+  it("IV-U20: the countdown reaching zero ends the Attempt, keeping what was typed as that question's Answer (interview second pass ticket 03)", async () => {
     // Only the test moves the clock: real time leaking in makes exact seconds flaky on a busy machine.
     vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
     const typing = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -493,8 +493,41 @@ describe("the interview runs without a pause (ticket 02)", () => {
     await typing.type(screen.getByRole("textbox"), "Half an answ");
     await act(() => vi.advanceTimersByTimeAsync(2_000));
 
-    await waitFor(() => expect(client.timeUp).toHaveBeenCalledWith(nearlyOut.id));
+    await waitFor(() =>
+      expect(client.timeUp).toHaveBeenCalledWith(nearlyOut.id, { questionId: "q0", transcript: "Half an answ" }),
+    );
+    expect(client.timeUp).toHaveBeenCalledTimes(1);
     expect(client.answer).not.toHaveBeenCalled();
+  });
+
+  it("IV-U20b: the countdown reaching zero with nothing said sends nothing to keep — the question is unreached", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
+    const typing = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const nearlyOut: Attempt = { ...attemptOf(), activeSeconds: 299 };
+    renderPanel({ attempt: nearlyOut, speech: false });
+    client.timeUp.mockResolvedValue({ ok: true, attempt: { ...nearlyOut, completedAt: "2026-09-16T10:00:00.000Z" } });
+
+    await typing.click(screen.getByRole("button", { name: "Resume" }));
+    await typing.type(screen.getByRole("textbox"), "   ");
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+
+    await waitFor(() => expect(client.timeUp).toHaveBeenCalledWith(nearlyOut.id, undefined));
+  });
+
+  it("IV-U20c: spoken, what the browser had heard — the settled words and the phrase still settling — is what is kept", async () => {
+    vi.useFakeTimers({ toFake: ["Date", "setInterval", "clearInterval"], shouldAdvanceTime: false });
+    const clicking = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const nearlyOut: Attempt = { ...attemptOf(), activeSeconds: 299 };
+    renderPanel({ attempt: nearlyOut, speech: true });
+    client.timeUp.mockResolvedValue({ ok: true, attempt: { ...nearlyOut, completedAt: "2026-09-16T10:00:00.000Z" } });
+
+    await clicking.click(screen.getByRole("button", { name: "Resume" }));
+    hear("I led the reporting redesign");
+    await act(() => vi.advanceTimersByTimeAsync(2_000));
+
+    await waitFor(() =>
+      expect(client.timeUp).toHaveBeenCalledWith(nearlyOut.id, { questionId: "q0", transcript: "I led the reporting redesign" }),
+    );
   });
 
   it("IV-U21: a failed submission keeps the answer and the seconds it cost, so a retry resumes rather than starts over", async () => {
@@ -666,6 +699,27 @@ describe("the Scorecard (ticket 03)", () => {
     // No score is shown as a number anywhere on the Scorecard.
     expect(document.body).not.toHaveTextContent(/\/ 100/);
     for (const score of [60, 65, 70, 75, 80]) expect(screen.queryByText(String(score))).not.toBeInTheDocument();
+  });
+
+  it("IV-U31d: an unreached question reads \"Not reached\" with no stars and no rationale, and so does a Category with nothing reached (interview second pass ticket 03)", () => {
+    const scored = attemptOf({ scored: true });
+    // The clock ran out on the technical question with nothing said, before the design one.
+    const attempt: Attempt = {
+      ...scored,
+      questions: scored.questions.map((question) => (question.order >= 3 ? { ...question, answer: undefined } : question)),
+    };
+    renderPanel({ attempt });
+
+    for (const category of ["technical", "design"] as const) {
+      const section = screen.getByRole("region", { name: CATEGORY_LABEL[category] });
+      expect(within(section).queryByRole("img")).not.toBeInTheDocument();
+      expect(within(section).getAllByText("Not reached")).toHaveLength(2);
+      expect(section).not.toHaveTextContent(`Because of the ${category} thing.`);
+    }
+    // 60, 65, 70 answered; two unreached at half weight: 195 / 4 = 48.75.
+    const overall = screen.getByRole("region", { name: "Overall" });
+    expect(within(overall).getByRole("img", { name: "2½ of 5 stars, developing" })).toBeInTheDocument();
+    expect(overall).toHaveTextContent("2 of which you didn’t get to");
   });
 
   it("IV-U31b: stars fill in half-steps beside the band word, and only the whole is announced", () => {

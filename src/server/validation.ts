@@ -341,6 +341,15 @@ export const startAttemptSchema = z.strictObject({
   reset: z.preprocess((value) => value ?? false, z.boolean("Reset must be true or false")),
 });
 
+/** An Answer's words as they cross the boundary: absent is empty, stripped, trimmed, and bounded. */
+const transcriptSchema = z.preprocess(
+  (value) => (value === null || value === undefined ? "" : value),
+  z
+    .string("An answer must be text")
+    .transform((text) => stripInvisible(text).trim())
+    .pipe(z.string().max(TRANSCRIPT_MAX_CHARS, `Keep an answer under ${TRANSCRIPT_MAX_CHARS} characters`)),
+);
+
 /**
  * Recording an Answer (ticket 02): which question it answers, what was said — spoken or typed, the
  * same field either way — and how much of the countdown it consumed. The transcript is bounded like
@@ -349,13 +358,7 @@ export const startAttemptSchema = z.strictObject({
  */
 export const recordAnswerSchema = z.strictObject({
   questionId: idSchema,
-  transcript: z.preprocess(
-    (value) => (value === null || value === undefined ? "" : value),
-    z
-      .string("An answer must be text")
-      .transform((text) => stripInvisible(text).trim())
-      .pipe(z.string().max(TRANSCRIPT_MAX_CHARS, `Keep an answer under ${TRANSCRIPT_MAX_CHARS} characters`)),
-  ),
+  transcript: transcriptSchema,
   /**
    * The browser's own count of the seconds this answer took. Bounded by the longest Attempt, so a
    * tab reporting a nonsense number cannot make the countdown jump; the server adds it to the
@@ -369,4 +372,15 @@ export const recordAnswerSchema = z.strictObject({
       .min(0)
       .max(attemptSeconds(ATTEMPT_LENGTHS[ATTEMPT_LENGTHS.length - 1])),
   ),
+});
+
+/**
+ * The countdown running out mid-answer (interview second pass ticket 03): which question was on
+ * screen, and whatever had been typed or transcribed on it so far, to be kept as its Answer. No
+ * elapsed time — running out spends the whole countdown, whatever the tab counted.
+ */
+export const timeUpSchema = z.strictObject({
+  timeUp: z.literal(true),
+  questionId: idSchema,
+  transcript: transcriptSchema,
 });

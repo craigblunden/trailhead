@@ -133,6 +133,41 @@ test.describe("interview simulator: a pro Tenant rehearses and is scored", () =>
     await expect(page.getByRole("button", { name: "Score my interview" })).toHaveCount(0);
   });
 
+  test("the clock running out keeps what was half-said, and the questions it never reached read Not reached", async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+    // The browser's clock is the test's to move, so fifteen minutes can pass in a moment.
+    await page.clock.install();
+    const account = await signUpAndVerify(page);
+    await putOnPlan(account.email, "pro");
+    await jobReadyToRehearse(page);
+
+    await page.getByRole("link", { name: "Practice interview" }).click();
+    await page.getByRole("button", { name: "Go" }).click();
+    await expect(page.getByRole("timer")).toBeVisible({ timeout: 60_000 });
+    await answerOne(page, "The one answer I finished.");
+    await expect(page.getByText(/Question 2 of 5/)).toBeVisible();
+    await page.getByRole("textbox", { name: /Your answer to/ }).fill("Half of my second answ");
+
+    // The countdown runs out mid-answer (interview second pass ticket 03).
+    await page.clock.fastForward("15:00");
+
+    const score = page.getByRole("button", { name: "Score my interview" });
+    await expect(score).toBeVisible({ timeout: 30_000 });
+    await score.click();
+    await expect(page.getByText("Overall")).toBeVisible({ timeout: 60_000 });
+
+    // What was half-said was kept and scored; the three questions after it were never reached.
+    await expect(page.getByText("Half of my second answ")).toBeVisible();
+    await expect(page.getByText("3 of which you didn’t get to")).toBeVisible();
+    for (const category of ["Stakeholder", "Technical", "Design"]) {
+      const section = page.getByRole("region", { name: category });
+      await expect(section.getByText("Not reached").first()).toBeVisible();
+      await expect(section.getByRole("img")).toHaveCount(0);
+    }
+  });
+
   test("an interview left mid-way is resumed on the question it reached, with the time it had left", async ({
     page,
   }) => {

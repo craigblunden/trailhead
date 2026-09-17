@@ -184,7 +184,34 @@ describe("recording an Answer (ticket 02)", () => {
     const outcome = await post(answerRoute, "attempt-1");
 
     expect(outcome.status).toBe(200);
-    expect(orchestration.endAttempt).toHaveBeenCalledWith("attempt-1");
+    expect(orchestration.endAttempt).toHaveBeenCalledWith("attempt-1", undefined);
+    expect(orchestration.answerQuestion).not.toHaveBeenCalled();
+  });
+
+  it("IV-R8b: the countdown running out mid-answer sends what was said so far, stripped, to be kept as that question's Answer (interview second pass ticket 03)", async () => {
+    orchestration.endAttempt.mockResolvedValue({ ok: true, attempt: { ...attempt, completedAt: "2026-09-16T10:00:00.000Z" } });
+
+    const outcome = await post(
+      answerRoute,
+      "attempt-1",
+      ...json({ timeUp: true, questionId: "q1", transcript: "  I was halfway​ through  " }),
+    );
+
+    expect(outcome.status).toBe(200);
+    expect(orchestration.endAttempt).toHaveBeenCalledWith("attempt-1", { questionId: "q1", transcript: "I was halfway through" });
+    expect(orchestration.answerQuestion).not.toHaveBeenCalled();
+  });
+
+  it("IV-R8c: a time-up body that cannot be read, or carries an elapsed time, is a 400 before any work", async () => {
+    for (const body of [
+      { timeUp: true, transcript: "No question." },
+      { timeUp: true, questionId: "q1", transcript: "x".repeat(TRANSCRIPT_MAX_CHARS + 1) },
+      { timeUp: true, questionId: "q1", transcript: "Sneaky.", elapsedSeconds: 10 },
+      { timeUp: false, questionId: "q1", transcript: "Not a time-up." },
+    ]) {
+      expect((await post(answerRoute, "attempt-1", ...json(body))).status).toBe(400);
+    }
+    expect(orchestration.endAttempt).not.toHaveBeenCalled();
     expect(orchestration.answerQuestion).not.toHaveBeenCalled();
   });
 

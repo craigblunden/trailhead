@@ -5,6 +5,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import {
   INTERVIEW_FAILURES,
   isComplete,
+  isUnreached,
   rollUp,
   type Attempt,
   type InterviewFailure,
@@ -21,7 +22,7 @@ import {
 } from "@/server/data/interview";
 import { logError } from "@/server/log";
 
-import { scoreAnswers } from "./claude";
+import { scoreAnswers, type ScoredAnswer } from "./claude";
 
 /**
  * Answering an Attempt's questions, and scoring it once every question has an Answer (interview
@@ -70,14 +71,17 @@ export async function answerQuestion(
 }
 
 /**
- * The countdown ran out mid-question: the Attempt ends where it stands, with whatever was typed
- * unrecorded and the remaining questions unanswered. Nothing is force-submitted, and the Attempt can
- * then be scored on the Answers it does have.
+ * The countdown ran out mid-question: the Attempt ends where it stands. What had been said on the
+ * question on screen, if anything, is recorded as its Answer (interview second pass ticket 03); the
+ * questions after it are unreached. The Attempt can then be scored on the Answers it has.
  */
-export async function endAttempt(attemptId: string): Promise<AnswerOutcome> {
+export async function endAttempt(
+  attemptId: string,
+  partial?: { questionId: string; transcript: string },
+): Promise<AnswerOutcome> {
   const { userId: tenant } = await requireSession();
   try {
-    return { ok: true, attempt: await completeAttempt(attemptId) };
+    return { ok: true, attempt: await completeAttempt(attemptId, { partial }) };
   } catch (error) {
     return failure(error, { tenant, operation: "interview.end" });
   }
@@ -92,15 +96,16 @@ export type ScoreOutcome =
  * rolled up per Category and into one overall score, then stored with the Attempt.
  *
  * An Attempt that is neither finished nor out of time cannot be scored — half a Scorecard would say
- * nothing useful about how the rehearsal went. An Attempt that ran out of time can: its unanswered
- * questions are sent as unanswered, and the scorer marks the silence rather than being shown nothing.
+ * nothing useful about how the rehearsal went. An Attempt that ran out of time can, and only its
+ * Answers go to the scorer (interview second pass ticket 03): an unreached question has nothing to
+ * mark, so the app gives it 0 with no rationale and the rollup weighs it at half. An Attempt with no
+ * Answer at all is scored without a call. A question reached and left empty is still an Answer.
  */
 export async function scoreAttempt(
   attemptId: string,
   { client }: { client: Anthropic | null },
 ): Promise<ScoreOutcome> {
   const { userId: tenant } = await requireSession();
-  if (!client) return { ok: false, reason: "unavailable" };
 
   try {
     const attempt = await getAttempt(attemptId);
@@ -108,44 +113,48 @@ export async function scoreAttempt(
       throw new RuleError("incomplete", INTERVIEW_FAILURES.incomplete);
     }
 
-    const sources = await interviewSources(attempt.jobId);
     const questions = [...attempt.questions].sort((a, b) => a.order - b.order);
-    const outcome = await scoreAnswers(
-      {
-        ...sources,
-        answers: questions.map((question) => ({
-          category: question.category,
-          question: question.text,
-          transcript: question.answer?.transcript ?? "",
-        })),
-      },
-      { client, tenant },
-    );
-    // A scoring failure costs the Tenant nothing: the Attempt is already paid for, its Answers are
-    // still stored, and scoring it again spends no quota. So a failure is passed on as it is.
-    if (!outcome.ok) return { ok: false, reason: outcome.reason };
+    const answered = questions.filter((question) => !isUnreached(question));
 
-    const scored = questions.map((question, index) => ({
-      ...question,
-      answer: {
-        transcript: question.answer?.transcript ?? "",
-        score: outcome.scores[index].score,
-        rationale: outcome.scores[index].rationale,
-      },
-    }));
+    let scores: ScoredAnswer[] = [];
+    if (answered.length > 0) {
+      if (!client) return { ok: false, reason: "unavailable" };
+      const sources = await interviewSources(attempt.jobId);
+      const outcome = await scoreAnswers(
+        {
+          ...sources,
+          answers: answered.map((question) => ({
+            category: question.category,
+            question: question.text,
+            transcript: question.answer?.transcript ?? "",
+          })),
+        },
+        { client, tenant },
+      );
+      // A scoring failure costs the Tenant nothing: the Attempt is already paid for, its Answers are
+      // still stored, and scoring it again spends no quota. So a failure is passed on as it is.
+      if (!outcome.ok) return { ok: false, reason: outcome.reason };
+      scores = outcome.scores;
+    }
+
+    const scoreFor = new Map(answered.map((question, index) => [question.id, scores[index]]));
+    const scored = questions.map((question) => {
+      const given = scoreFor.get(question.id);
+      return given ? { ...question, answer: { transcript: question.answer?.transcript ?? "", ...given } } : question;
+    });
     const scorecard = rollUp(scored);
     const stored = await storeScores(
       attemptId,
-      scored.map((question) => ({
+      // An unreached question is given 0 and no rationale by the app, never by the scorer.
+      questions.map((question) => ({
         questionId: question.id,
-        score: question.answer.score,
-        rationale: question.answer.rationale,
+        score: scoreFor.get(question.id)?.score ?? 0,
+        rationale: scoreFor.get(question.id)?.rationale ?? "",
       })),
       scorecard.overall,
     );
     return { ok: true, attempt: stored, scorecard };
   } catch (error) {
-    console.log(error);
     return failure(error, { tenant, operation: "interview.score" });
   }
 }

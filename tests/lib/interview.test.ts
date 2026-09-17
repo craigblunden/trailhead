@@ -15,6 +15,7 @@ import {
   isKnownLength,
   isComplete,
   isScored,
+  isUnreached,
   nextQuestion,
   questionCount,
   remainingSeconds,
@@ -183,32 +184,90 @@ describe("the Scorecard's rollups (ticket 03)", () => {
     ]);
 
     expect(scorecard.categories).toEqual([
-      { category: "personal", score: 80, questions: 1 },
-      { category: "technical", score: 50, questions: 3 },
+      { category: "personal", score: 80, questions: 1, unreached: 0 },
+      { category: "technical", score: 50, questions: 3, unreached: 0 },
     ]);
     // Not the average of the two Category averages (65) — that would weigh one question as heavily
     // as three.
     expect(scorecard.overall).toBe(58);
   });
 
-  it("IV-13: a Category is listed in the fixed Category order, and one with nothing answered is left out rather than shown as a zero", () => {
+  it("IV-13: a Category is listed in the fixed Category order, and an answered question not yet scored counts for nothing", () => {
     const scorecard = rollUp([
       question(0, "design", { score: 90 }),
       question(1, "personal", { score: 70 }),
-      // Answered but unscored, and unanswered: neither earns a Category a zero.
       question(2, "stakeholder", { score: null }),
-      question(3, "behavioural"),
     ]);
 
     expect(scorecard.categories.map((category) => category.category)).toEqual(["personal", "design"]);
     expect(scorecard.overall).toBe(80);
   });
 
-  it("IV-14: an Attempt with nothing scored rolls up to zero rather than to NaN", () => {
-    expect(rollUp([question(0, "personal"), question(1, "design")])).toEqual({ overall: 0, categories: [] });
+  it("IV-14: an empty Attempt rolls up to zero rather than to NaN", () => {
     expect(rollUp([])).toEqual({ overall: 0, categories: [] });
   });
+});
 
+describe("unreached questions (interview second pass ticket 03)", () => {
+  it("IV-14b: an unreached question counts as nothing at half weight — five questions, three answered at 80, two unreached, is 60", () => {
+    const scorecard = rollUp([
+      question(0, "personal", { score: 80 }),
+      question(1, "behavioural", { score: 80 }),
+      question(2, "stakeholder", { score: 80 }),
+      question(3, "technical"),
+      question(4, "design"),
+    ]);
+
+    // At full weight it would be 48: running out of time costs something, but not as much as answering badly.
+    expect(scorecard.overall).toBe(60);
+  });
+
+  it("IV-14c: Category rollups use the same rule, and say how many of their questions were unreached", () => {
+    const scorecard = rollUp([
+      question(0, "technical", { score: 90 }),
+      question(1, "technical"),
+      question(2, "design"),
+      question(3, "design"),
+    ]);
+
+    expect(scorecard.categories).toEqual([
+      // 90 at full weight, 0 at half: 90 / 1.5.
+      { category: "technical", score: 60, questions: 2, unreached: 1 },
+      { category: "design", score: 0, questions: 2, unreached: 2 },
+    ]);
+    // 90 / (1 + 0.5 × 3)
+    expect(scorecard.overall).toBe(36);
+  });
+
+  it("IV-14d: with every question unreached the rollup is zero; with none unreached it is a plain average", () => {
+    expect(rollUp([question(0, "personal"), question(1, "design")])).toEqual({
+      overall: 0,
+      categories: [
+        { category: "personal", score: 0, questions: 1, unreached: 1 },
+        { category: "design", score: 0, questions: 1, unreached: 1 },
+      ],
+    });
+    expect(rollUp([question(0, "personal", { score: 70 }), question(1, "personal", { score: 51 })]).overall).toBe(61);
+  });
+
+  it("IV-14e: a question reached and left empty is an Answer, scored at full weight like any other", () => {
+    const scorecard = rollUp([
+      question(0, "personal", { score: 80 }),
+      question(1, "design", { transcript: "", score: 0 }),
+    ]);
+
+    expect(scorecard.overall).toBe(40);
+    expect(scorecard.categories[1]).toEqual({ category: "design", score: 0, questions: 1, unreached: 0 });
+  });
+
+  it("IV-14f: a question is unreached exactly when it has no Answer recorded", () => {
+    expect(isUnreached(question(0, "personal"))).toBe(true);
+    expect(isUnreached(question(0, "personal", { transcript: "" }))).toBe(false);
+    expect(isUnreached(question(0, "personal", { score: 70 }))).toBe(false);
+  });
+});
+
+describe("how a score reads", () => {
   it("IV-15: a score reads as a band, so the Scorecard is words as well as stars", () => {
     expect([100, 80].map(scoreBand)).toEqual(["strong", "strong"]);
     expect([79, 60].map(scoreBand)).toEqual(["solid", "solid"]);

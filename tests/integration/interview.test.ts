@@ -13,6 +13,7 @@ import {
   attemptSeconds,
   nextQuestion,
   remainingSeconds,
+  rollUp,
   type AttemptLength,
   type Category,
   type KnownLength,
@@ -417,6 +418,38 @@ describe("ticket 02: answering, the clock, and completion", () => {
     expect(stored?.questions[0].answer?.transcript).toBe("Once.");
   });
 
+  it("the countdown running out keeps what was half-said on the question on screen as its Answer (interview second pass ticket 03)", async () => {
+    const { jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+    const [first, second, third] = started.attempt.questions;
+    await answerQuestion(started.attempt.id, { questionId: first.id, transcript: "Finished this one.", elapsedSeconds: 30 });
+
+    const ended = await endAttempt(started.attempt.id, { questionId: second.id, transcript: "I was halfway through say" });
+
+    expect(ended.ok).toBe(true);
+    if (!ended.ok) return;
+    expect(ended.attempt.completedAt).not.toBeNull();
+    expect(remainingSeconds(ended.attempt)).toBe(0);
+    expect(ended.attempt.questions[1].answer?.transcript).toBe("I was halfway through say");
+    expect(ended.attempt.questions.slice(2).every((question) => !question.answer)).toBe(true);
+
+    // Stored, and nothing half-said can be recorded against an Attempt that has already ended.
+    expect((await latestAttempt(jobId))?.questions[1].answer?.transcript).toBe("I was halfway through say");
+    const again = await endAttempt(started.attempt.id, { questionId: third.id, transcript: "Too late." });
+    expect(again.ok && again.attempt.questions[2].answer).toBeFalsy();
+  });
+
+  it("the countdown running out with nothing said records nothing: the question on screen is unreached", async () => {
+    const { jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+
+    const ended = await endAttempt(started.attempt.id, { questionId: started.attempt.questions[0].id, transcript: "" });
+
+    expect(ended.ok && ended.attempt.questions.every((question) => !question.answer)).toBe(true);
+  });
+
   it("the countdown running out ends the Attempt where it stands: nothing is force-submitted", async () => {
     const { jobId } = await proTenantWithJob();
     const started = await start(jobId);
@@ -583,25 +616,76 @@ describe("ticket 03: scoring a completed Attempt", () => {
     expect((await latestAttempt(jobId))?.overallScore).toBeNull();
   });
 
-  it("scores an Attempt the clock ended, marking its unanswered questions rather than skipping them", async () => {
+  it("scores an Attempt the clock ended by sending only its Answers: unreached questions get nothing from Claude and count at half weight (interview second pass ticket 03)", async () => {
     const { jobId } = await proTenantWithJob();
     const started = await start(jobId);
     if (!started.ok) throw new Error("expected a started Attempt");
-    await answerQuestion(started.attempt.id, {
-      questionId: started.attempt.questions[0].id,
-      transcript: "The only one I finished.",
-      elapsedSeconds: 30,
-    });
-    await endAttempt(started.attempt.id);
+    const [first, second, third] = started.attempt.questions;
+    await answerQuestion(started.attempt.id, { questionId: first.id, transcript: "The first.", elapsedSeconds: 30 });
+    // Reached with time left and submitted empty: still an Answer, scored at full weight.
+    await answerQuestion(started.attempt.id, { questionId: second.id, transcript: "", elapsedSeconds: 30 });
+    await endAttempt(started.attempt.id, { questionId: third.id, transcript: "Half an answ" });
 
-    reply = { body: scores(5, 0) };
+    reply = { body: answer({ scores: [80, 80, 80].map((score) => ({ score, rationale: "Good." })) }) };
+    prompts = [];
     const scored = await scoreAttempt(started.attempt.id, { client: claude() });
 
     expect(scored.ok).toBe(true);
     if (!scored.ok) return;
-    // Every question is scored, including the four the clock never reached.
-    expect(scored.attempt.questions.every((question) => typeof question.answer?.score === "number")).toBe(true);
-    expect(scored.scorecard.categories).toHaveLength(CATEGORIES.length);
+    // Three Answers went to the scorer; the two unreached questions did not.
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0].match(/<answer index="/g)).toHaveLength(3);
+    expect(prompts[0]).toContain("<response>\nHalf an answ\n</response>");
+    expect(prompts[0]).not.toContain(started.attempt.questions[3].text);
+    // Three at 80, two unreached at half weight.
+    expect(scored.scorecard.overall).toBe(60);
+    expect(scored.attempt.overallScore).toBe(60);
+    expect(scored.attempt.questions.slice(3).every((question) => !question.answer)).toBe(true);
+    expect((await latestAttempt(jobId))?.overallScore).toBe(60);
+  });
+
+  it("scores an Attempt where every question was unreached without calling Claude at all", async () => {
+    const { jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+    await endAttempt(started.attempt.id);
+    prompts = [];
+
+    const scored = await scoreAttempt(started.attempt.id, { client: claude() });
+
+    expect(prompts).toHaveLength(0);
+    expect(scored).toMatchObject({ ok: true, attempt: { overallScore: 0 }, scorecard: { overall: 0 } });
+  });
+
+  it("an Attempt scored before unreached questions were weighted reads under the new rule, with no call to rescore it", async () => {
+    const { userId, jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+    const [first, second, third] = started.attempt.questions;
+    for (const question of [first, second, third]) {
+      await answerQuestion(started.attempt.id, { questionId: question.id, transcript: "Answered.", elapsedSeconds: 30 });
+    }
+    await endAttempt(started.attempt.id);
+    // As the first pass stored it: every question scored — the silences at the bottom of the scale — and
+    // an overall that averaged them in at full weight.
+    await withTenant(userId, async (tx) => {
+      for (const question of started.attempt.questions) {
+        const answered = [first.id, second.id, third.id].includes(question.id);
+        await tx.attemptQuestion.update({
+          where: { id: question.id },
+          data: { score: answered ? 80 : 0, rationale: answered ? "Good." : "Nothing to score." },
+        });
+      }
+      await tx.attempt.update({ where: { id: started.attempt.id }, data: { overallScore: 48 } });
+    });
+    prompts = [];
+
+    const stored = await latestAttempt(jobId);
+
+    expect(prompts).toHaveLength(0);
+    // The two silences carry no Answer, so they are unreached — no score, no rationale on show.
+    expect(stored?.questions.slice(3).every((question) => !question.answer)).toBe(true);
+    expect(rollUp(stored!.questions).overall).toBe(60);
   });
 
   it("a scoring failure costs nothing and can be retried: the Attempt was counted when it was started", async () => {

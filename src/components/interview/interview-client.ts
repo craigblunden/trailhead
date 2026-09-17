@@ -5,6 +5,7 @@ import type {
   ScoreAttemptResponse,
   StartAttemptRequest,
   StartAttemptResponse,
+  TimeUpRequest,
 } from "@/lib/interview";
 
 /**
@@ -47,9 +48,15 @@ export const interviewClient = {
     answer: { questionId: string; transcript: string; elapsedSeconds: number },
   ): Promise<RecordAnswerResponse> => send(`/api/attempts/${encodeURIComponent(attemptId)}/answer`, answer),
 
-  /** The countdown ran out: no body, so nothing half-typed is recorded. */
-  timeUp: (attemptId: string): Promise<RecordAnswerResponse> =>
-    send(`/api/attempts/${encodeURIComponent(attemptId)}/answer`),
+  /**
+   * The countdown ran out. What had been said on the question on screen goes with it, to be kept as
+   * its Answer (interview second pass ticket 03); with nothing said, no body, and nothing is recorded.
+   */
+  timeUp: (attemptId: string, partial?: { questionId: string; transcript: string }): Promise<RecordAnswerResponse> =>
+    send(
+      `/api/attempts/${encodeURIComponent(attemptId)}/answer`,
+      partial ? ({ timeUp: true, ...partial } satisfies TimeUpRequest) : undefined,
+    ),
 
   score: (attemptId: string): Promise<ScoreAttemptResponse> =>
     send(`/api/attempts/${encodeURIComponent(attemptId)}/score`),

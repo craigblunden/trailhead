@@ -190,8 +190,11 @@ export const TRANSCRIPT_MAX_CHARS = 6_000;
 /** A rationale is a sentence or two about one Answer, and the schema says so. */
 export const RATIONALE_MAX_CHARS = 400;
 
-/** One Category's part of a Scorecard: its questions' average, and how many it covered. */
-export type CategoryScore = { category: Category; score: number; questions: number };
+/**
+ * One Category's part of a Scorecard: its questions' weighted average, how many it covered, and how
+ * many of those the countdown ran out before — all of them, and the Category reads "Not reached".
+ */
+export type CategoryScore = { category: Category; score: number; questions: number; unreached: number };
 
 /** What a completed, scored Attempt is worth: per Answer, per Category, and overall. */
 export type Scorecard = {
@@ -199,25 +202,55 @@ export type Scorecard = {
   categories: CategoryScore[];
 };
 
-const average = (values: number[]) => Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+/**
+ * An **Unreached question** (interview second pass ticket 03): the countdown ran out before the Tenant
+ * got to it, or with nothing yet said on it, so no Answer was recorded. Distinct from a question
+ * reached and left empty, which is an Answer and scored like any other.
+ */
+export function isUnreached(question: Pick<AttemptQuestion, "answer">): boolean {
+  return !question.answer;
+}
 
 /**
- * The Scorecard's rollups, from the Answers' own scores: each Category is the average of its
- * answered questions, and overall is the average across every answered question — not an average of
- * the Category averages, which would weigh a one-question Category as heavily as a four-question one.
- * A Category with no answered question is left out rather than shown as a zero it did not earn.
+ * How much an unreached question weighs in a rollup, against an Answer's 1. Being cut off costs
+ * something, but not as much as answering badly: five questions, three answered at 80 and two
+ * unreached, is 60 rather than the 48 full weight would make it.
+ */
+export const UNREACHED_WEIGHT = 0.5;
+
+/**
+ * The Scorecard's rollups, from the Answers' own scores: each Category is the weighted average of its
+ * questions, and overall is the weighted average across every question — not an average of the
+ * Category averages, which would weigh a one-question Category as heavily as a four-question one.
+ * A scored Answer weighs 1; an unreached question counts as 0 at `UNREACHED_WEIGHT`. An Answer not yet
+ * scored counts for nothing, and a Category with nothing to count is left out.
+ *
+ * Derived on read, never trusted from storage, so an Attempt scored before unreached questions were
+ * weighted this way reads under the same rule (its unreached questions carry no Answer).
  */
 export function rollUp(questions: AttemptQuestion[]): Scorecard {
-  const scored = questions.filter(
-    (question): question is AttemptQuestion & { answer: AttemptAnswer & { score: number } } =>
-      typeof question.answer?.score === "number",
-  );
-  const categories = CATEGORIES.flatMap((category) => {
-    const inCategory = scored.filter((question) => question.category === category);
-    if (inCategory.length === 0) return [];
-    return [{ category, score: average(inCategory.map((q) => q.answer.score)), questions: inCategory.length }];
+  const counted = questions.flatMap((question) => {
+    if (isUnreached(question)) return [{ question, score: 0, weight: UNREACHED_WEIGHT }];
+    const score = question.answer?.score;
+    return typeof score === "number" ? [{ question, score, weight: 1 }] : [];
   });
-  return { overall: scored.length === 0 ? 0 : average(scored.map((q) => q.answer.score)), categories };
+  const weighted = (items: typeof counted) => {
+    const weight = items.reduce((sum, item) => sum + item.weight, 0);
+    return weight === 0 ? 0 : Math.round(items.reduce((sum, item) => sum + item.score * item.weight, 0) / weight);
+  };
+  const categories = CATEGORIES.flatMap((category) => {
+    const inCategory = counted.filter((item) => item.question.category === category);
+    if (inCategory.length === 0) return [];
+    return [
+      {
+        category,
+        score: weighted(inCategory),
+        questions: inCategory.length,
+        unreached: inCategory.filter((item) => isUnreached(item.question)).length,
+      },
+    ];
+  });
+  return { overall: weighted(counted), categories };
 }
 
 /** Where a score sits, so the Scorecard reads as words and not only stars. */
@@ -375,6 +408,16 @@ export type RecordAnswerRequest = {
   transcript: string;
   /** Seconds of the countdown this answer consumed. Added to the Attempt's active time. */
   elapsedSeconds: number;
+};
+
+/**
+ * What the record-Answer route accepts when the countdown runs out mid-answer: the question on
+ * screen and what had been said on it so far, kept as its Answer (interview second pass ticket 03).
+ */
+export type TimeUpRequest = {
+  timeUp: true;
+  questionId: string;
+  transcript: string;
 };
 
 type InterviewError = {
