@@ -145,6 +145,13 @@ way, and kept — but never scored. It belongs to no Job, draws on no posting or
 Limit counts it. It is not a kind of Attempt.
 _Avoid_: Demo, Trial, Taster, Demo Attempt
 
+**Tutorial**:
+One guided question that shows a Tenant how any run of the Interview Simulator works — how many
+questions there are, the clock, turning the microphone on, and submitting when done — before their
+first Practice round or Attempt. Offered on every Plan. It is kept nowhere, counted by nothing, and
+never scored, and it is neither a Practice round nor an Attempt.
+_Avoid_: Test (for any run of the Simulator), Walkthrough, Warm-up, Demo
+
 **Category**:
 One of the five fixed dimensions an Attempt's questions are drawn from: personal, behavioural,
 stakeholder, technical, design. Every Attempt spans all five regardless of length. Each Category has
@@ -153,8 +160,11 @@ than a design one) — and an Attempt's countdown is its questions' answer times
 time is a guide the Tenant is shown, never a cut-off: the countdown is still one for the whole Attempt.
 
 **Answer**:
-The response captured for one question during an Attempt, within that question's time.
-_Avoid_: Response, Transcript (reserve for when the answer is actually spoken and transcribed)
+The response captured for one question during an Attempt or a Practice round, within that question's
+time. Always spoken, and kept as the words the browser heard; Answers saved from when typing was offered
+read the same.
+_Avoid_: Response, Transcript (the words shown while speaking — what an Answer is made from, not the
+Answer itself)
 
 **Scorecard**:
 The result of a completed Attempt: for each Answer a score, what landed, and its Missed points;
