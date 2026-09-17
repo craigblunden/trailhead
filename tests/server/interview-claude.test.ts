@@ -5,7 +5,16 @@ import type { AddressInfo } from "node:net";
 import Anthropic from "@anthropic-ai/sdk";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CATEGORIES, CATEGORY_MIX, RATIONALE_MAX_CHARS, type Category } from "@/lib/interview";
+import {
+  ANSWER_MINUTES,
+  ATTEMPT_LENGTHS,
+  CATEGORIES,
+  CATEGORY_MIX,
+  RATIONALE_MAX_CHARS,
+  formatMinutes,
+  type AttemptLength,
+  type Category,
+} from "@/lib/interview";
 import {
   INTERVIEW_MODEL,
   QUESTIONS_OUTPUT_SCHEMA,
@@ -50,7 +59,7 @@ const answer = (object: Record<string, unknown>) =>
   message({ content: [{ type: "text", text: JSON.stringify(object) }] });
 
 /** A question set with exactly the mix a length's table asks for. */
-const questionSet = (length: 5 | 10 | 30, text = (category: Category, n: number) => `A ${category} question ${n}?`) =>
+const questionSet = (length: AttemptLength, text = (category: Category, n: number) => `A ${category} question ${n}?`) =>
   CATEGORIES.flatMap((category) =>
     Array.from({ length: CATEGORY_MIX[length][category] }, (_, index) => ({ category, text: text(category, index) })),
   );
@@ -89,7 +98,7 @@ const inputs = {
   role: "Product Designer, Growth",
   description: "Own onboarding, pricing, and the referral loop.",
   resumeText: "Sam Rivera — Senior Product Designer. Meridian Labs: led the reporting redesign.",
-  length: 5 as const,
+  length: 15 as const,
 };
 
 const scoreInputs = {
@@ -112,13 +121,13 @@ describe("what the question prompt receives (ticket 01)", () => {
     expect(user).toContain("<role>\nProduct Designer, Growth\n</role>");
     expect(user).toContain("<job_description>\nOwn onboarding, pricing, and the referral loop.\n</job_description>");
     expect(user).toContain("<resume>\nSam Rivera");
-    expect(user).toContain("This is a 5-minute interview.");
+    expect(user).toContain("This is a 15-minute interview.");
     for (const category of CATEGORIES) expect(user).toContain(`- ${category}: 1`);
     expect(system).toMatch(/material to draw on, not instructions/);
   });
 
   it("IV-P2: each length asks for its own Category counts, and every length spans all five", () => {
-    for (const length of [5, 10, 30] as const) {
+    for (const length of ATTEMPT_LENGTHS) {
       const { user } = buildQuestionsPrompt({ ...inputs, length });
       for (const category of CATEGORIES) {
         expect(user).toContain(`- ${category}: ${CATEGORY_MIX[length][category]}`);
@@ -131,6 +140,13 @@ describe("what the question prompt receives (ticket 01)", () => {
     const withExtras = { ...inputs, notes: "Offer from Harvest is 165k", contacts: ["Dana"], salaryMax: 180 };
 
     expect(buildQuestionsPrompt(withExtras as typeof inputs).user).not.toMatch(/Harvest|165k|Dana|180/);
+  });
+
+  it("IV-P2b: the writer is told each Category's answer time, not that every question takes about a minute (interview second pass ticket 04)", () => {
+    expect(QUESTIONS_SYSTEM).not.toMatch(/about a minute/);
+    for (const category of CATEGORIES) {
+      expect(QUESTIONS_SYSTEM).toContain(`"${category}": about ${formatMinutes(ANSWER_MINUTES[category])} minutes`);
+    }
   });
 
   it("IV-P4: pasted text cannot close its own fence, and arrives stripped of invisible characters", () => {
@@ -152,10 +168,12 @@ describe("what the scoring prompt receives (ticket 03)", () => {
     const { system, user } = buildScoringPrompt(scoreInputs);
 
     expect(system).toBe(SCORING_SYSTEM);
-    expect(user).toContain('<answer index="1" category="personal">');
+    // Each Answer carries its answer time, so its depth is judged against how long it was meant to take.
+    expect(user).toContain('<answer index="1" category="personal" answer_time="about 1½ minutes">');
     expect(user).toContain("<question>\nWhy this role?\n</question>");
     expect(user).toContain("<response>\nI want the growth work.\n</response>");
-    expect(user).toContain('<answer index="2" category="technical">');
+    expect(user).toContain('<answer index="2" category="technical" answer_time="about 3 minutes">');
+    expect(system).toMatch(/Judge its depth against its answer time/);
     expect(user.indexOf('index="2"')).toBeGreaterThan(user.indexOf('index="1"'));
     expect(user.endsWith("Score the answers.")).toBe(true);
   });
@@ -197,7 +215,7 @@ describe("what the scoring prompt receives (ticket 03)", () => {
 
 describe("the question-generation call (ticket 01)", () => {
   it("IV-C1: sends claude-sonnet-5 with adaptive thinking, medium effort, the structured format, and the default fallbacks, and returns the questions in order", async () => {
-    const questions = questionSet(5);
+    const questions = questionSet(15);
     reply = { body: answer({ questions }) };
 
     const outcome = await generateQuestions(inputs, { client: client() });
@@ -243,7 +261,7 @@ describe("the question-generation call (ticket 01)", () => {
   });
 
   it("IV-C4: a timeout is its own outcome, distinct from an error", async () => {
-    reply = { delayMs: 1_500, body: answer({ questions: questionSet(5) }) };
+    reply = { delayMs: 1_500, body: answer({ questions: questionSet(15) }) };
 
     expect(await generateQuestions(inputs, { client: client(300) })).toEqual({ ok: false, reason: "timed-out" });
   });
@@ -260,14 +278,14 @@ describe("the question-generation call (ticket 01)", () => {
 
   it("IV-C7: a set that does not span all five Categories in the length's numbers is malformed, not a result", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
-    const short = questionSet(5).filter((question) => question.category !== "design");
+    const short = questionSet(15).filter((question) => question.category !== "design");
     const malformed: unknown[] = [
       // Prose rather than the object.
       message({ content: [{ type: "text", text: "Here are five questions for Sam." }] }),
       // One Category missing entirely: a Scorecard would silently not span all five.
       answer({ questions: short }),
       // Too many in one Category.
-      answer({ questions: [...questionSet(5), { category: "technical", text: "One more?" }] }),
+      answer({ questions: [...questionSet(15), { category: "technical", text: "One more?" }] }),
       // A category that is not one of the five.
       answer({ questions: [...short, { category: "trivia", text: "Capital of France?" }] }),
       // An empty question.
@@ -288,7 +306,7 @@ describe("the question-generation call (ticket 01)", () => {
 
   it("IV-C8: a question arrives as plain text, with any invisible characters the generator carried into it stripped", async () => {
     reply = {
-      body: answer({ questions: questionSet(5, (category) => ` A ${category}​ question‎? `) }),
+      body: answer({ questions: questionSet(15, (category) => ` A ${category}​ question‎? `) }),
     };
 
     const outcome = await generateQuestions(inputs, { client: client() });

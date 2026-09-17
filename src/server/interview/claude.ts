@@ -183,7 +183,7 @@ function parse<T>(schema: z.ZodType<T>, text: string): T | null {
 /**
  * The question set for one Attempt. The Category mix is checked against the length's table here
  * rather than trusted: a set short of one Category would leave a Scorecard that silently doesn't
- * span all five, and the whole point of the mix is that a five-minute rehearsal is still balanced.
+ * span all five, and the whole point of the mix is that the shortest rehearsal is still balanced.
  */
 export async function generateQuestions(
   inputs: QuestionInputs,

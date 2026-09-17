@@ -73,7 +73,7 @@ async function post(
   return { status: response.status, body: (await response.json()) as Body };
 }
 
-const start = (id: string, body: unknown = { length: 10 }) => post(startRoute, id, ...json(body));
+const start = (id: string, body: unknown = { length: 20 }) => post(startRoute, id, ...json(body));
 
 beforeEach(() => {
   for (const mock of Object.values(orchestration)) mock.mockReset();
@@ -94,9 +94,9 @@ describe("starting an Attempt: what an outcome means in HTTP (ticket 01)", () =>
   it("IV-R2: reset defaults to false, so a start request never silently abandons an Attempt in progress", async () => {
     orchestration.startAttempt.mockResolvedValue({ ok: true, attempt, quota });
 
-    await start("job-1", { length: 5 });
+    await start("job-1", { length: 15 });
 
-    expect(orchestration.startAttempt).toHaveBeenCalledWith("job-1", { client: null, length: 5, reset: false });
+    expect(orchestration.startAttempt).toHaveBeenCalledWith("job-1", { client: null, length: 15, reset: false });
   });
 
   it.each<[InterviewFailure, number]>([
@@ -145,9 +145,9 @@ describe("starting an Attempt: what an outcome means in HTTP (ticket 01)", () =>
   });
 });
 
-describe("starting an Attempt: the body (tickets 04, 05)", () => {
-  it("IV-R6: a length that is not one of the three, a missing one, and an unreadable body are each a 400 before any work", async () => {
-    for (const body of [{ length: 15 }, { length: "10" }, {}, { length: 10, sneak: true }]) {
+describe("starting an Attempt: the body (tickets 04, 05; interview second pass ticket 04)", () => {
+  it("IV-R6: a length the app has never known, a missing one, and an unreadable body are each a 400 before any work", async () => {
+    for (const body of [{ length: 45 }, { length: "20" }, {}, { length: 20, sneak: true }]) {
       expect(await start("job-1", body)).toEqual({
         status: 400,
         body: { ok: false, error: "bad-answer", message: INTERVIEW_FAILURES["bad-answer"], refunded: false },
@@ -157,6 +157,13 @@ describe("starting an Attempt: the body (tickets 04, 05)", () => {
       status: 400,
     });
     expect(orchestration.startAttempt).not.toHaveBeenCalled();
+  });
+
+  it("IV-R6b: a retired length reaches the module, which refuses it as bad-length like any length the Plan does not offer", async () => {
+    orchestration.startAttempt.mockResolvedValue({ ok: false, reason: "bad-length", refunded: false, quota });
+
+    expect(await start("job-1", { length: 5 })).toMatchObject({ status: 422, body: { error: "bad-length" } });
+    expect(orchestration.startAttempt).toHaveBeenCalledWith("job-1", { client: null, length: 5, reset: false });
   });
 });
 

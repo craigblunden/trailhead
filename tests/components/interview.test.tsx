@@ -13,7 +13,7 @@ import {
   SPEAK_RECOMMENDED,
   SPEAK_UNSUPPORTED,
   type Attempt,
-  type AttemptLength,
+  type KnownLength,
   type Category,
   type InterviewQuotaStatus,
 } from "@/lib/interview";
@@ -70,7 +70,7 @@ function attemptOf({
   length = 5,
   answered = 0,
   scored = false,
-}: { length?: AttemptLength; answered?: number; scored?: boolean } = {}): Attempt {
+}: { length?: KnownLength; answered?: number; scored?: boolean } = {}): Attempt {
   const questions = CATEGORIES.map((category, order) => ({
     id: `q${order}`,
     category: category as Category,
@@ -279,11 +279,11 @@ describe("steps two and three: set up and Go (tickets 05, 06)", () => {
     expect(screen.getByText(/doesn’t pause between them/)).toBeInTheDocument();
   });
 
-  it("IV-U9: offers 5, 10, and 30 minutes to a pro Tenant, and Go sends the chosen one", async () => {
+  it("IV-U9: offers 15, 20, and 30 minutes to a pro Tenant, and Go sends the chosen one", async () => {
     const { user } = renderPanel();
     client.start.mockResolvedValue({ ok: true, attempt: attemptOf({ length: 30 }), quota: quota(8) });
 
-    for (const minutes of [5, 10, 30]) expect(lengthButton(minutes)).toBeEnabled();
+    for (const minutes of [15, 20, 30]) expect(lengthButton(minutes)).toBeEnabled();
     await user.click(lengthButton(30));
     await user.click(go());
 
@@ -294,10 +294,10 @@ describe("steps two and three: set up and Go (tickets 05, 06)", () => {
     const { user } = renderPanel();
 
     expect(screen.getByText(/1 personal, 1 behavioural, 1 stakeholder, 1 technical, 1 design/)).toBeInTheDocument();
-    await user.click(lengthButton(10));
-    expect(screen.getByText(/2 personal, 2 behavioural, 2 stakeholder, 2 technical, 2 design/)).toBeInTheDocument();
+    await user.click(lengthButton(20));
+    expect(screen.getByText(/2 personal, 2 behavioural, 2 stakeholder, 1 technical, 1 design/)).toBeInTheDocument();
     await user.click(lengthButton(30));
-    expect(screen.getByText(/2 personal, 3 behavioural, 3 stakeholder, 4 technical, 3 design/)).toBeInTheDocument();
+    expect(screen.getByText(/2 personal, 3 behavioural, 3 stakeholder, 2 technical, 2 design/)).toBeInTheDocument();
   });
 
   it("IV-U11: speaking is the default where the browser can transcribe, with the reason shown", () => {
@@ -356,7 +356,7 @@ describe("the locked preview (ticket 08)", () => {
       renderPanel({ plan });
 
       expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Pro");
-      for (const minutes of [5, 10, 30]) expect(lengthButton(minutes)).toBeDisabled();
+      for (const minutes of [15, 20, 30]) expect(lengthButton(minutes)).toBeDisabled();
       expect(screen.getByText(/1 personal, 1 behavioural/)).toBeInTheDocument();
       expect(screen.getByText(/Interview Simulator is a Pro feature/)).toBeInTheDocument();
       // Not a disabled Go — no Go at all.
@@ -369,7 +369,7 @@ describe("the locked preview (ticket 08)", () => {
   it("IV-U17: locked, the set-up is shown before a job is chosen too — the preview is the point", () => {
     renderPanel({ plan: "free", job: null });
 
-    for (const minutes of [5, 10, 30]) expect(lengthButton(minutes)).toBeDisabled();
+    for (const minutes of [15, 20, 30]) expect(lengthButton(minutes)).toBeDisabled();
     expect(screen.getByText(/Interview Simulator is a Pro feature/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Go" })).not.toBeInTheDocument();
   });
@@ -443,6 +443,21 @@ describe("the interview runs without a pause (ticket 02)", () => {
 
     expect(screen.getByRole("button", { name: "Saving your answer…" })).toBeDisabled();
     expect(screen.getByRole("timer").textContent).toBe(atSubmit);
+  });
+
+  it("IV-U17b: under each question, how long to aim for in its Category — a guide, with the one countdown still running (interview second pass ticket 04)", async () => {
+    const { user } = renderPanel({ attempt: attemptOf({ length: 30 }), speech: false });
+    client.answer.mockResolvedValue({ ok: true, attempt: { ...attemptOf({ length: 30, answered: 1 }) } });
+
+    await user.click(screen.getByRole("button", { name: "Resume" }));
+    expect(screen.getByText("Aim for about 1½ min")).toBeInTheDocument();
+    expect(screen.getByRole("timer")).toHaveTextContent("30:00 left");
+
+    await user.type(screen.getByRole("textbox"), "An answer.");
+    await user.click(submitButton());
+
+    expect(await screen.findByRole("heading", { level: 1, name: "A behavioural question?" })).toBeInTheDocument();
+    expect(screen.getByText("Aim for about 2½ min")).toBeInTheDocument();
   });
 
   it("IV-U18: an empty answer cannot be submitted", async () => {
@@ -606,12 +621,12 @@ describe("resuming or starting over (ticket 04)", () => {
   });
 
   it("IV-U29: with Attempts left, starting over is offered and starts a fresh one", async () => {
-    const { user } = renderPanel({ attempt: attemptOf({ answered: 1 }), remaining: 4 });
+    const { user } = renderPanel({ attempt: attemptOf({ length: 20, answered: 1 }), remaining: 4 });
     client.start.mockResolvedValue({ ok: true, attempt: attemptOf(), quota: quota(3) });
 
     await user.click(screen.getByRole("button", { name: /Start over/ }));
 
-    expect(client.start).toHaveBeenCalledWith(job.id, 5, true);
+    expect(client.start).toHaveBeenCalledWith(job.id, 20, true);
   });
 
   it("IV-U30: with no Attempts left, only resuming is offered", () => {
@@ -679,6 +694,17 @@ describe("the Scorecard (ticket 03)", () => {
     expect(screen.getByText("Overall")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Score my interview" })).not.toBeInTheDocument();
     expect(screen.queryByRole("timer")).not.toBeInTheDocument();
+    // Started at a retired length, it still says the length it ran for (interview second pass ticket 04).
+    expect(screen.getByText(/in 5 minutes/)).toBeInTheDocument();
+  });
+
+  it("IV-U32b: starting over an Attempt at a retired length starts at a length offered now", async () => {
+    const { user } = renderPanel({ attempt: attemptOf({ length: 10, answered: 1 }) });
+    client.start.mockReturnValue(new Promise(() => {}));
+
+    await user.click(screen.getByRole("button", { name: /Start over/ }));
+
+    expect(client.start).toHaveBeenCalledWith(job.id, 15, true);
   });
 
   it("IV-U33: a scoring failure says so and leaves the Attempt scorable again", async () => {

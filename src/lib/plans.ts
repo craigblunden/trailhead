@@ -36,11 +36,11 @@ export type Limits = {
 };
 
 export const PLAN_LIMITS = {
-  free: { documents: 3, lettersPerWeek: 5, interviewsPerWeek: 1, interviewLengths: [5] },
-  basic: { documents: 10, lettersPerWeek: 15, interviewsPerWeek: 3, interviewLengths: [5, 10] },
+  free: { documents: 3, lettersPerWeek: 5, interviewsPerWeek: 1, interviewLengths: [15] },
+  basic: { documents: 10, lettersPerWeek: 15, interviewsPerWeek: 3, interviewLengths: [15, 20] },
   // Letters and interviews stay finite on every Plan: each one is a paid model call, and
   // "unlimited" would be a bill with no ceiling.
-  pro: { documents: "unlimited", lettersPerWeek: 25, interviewsPerWeek: 10, interviewLengths: [5, 10, 30] },
+  pro: { documents: "unlimited", lettersPerWeek: 25, interviewsPerWeek: 10, interviewLengths: [15, 20, 30] },
 } as const satisfies Record<Plan, Limits>;
 
 export function limitsOf(plan: Plan): Limits {

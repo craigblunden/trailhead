@@ -8,10 +8,12 @@ import { Soundwave, type MicState } from "@/components/interview/soundwave";
 import { useSpeech } from "@/components/interview/use-speech";
 import { Button } from "@/components/ui/button";
 import {
+  ANSWER_MINUTES,
   CATEGORY_LABEL,
   SPEAK_UNSUPPORTED,
   TRANSCRIPT_MAX_CHARS,
   formatClock,
+  formatMinutes,
   nextQuestion,
   remainingSeconds,
   type Attempt,
@@ -194,6 +196,9 @@ function QuestionRun({
       <h1 id={questionId} className="mt-8 text-2xl leading-snug text-balance sm:mt-12 sm:text-3xl lg:text-4xl">
         {question.text}
       </h1>
+      {/* A guide to pace against, never a cut-off: the one countdown above is still the only clock
+          (interview second pass ticket 04). */}
+      <p className="mt-3 text-sm text-muted-foreground">Aim for about {formatMinutes(ANSWER_MINUTES[question.category])} min</p>
 
       <div className="mt-8 space-y-4">
         {speaking ? (

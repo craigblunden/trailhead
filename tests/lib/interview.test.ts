@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ANSWER_MINUTES,
   ATTEMPT_LENGTHS,
   CATEGORIES,
   CATEGORY_MIX,
@@ -8,8 +9,10 @@ import {
   attemptSeconds,
   canStartAttempt,
   formatClock,
+  formatMinutes,
   interviewQuotaStatus,
   isAttemptLength,
+  isKnownLength,
   isComplete,
   isScored,
   nextQuestion,
@@ -62,27 +65,44 @@ const attempt = (questions: AttemptQuestion[], overrides: Partial<Attempt> = {})
   ...overrides,
 });
 
-describe("the Category mix (ticket 05)", () => {
+describe("the Category mix (ticket 05; interview second pass ticket 04)", () => {
   it("IV-1: every length spans all five Categories, and the counts are the spec's table", () => {
-    expect(ATTEMPT_LENGTHS).toEqual([5, 10, 30]);
+    expect(ATTEMPT_LENGTHS).toEqual([15, 20, 30]);
     expect(CATEGORIES).toEqual(["personal", "behavioural", "stakeholder", "technical", "design"]);
     for (const length of ATTEMPT_LENGTHS) {
       for (const category of CATEGORIES) expect(CATEGORY_MIX[length][category]).toBeGreaterThan(0);
     }
-    expect(CATEGORY_MIX[5]).toEqual({ personal: 1, behavioural: 1, stakeholder: 1, technical: 1, design: 1 });
-    expect(CATEGORY_MIX[10]).toEqual({ personal: 2, behavioural: 2, stakeholder: 2, technical: 2, design: 2 });
-    expect(CATEGORY_MIX[30]).toEqual({ personal: 2, behavioural: 3, stakeholder: 3, technical: 4, design: 3 });
+    expect(CATEGORY_MIX[15]).toEqual({ personal: 1, behavioural: 1, stakeholder: 1, technical: 1, design: 1 });
+    expect(CATEGORY_MIX[20]).toEqual({ personal: 2, behavioural: 2, stakeholder: 2, technical: 1, design: 1 });
+    expect(CATEGORY_MIX[30]).toEqual({ personal: 2, behavioural: 3, stakeholder: 3, technical: 2, design: 2 });
   });
 
-  it("IV-2: the totals are 5, 10, and 15 questions, and the countdown is the length in minutes", () => {
-    expect([5, 10, 30].map((length) => questionCount(length as 5 | 10 | 30))).toEqual([5, 10, 15]);
-    expect(attemptSeconds(5)).toBe(300);
+  it("IV-2: the totals are 5, 8, and 12 questions, and the countdown is the length in minutes", () => {
+    expect(ATTEMPT_LENGTHS.map(questionCount)).toEqual([5, 8, 12]);
+    expect(attemptSeconds(15)).toBe(900);
     expect(attemptSeconds(30)).toBe(1_800);
+    // A retired length still has its countdown, so an Attempt started at one resumes on its own clock.
+    expect(attemptSeconds(5)).toBe(300);
   });
 
-  it("IV-3: only the three lengths are lengths", () => {
-    expect([5, 10, 30].every(isAttemptLength)).toBe(true);
-    for (const value of [0, 1, 15, 45, "5", null, undefined, NaN]) expect(isAttemptLength(value)).toBe(false);
+  it("IV-3: only the three offered lengths may be started; the two retired ones are still known", () => {
+    expect([15, 20, 30].every(isAttemptLength)).toBe(true);
+    for (const value of [0, 1, 5, 10, 45, "15", null, undefined, NaN]) expect(isAttemptLength(value)).toBe(false);
+    expect([5, 10, 15, 20, 30].every(isKnownLength)).toBe(true);
+    for (const value of [0, 45, "5", null]) expect(isKnownLength(value)).toBe(false);
+  });
+
+  it("IV-3b: each Category has its own answer time, and each mix's answer times add up to within a couple of minutes of its countdown", () => {
+    expect(ANSWER_MINUTES).toEqual({ personal: 1.5, behavioural: 2.5, stakeholder: 2, technical: 3, design: 4 });
+    for (const length of ATTEMPT_LENGTHS) {
+      const planned = CATEGORIES.reduce((total, category) => total + CATEGORY_MIX[length][category] * ANSWER_MINUTES[category], 0);
+      expect(Math.abs(planned - length), `${length} minutes plans ${planned}`).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("IV-3c: an answer time reads in whole and half minutes", () => {
+    expect(CATEGORIES.map((category) => formatMinutes(ANSWER_MINUTES[category]))).toEqual(["1½", "2½", "2", "3", "4"]);
+    expect(formatMinutes(0.5)).toBe("½");
   });
 });
 
@@ -96,9 +116,9 @@ describe("which Plans may run one (ticket 08)", () => {
     expect(PLAN_LIMITS.free.interviewsPerWeek).toBe(1);
     expect(PLAN_LIMITS.basic.interviewsPerWeek).toBe(3);
     expect(PLAN_LIMITS.pro.interviewsPerWeek).toBe(10);
-    expect(PLAN_LIMITS.free.interviewLengths).toEqual([5]);
-    expect(PLAN_LIMITS.basic.interviewLengths).toEqual([5, 10]);
-    expect(PLAN_LIMITS.pro.interviewLengths).toEqual([5, 10, 30]);
+    expect(PLAN_LIMITS.free.interviewLengths).toEqual([15]);
+    expect(PLAN_LIMITS.basic.interviewLengths).toEqual([15, 20]);
+    expect(PLAN_LIMITS.pro.interviewLengths).toEqual([15, 20, 30]);
   });
 });
 

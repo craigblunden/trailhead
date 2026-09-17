@@ -85,8 +85,8 @@ test.describe("interview simulator: a pro Tenant rehearses and is scored", () =>
     await expect(page.getByText(/doesn’t pause between them/)).toBeVisible();
 
     // The real length choice, and the breakdown that length produces (ticket 05).
-    await expect(page.getByRole("button", { name: /^5\s*minutes/ })).toBeEnabled();
-    await page.getByRole("button", { name: /^5\s*minutes/ }).click();
+    await expect(page.getByRole("button", { name: /^15\s*minutes/ })).toBeEnabled();
+    await page.getByRole("button", { name: /^15\s*minutes/ }).click();
     await expect(page.getByText(/1 personal, 1 behavioural, 1 stakeholder, 1 technical, 1 design/)).toBeVisible();
 
     // Speaking is the default where the browser can transcribe, with the reason beside it (ticket 06).
@@ -100,7 +100,9 @@ test.describe("interview simulator: a pro Tenant rehearses and is scored", () =>
     await expect(clock).toBeVisible({ timeout: 60_000 });
     await expect(page.getByText(/Question 1 of 5/)).toBeVisible();
     await expect(page.getByRole("heading", { level: 1 })).toContainText("personal question");
-    await expect(clock).not.toHaveText("5:00 left", { timeout: 5_000 });
+    // Each question says how long to aim for in its Category (interview second pass ticket 04).
+    await expect(page.getByText("Aim for about 1½ min")).toBeVisible();
+    await expect(clock).not.toHaveText("15:00 left", { timeout: 5_000 });
 
     for (let index = 1; index <= 5; index += 1) {
       await expect(page.getByText(new RegExp(`Question ${index} of 5`))).toBeVisible();
@@ -157,8 +159,8 @@ test.describe("interview simulator: a pro Tenant rehearses and is scored", () =>
     await expect(page.getByText(/Question 2 of 5/)).toBeVisible();
     // The budget is what was left when they walked away — the seconds that first answer took are
     // gone, and nothing drained in between.
-    await expect(page.getByRole("timer")).not.toHaveText("5:00 left");
-    await expect(page.getByRole("timer")).toHaveText(/^4:5\d left$/);
+    await expect(page.getByRole("timer")).not.toHaveText("15:00 left");
+    await expect(page.getByRole("timer")).toHaveText(/^14:5\d left$/);
   });
 });
 
@@ -182,7 +184,7 @@ test.describe("interview simulator: the locked preview (ticket 08)", () => {
 
     await expect(page.getByText(/Interview Simulator is a Pro feature/)).toBeVisible();
     // The real screen: every length, and the real Category breakdown — all of it refused.
-    for (const minutes of [5, 10, 30]) {
+    for (const minutes of [15, 20, 30]) {
       await expect(page.getByRole("button", { name: new RegExp(`^${minutes}\\s*minutes`) })).toBeDisabled();
     }
     await expect(page.getByText(/1 personal, 1 behavioural/)).toBeVisible();

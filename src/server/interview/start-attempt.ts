@@ -5,9 +5,10 @@ import type Anthropic from "@anthropic-ai/sdk";
 import {
   REFUNDED_INTERVIEW_FAILURES,
   canStartAttempt,
+  isAttemptLength,
   isComplete,
   type Attempt,
-  type AttemptLength,
+  type KnownLength,
   type InterviewFailure,
   type InterviewQuotaStatus,
 } from "@/lib/interview";
@@ -78,7 +79,7 @@ const quotaNow = () => interviewQuota().catch(() => undefined);
 
 export async function startAttempt(
   jobId: string,
-  { client, length, reset = false }: { client: Anthropic | null; length: AttemptLength; reset?: boolean },
+  { client, length, reset = false }: { client: Anthropic | null; length: KnownLength; reset?: boolean },
 ): Promise<StartOutcome> {
   const { userId: tenant } = await requireSession();
   if (!client) return { ok: false, reason: "unavailable", refunded: false };
@@ -106,7 +107,8 @@ export async function startAttempt(
     if (!canStartAttempt(plan)) return { ok: false, reason: "not-pro", refunded: false };
 
     const limits = limitsOf(plan);
-    if (!limits.interviewLengths.includes(length)) {
+    // A retired length is refused like any other the Plan does not offer (interview second pass ticket 04).
+    if (!isAttemptLength(length) || !limits.interviewLengths.includes(length)) {
       return { ok: false, reason: "bad-length", refunded: false, quota: await quotaNow() };
     }
 

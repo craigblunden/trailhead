@@ -57,7 +57,7 @@ describe("/llms.txt", () => {
   it("LLM-5: says what interview practice needs, and that no audio is stored", async () => {
     const { text } = await llmsTxt();
 
-    expect(text).toContain("5, 10, or 30 minutes");
+    expect(text).toContain("15, 20, or 30 minutes");
     expect(text).toContain("personal, behavioural, stakeholder, technical, and design");
     expect(text).toMatch(/No audio is recorded, uploaded, or stored/);
     expect(text).toMatch(/doesn't pause between questions/);

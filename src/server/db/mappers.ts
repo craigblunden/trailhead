@@ -10,7 +10,7 @@ import type {
 import type { ContactDetail, ContactListItem } from "@/lib/contacts";
 import { isoDate } from "@/lib/dates";
 import type { DocumentSummary } from "@/lib/documents";
-import { ATTEMPT_LENGTHS, isAttemptLength, type Attempt } from "@/lib/interview";
+import { ATTEMPT_LENGTHS, isKnownLength, type Attempt } from "@/lib/interview";
 import { STAGES, type ActivityEntry, type Contact, type Job } from "@/lib/jobs";
 
 /**
@@ -229,9 +229,9 @@ export function toAttemptDto(row: AttemptRow): Attempt {
   return {
     id: row.id,
     jobId: row.jobId,
-    // The column is an integer; only `ATTEMPT_LENGTHS` are ever written to it (the routes refuse
+    // The column is an integer; only a known length is ever written to it (the routes refuse
     // anything else), so a row that somehow holds another number reads as the shortest Attempt.
-    length: isAttemptLength(row.length) ? row.length : ATTEMPT_LENGTHS[0],
+    length: isKnownLength(row.length) ? row.length : ATTEMPT_LENGTHS[0],
     activeSeconds: row.activeSeconds,
     completedAt: row.completedAt?.toISOString() ?? null,
     overallScore: row.overallScore,

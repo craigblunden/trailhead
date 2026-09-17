@@ -8,7 +8,7 @@ See `spec.md` → The Scorecard.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** done
+**Status:** ready-for-agent
 
 - [ ] A pure mapping from a 0–100 score to stars: score ÷ 20, to the nearest half (70 → 3½, 0 → 0,
       100 → 5), unit-tested at the edges and at each band boundary.

@@ -27,7 +27,7 @@ export function PlanComparison({ current }: { current: Plan }) {
 
 function PlanColumn({ plan, current }: { plan: Plan; current: boolean }) {
   const nameId = useId();
-  const { documents, lettersPerWeek } = PLAN_LIMITS[plan];
+  const { documents, lettersPerWeek, interviewLengths } = PLAN_LIMITS[plan];
 
   return (
     <li
@@ -52,6 +52,10 @@ function PlanColumn({ plan, current }: { plan: Plan; current: boolean }) {
         <div className="flex items-baseline justify-between gap-3">
           <dt className="text-muted-foreground">Cover letters a week</dt>
           <dd className="font-medium tabular-nums">{limitText(lettersPerWeek)}</dd>
+        </div>
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-muted-foreground">Interview lengths</dt>
+          <dd className="font-medium tabular-nums">{interviewLengths.join(", ")} min</dd>
         </div>
       </dl>
     </li>

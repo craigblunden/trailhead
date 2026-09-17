@@ -7,7 +7,7 @@ import {
   INTERVIEW_FAILURES,
   attemptSeconds,
   interviewQuotaStatus,
-  isAttemptLength,
+  isKnownLength,
   type Attempt,
   type AttemptLength,
   type InterviewQuotaStatus,
@@ -48,7 +48,7 @@ import { planOf } from "./plans";
 const WEEK = /^\d{4}-\d{2}-\d{2}$/;
 
 /** The whole countdown for a stored length, tolerating a column that somehow holds another number. */
-const budgetOf = (length: number) => attemptSeconds(isAttemptLength(length) ? length : ATTEMPT_LENGTHS[0]);
+const budgetOf = (length: number) => attemptSeconds(isKnownLength(length) ? length : ATTEMPT_LENGTHS[0]);
 
 /** The Tenant's Attempts-per-week Limit, from inside the transaction that counts against it. */
 const interviewsPerWeek = async (tenant: Tenant) => limitsOf(await planOf(tenant)).interviewsPerWeek;

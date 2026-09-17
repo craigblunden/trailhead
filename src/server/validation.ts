@@ -15,8 +15,8 @@ import {
   ATTEMPT_LENGTHS,
   TRANSCRIPT_MAX_CHARS,
   attemptSeconds,
-  isAttemptLength,
-  type AttemptLength,
+  isKnownLength,
+  type KnownLength,
 } from "@/lib/interview";
 import { stripInvisible } from "@/lib/invisible";
 import { JOB_LIMITS, locationOrFallback, salaryFromText } from "@/lib/job-fields";
@@ -335,7 +335,9 @@ export function parseInput<T>(schema: z.ZodType<T>, input: unknown): ParseResult
  * layer's (`src/server/interview/start-attempt.ts`), because only it knows the Plan.
  */
 export const startAttemptSchema = z.strictObject({
-  length: z.custom<AttemptLength>(isAttemptLength, "Pick an interview length"),
+  // A retired length passes here so the orchestration can refuse it as `bad-length`, like any other
+  // length the Plan does not offer (interview second pass ticket 04).
+  length: z.custom<KnownLength>(isKnownLength, "Pick an interview length"),
   reset: z.preprocess((value) => value ?? false, z.boolean("Reset must be true or false")),
 });
 

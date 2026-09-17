@@ -68,7 +68,7 @@ Opening a card shows the job's page:
 
 The Interview Simulator page rehearses for one job. Pick the job from its searchable list, or open it from that job's own page.
 
-- Choose how long to rehearse for: 5, 10, or 30 minutes. Longer means more questions, not longer questions.
+- Choose how long to rehearse for: 15, 20, or 30 minutes. Longer means more questions, not longer questions. Each area has its own answer time, shown under each question as a guide (about 1½ minutes for a personal question, up to about 4 for a design one); it never cuts the answer off.
 - The questions are written from that job's description and the user's attached resume, so both must be on the job first. They cover five areas every time, whatever the length: personal, behavioural, stakeholder, technical, and design.
 - One countdown runs for the whole interview, not per question, and it doesn't pause between questions. It starts when "Go" is pressed, with the first question on screen, and each later question starts the moment the previous answer is submitted. Closing the tab stops the clock; returning picks up the same questions with the same time left.
 - Answers are spoken aloud by default, transcribed by the browser. No audio is recorded, uploaded, or stored — only the text. Typing instead is always offered, and is the only option on a browser that cannot transcribe speech.

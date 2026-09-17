@@ -40,24 +40,57 @@ export const CATEGORY_BLURB: Record<Category, string> = {
   design: "How you think a problem through from scratch.",
 };
 
-/** The lengths an Attempt can run for, in minutes. */
-export const ATTEMPT_LENGTHS = [5, 10, 30] as const;
+/**
+ * Each Category's **answer time**, in minutes: how long one of its Answers is meant to take
+ * (interview second pass ticket 04). A guide the Tenant is shown under each question and the question
+ * writer and scorer are told — never a cut-off: the countdown is still one for the whole Attempt.
+ */
+export const ANSWER_MINUTES: Record<Category, number> = {
+  personal: 1.5,
+  behavioural: 2.5,
+  stakeholder: 2,
+  technical: 3,
+  design: 4,
+};
+
+/** "1½", "3": minutes as they read beside a question, in whole and half minutes. */
+export function formatMinutes(minutes: number): string {
+  const whole = Math.floor(minutes);
+  return minutes === whole ? String(whole) : `${whole === 0 ? "" : whole}½`;
+}
+
+/** The lengths an Attempt can be started at, in minutes. */
+export const ATTEMPT_LENGTHS = [15, 20, 30] as const;
 
 export type AttemptLength = (typeof ATTEMPT_LENGTHS)[number];
+
+/**
+ * Lengths offered before the second pass. No Attempt can be started at one any more, but one started
+ * before still resumes on its own countdown and question set, scores, and shows its length.
+ */
+export const RETIRED_LENGTHS = [5, 10] as const;
+
+/** Any length an Attempt may carry: one offered now, or one it was started at before. */
+export type KnownLength = AttemptLength | (typeof RETIRED_LENGTHS)[number];
 
 export function isAttemptLength(value: unknown): value is AttemptLength {
   return ATTEMPT_LENGTHS.includes(value as AttemptLength);
 }
 
+export function isKnownLength(value: unknown): value is KnownLength {
+  return isAttemptLength(value) || RETIRED_LENGTHS.includes(value as (typeof RETIRED_LENGTHS)[number]);
+}
+
 /**
  * How many questions each Category contributes at each length (spec's table). Every Attempt spans
- * all five Categories regardless of length, so a five-minute rehearsal is balanced rather than
- * skewed to one dimension; the longer ones lean towards the dimensions with the most to cover.
+ * all five Categories regardless of length, so the shortest rehearsal is balanced rather than skewed
+ * to one dimension. The mixes are built from the answer times: technical and design questions take
+ * longest to answer, so the longer lengths ask fewer of them than their share of the clock suggests.
  */
 export const CATEGORY_MIX: Record<AttemptLength, Record<Category, number>> = {
-  5: { personal: 1, behavioural: 1, stakeholder: 1, technical: 1, design: 1 },
-  10: { personal: 2, behavioural: 2, stakeholder: 2, technical: 2, design: 2 },
-  30: { personal: 2, behavioural: 3, stakeholder: 3, technical: 4, design: 3 },
+  15: { personal: 1, behavioural: 1, stakeholder: 1, technical: 1, design: 1 },
+  20: { personal: 2, behavioural: 2, stakeholder: 2, technical: 1, design: 1 },
+  30: { personal: 2, behavioural: 3, stakeholder: 3, technical: 2, design: 2 },
 };
 
 /** How many questions an Attempt of this length asks in all. */
@@ -66,7 +99,7 @@ export function questionCount(length: AttemptLength): number {
 }
 
 /** The Attempt's total countdown, in seconds. One countdown for the whole Attempt, never per question. */
-export function attemptSeconds(length: AttemptLength): number {
+export function attemptSeconds(length: KnownLength): number {
   return length * 60;
 }
 
@@ -106,7 +139,8 @@ export const SPEAK_UNSUPPORTED =
 export type Attempt = {
   id: string;
   jobId: string;
-  length: AttemptLength;
+  /** Minutes. A retired length on an Attempt started before the lengths changed. */
+  length: KnownLength;
   /** Seconds this Attempt has actually been answered for. Not wall-clock time since it started. */
   activeSeconds: number;
   /** Set once every question has a recorded Answer, or the countdown ran out. */

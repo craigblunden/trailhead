@@ -25,6 +25,7 @@ import {
   INTERVIEW_FAILURES,
   canStartAttempt,
   formatClock,
+  isAttemptLength,
   isComplete,
   isScored,
   questionCount,
@@ -198,7 +199,8 @@ export function InterviewPanel({
                 <ResumeStep
                   attempt={attempt!}
                   onResume={() => setRunning(true)}
-                  onStartOver={() => start(true, attempt!.length)}
+                  // An Attempt started at a retired length starts over at the shortest length offered now.
+                  onStartOver={() => start(true, isAttemptLength(attempt!.length) ? attempt!.length : lengths[0])}
                   outOfAttempts={outOfAttempts}
                   busy={busy}
                   failure={failure}

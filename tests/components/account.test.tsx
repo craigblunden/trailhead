@@ -69,6 +69,10 @@ describe("the Plans coming-soon section (account issue 05)", () => {
       expect(within(column(plan)).getByText("Cover letters a week").nextElementSibling).toHaveTextContent(
         text(lettersPerWeek),
       );
+      // The interview lengths each Plan chooses between (interview second pass ticket 04).
+      expect(within(column(plan)).getByText("Interview lengths").nextElementSibling).toHaveTextContent(
+        `${PLAN_LIMITS[plan].interviewLengths.join(", ")} min`,
+      );
     }
     expect(within(column("pro")).getByText("Unlimited")).toBeInTheDocument();
   });

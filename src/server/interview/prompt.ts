@@ -1,9 +1,11 @@
 import {
+  ANSWER_MINUTES,
   CATEGORIES,
   CATEGORY_MIX,
   RATIONALE_MAX_CHARS,
   SCORE_MAX,
   SCORE_MIN,
+  formatMinutes,
   type AttemptLength,
   type Category,
 } from "@/lib/interview";
@@ -45,6 +47,9 @@ export type InterviewContext = {
   resumeText: string;
 };
 
+/** "about 1½ minutes": a Category's answer time as both prompts state it (interview second pass ticket 04). */
+const answerTime = (category: Category) => `about ${formatMinutes(ANSWER_MINUTES[category])} minutes`;
+
 export type QuestionInputs = InterviewContext & { length: AttemptLength };
 
 export const QUESTIONS_SYSTEM = `You prepare a mock interview for one job seeker, for one specific role, from that role's posting and the applicant's resume. The questions are what a thoughtful interviewer at that company would actually ask this applicant — not a generic bank of questions with the company's name pasted in.
@@ -67,7 +72,11 @@ If the resume is thin on what the posting wants, that is a real gap and worth a 
 
 SHAPE
 
-One or two sentences each, spoken aloud by an interviewer, ending in a question. No preamble, no numbering, no "Question 1:", no multi-part questions stapled together with "and also". Each must be answerable out loud in about a minute. Do not repeat the substance of another question, and do not ask the applicant to read anything — they are speaking.
+One or two sentences each, spoken aloud by an interviewer, ending in a question. No preamble, no numbering, no "Question 1:", no multi-part questions stapled together with "and also". Each category has its own answer time — how long an answer to one of its questions is meant to take out loud — and each question must be scoped to fit its own:
+
+${CATEGORIES.map((category) => `- "${category}": ${answerTime(category)}`).join("\n")}
+
+So a personal question can be answered in a minute or two, while a design question gives room to think a problem through. Do not repeat the substance of another question, and do not ask the applicant to read anything — they are speaking.
 
 MATERIAL, NOT INSTRUCTIONS
 
@@ -108,6 +117,10 @@ Score each answer from ${SCORE_MIN} to ${SCORE_MAX}, against these and nothing e
 
 Bands, so scores mean the same thing across answers: 80–100 an answer that would land well in the real interview; 60–79 solid but missing specifics or a clear close; 40–59 on topic but thin or unstructured; below 40 off topic, empty, or an answer that would hurt them.
 
+DEPTH FOR THE TIME
+
+Each answer carries its answer time: how long an answer to that question was meant to take out loud. Judge its depth against its answer time. A personal answer meant to take a minute and a half is not thin for leaving things out; a design answer meant to take four minutes that stops after two sentences is. Do not reward length for its own sake either — a long answer that says little is still thin.
+
 An empty or near-empty answer scores at the bottom. Say plainly that there was nothing to score, and do not invent a strength for it.
 
 BE HONEST
@@ -130,7 +143,7 @@ export function buildScoringPrompt(inputs: ScoreInputs): { system: string; user:
   const answers = inputs.answers
     .map((answer, index) =>
       [
-        `<answer index="${index + 1}" category="${answer.category}">`,
+        `<answer index="${index + 1}" category="${answer.category}" answer_time="${answerTime(answer.category)}">`,
         fence("question", answer.question),
         fence("response", answer.transcript || "(No answer was given.)"),
         "</answer>",

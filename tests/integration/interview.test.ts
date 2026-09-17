@@ -8,12 +8,14 @@ import { signInAs, signOut } from "./session-mock";
 
 import {
   CATEGORIES,
+  ATTEMPT_LENGTHS,
   CATEGORY_MIX,
   attemptSeconds,
   nextQuestion,
   remainingSeconds,
   type AttemptLength,
   type Category,
+  type KnownLength,
 } from "@/lib/interview";
 import { PLAN_LIMITS } from "@/lib/plans";
 import { setJobDocument } from "@/server/data/documents";
@@ -65,7 +67,7 @@ const questionSet = (length: AttemptLength) =>
     })),
   );
 
-const QUESTIONS = (length: AttemptLength = 5) => answer({ questions: questionSet(length) });
+const QUESTIONS = (length: AttemptLength = 15) => answer({ questions: questionSet(length) });
 
 beforeAll(async () => {
   server = createServer((request, response) => {
@@ -127,7 +129,7 @@ async function proTenantWithJob(description = "Own onboarding, pricing, and the 
   return { userId, jobId: job.id };
 }
 
-const start = (jobId: string, length: AttemptLength = 5, reset = false) =>
+const start = (jobId: string, length: KnownLength = 15, reset = false) =>
   startAttempt(jobId, { client: claude(), length, reset });
 
 const usedThisWeek = (userId: string) =>
@@ -165,7 +167,7 @@ describe("ticket 01: starting an Attempt", () => {
     expect(outcome.attempt.questions).toHaveLength(5);
     expect(outcome.attempt.questions.map((question) => question.order)).toEqual([0, 1, 2, 3, 4]);
     expect(new Set(outcome.attempt.questions.map((question) => question.category))).toEqual(new Set(CATEGORIES));
-    expect(outcome.attempt.length).toBe(5);
+    expect(outcome.attempt.length).toBe(15);
     expect(outcome.attempt.completedAt).toBeNull();
     expect(await usedThisWeek(userId)).toBe(1);
     expect(outcome.quota).toMatchObject({ limit: PLAN_LIMITS.pro.interviewsPerWeek, used: 1, remaining: 9 });
@@ -185,7 +187,7 @@ describe("ticket 01: starting an Attempt", () => {
   });
 
   it("each length persists its own Category mix", async () => {
-    for (const length of [5, 10, 30] as const) {
+    for (const length of ATTEMPT_LENGTHS) {
       const { jobId } = await proTenantWithJob();
       reply = { body: QUESTIONS(length) };
 
@@ -223,8 +225,14 @@ describe("ticket 01: starting an Attempt", () => {
 
     await setPlan(userId, "pro");
     // `pro` chooses between all three; a fourth length never reaches the call.
-    expect(await start(jobId, 45 as AttemptLength)).toMatchObject({ ok: false, reason: "bad-length" });
+    expect(await start(jobId, 45 as KnownLength)).toMatchObject({ ok: false, reason: "bad-length" });
+    // Nor does a retired one: an Attempt can no longer be started at 5 or 10 minutes (interview
+    // second pass ticket 04).
+    for (const retired of [5, 10] as const) {
+      expect(await start(jobId, retired)).toMatchObject({ ok: false, reason: "bad-length" });
+    }
     expect(requests).toBe(0);
+    expect(await usedThisWeek(userId)).toBe(0);
   });
 });
 
@@ -260,7 +268,7 @@ describe("ticket 01: the weekly quota, reserved and given back", () => {
       { status: 529, body: { type: "error", error: { type: "overloaded_error", message: "Overloaded" } } },
       { body: message({ stop_reason: "max_tokens", content: [{ type: "text", text: '{"questions": [' }] }) },
       // A set that does not span the five Categories is malformed, and ours to give back.
-      { body: answer({ questions: questionSet(5).slice(0, 3) }) },
+      { body: answer({ questions: questionSet(15).slice(0, 3) }) },
     ];
     vi.spyOn(console, "error").mockImplementation(() => {});
     for (const failure of ours) {
@@ -270,7 +278,7 @@ describe("ticket 01: the weekly quota, reserved and given back", () => {
     }
 
     reply = { delayMs: 1_000, body: QUESTIONS() };
-    expect(await startAttempt(jobId, { client: claude(200), length: 5 })).toMatchObject({
+    expect(await startAttempt(jobId, { client: claude(200), length: 15 })).toMatchObject({
       ok: false,
       reason: "timed-out",
       refunded: true,
@@ -311,7 +319,7 @@ describe("ticket 02: answering, the clock, and completion", () => {
     if (!afterFirst.ok) return;
     expect(afterFirst.attempt.questions[0].answer?.transcript).toBe("I led the reporting redesign.");
     expect(afterFirst.attempt.activeSeconds).toBe(45);
-    expect(remainingSeconds(afterFirst.attempt)).toBe(attemptSeconds(5) - 45);
+    expect(remainingSeconds(afterFirst.attempt)).toBe(attemptSeconds(15) - 45);
     // The pause between questions is untimed: nothing but a submitted Answer moves the clock.
     expect(nextQuestion(afterFirst.attempt)?.id).toBe(second.id);
     expect(afterFirst.attempt.completedAt).toBeNull();
@@ -396,7 +404,7 @@ describe("ticket 04: resuming an interrupted Attempt, or resetting it", () => {
     if (!resumed) return;
     // Nothing drained while they were away: active time is only what was actually answered for.
     expect(resumed.activeSeconds).toBe(40);
-    expect(remainingSeconds(resumed)).toBe(attemptSeconds(5) - 40);
+    expect(remainingSeconds(resumed)).toBe(attemptSeconds(15) - 40);
     expect(nextQuestion(resumed)?.id).toBe(started.attempt.questions[1].id);
     // The question they were mid-way through carries no half-recorded Answer.
     expect(resumed.questions[1].answer).toBeUndefined();
@@ -424,7 +432,7 @@ describe("ticket 04: resuming an interrupted Attempt, or resetting it", () => {
     const started = await start(jobId);
     if (!started.ok) throw new Error("expected a started Attempt");
 
-    const fresh = await start(jobId, 5, true);
+    const fresh = await start(jobId, 15, true);
 
     expect(fresh.ok).toBe(true);
     if (!fresh.ok) return;
@@ -443,9 +451,35 @@ describe("ticket 04: resuming an interrupted Attempt, or resetting it", () => {
     );
     vi.setSystemTime(new Date("2026-07-22T09:00:00.000Z"));
 
-    expect(await start(jobId, 5, true)).toMatchObject({ ok: false, reason: "quota", refunded: false });
+    expect(await start(jobId, 15, true)).toMatchObject({ ok: false, reason: "quota", refunded: false });
     expect(requests).toBe(0);
     vi.useRealTimers();
+  });
+});
+
+describe("interview second pass ticket 04: an Attempt started at a retired length", () => {
+  it("still resumes on its own countdown and question set, still scores, and still carries its length", async () => {
+    const { userId, jobId } = await proTenantWithJob();
+    const started = await start(jobId);
+    if (!started.ok) throw new Error("expected a started Attempt");
+    // Started before the lengths changed: five questions against a five-minute countdown.
+    await withTenant(userId, (tx) => tx.attempt.update({ where: { id: started.attempt.id }, data: { length: 5 } }));
+    await answerQuestion(started.attempt.id, {
+      questionId: started.attempt.questions[0].id,
+      transcript: "Answered before the lengths changed.",
+      elapsedSeconds: 60,
+    });
+
+    const resumed = await latestAttempt(jobId);
+    expect(resumed?.length).toBe(5);
+    expect(remainingSeconds(resumed!)).toBe(attemptSeconds(5) - 60);
+    expect(resumed?.questions.map((question) => question.id)).toEqual(started.attempt.questions.map((question) => question.id));
+
+    await answerAll(started.attempt.id, started.attempt.questions.slice(1), 20);
+    reply = { body: answer({ scores: Array.from({ length: 5 }, () => ({ score: 70, rationale: "Fine." })) }) };
+    const scored = await scoreAttempt(started.attempt.id, { client: claude() });
+
+    expect(scored).toMatchObject({ ok: true, attempt: { length: 5, overallScore: 70 } });
   });
 });
 
