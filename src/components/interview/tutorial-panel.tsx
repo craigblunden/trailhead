@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Mic } from "lucide-react";
+import { ArrowLeft, Mic, Signpost } from "lucide-react";
 
 import { AppHeader } from "@/components/app-header";
 import { BrandLogo } from "@/components/brand-logo";
 import { SpeechUnsupported } from "@/components/interview/interview-path";
-import { HeldRunScreen, RunScreen } from "@/components/interview/run-screen";
+import { HeldRunScreen, RunScreen, type Spotlight } from "@/components/interview/run-screen";
 import { primeSpeech } from "@/components/interview/use-ask-aloud";
 import { useSpeech, useSpeechSupported } from "@/components/interview/use-speech";
 import { rememberTutorialSeen, useTutorialSeen } from "@/components/interview/use-tutorial-seen";
@@ -29,6 +29,10 @@ import { cn } from "@/lib/utils";
  */
 
 type Step = "count" | "clock" | "microphone" | "running" | "end";
+
+/** The steps before the clock runs, in order, and the part of the run each one is about. */
+const HELD_STEPS = ["count", "clock", "microphone"] as const;
+const SPOTLIGHT: Record<(typeof HELD_STEPS)[number], Spotlight> = { count: "count", clock: "clock", microphone: "answer" };
 
 export function TutorialPanel({ plan }: { plan: Plan }) {
   const speechSupported = useSpeechSupported();
@@ -77,7 +81,7 @@ export function TutorialPanel({ plan }: { plan: Plan }) {
         onAnswer={finish}
         onTimeUp={finish}
         onLeave={() => setStep("microphone")}
-        submitCallout={<Callout>Press Submit when you’ve finished answering.</Callout>}
+        submitCallout={<Callout pointer="down-start">Press Submit when you’ve finished answering.</Callout>}
       />
     );
   } else if (step === "end") {
@@ -106,45 +110,41 @@ export function TutorialPanel({ plan }: { plan: Plan }) {
       </div>
     );
   } else {
-    body = (
-      <HeldRunScreen run={TUTORIAL_RUN} caption="Tutorial">
-        {step === "count" && (
-          <Callout onNext={() => setStep("clock")}>
-            Questions come one at a time. This tutorial has one;{" "}
-            {canStartPracticeRound(plan)
-              ? `a practice round has ${PRACTICE_QUESTION_COUNT}.`
-              : "an interview has several, across five areas."}
-          </Callout>
-        )}
-        {step === "clock" && (
-          <Callout align="end" onNext={() => setStep("microphone")}>
-            There is one countdown for the whole run — {pluralize(TUTORIAL_SECONDS / 60, "minute")} here — and it only
-            runs while you’re answering.
-          </Callout>
-        )}
-        {step === "microphone" && (
-          <Callout>
-            <p>
-              You answer out loud, so the page needs your microphone. Nothing is recorded: your browser turns what you
-              say into words.
+    const callout =
+      step === "count" ? (
+        <Callout step={1} onNext={() => setStep("clock")}>
+          Questions come one at a time. This tutorial has one;{" "}
+          {canStartPracticeRound(plan)
+            ? `a practice round has ${PRACTICE_QUESTION_COUNT}.`
+            : "an interview has several, across five areas."}
+        </Callout>
+      ) : step === "clock" ? (
+        <Callout step={2} pointer="up-end" onNext={() => setStep("microphone")}>
+          There is one countdown for the whole run — {pluralize(TUTORIAL_SECONDS / 60, "minute")} here — and it only runs
+          while you’re answering.
+        </Callout>
+      ) : (
+        <Callout step={3}>
+          <p>
+            You answer out loud, so the page needs your microphone. Nothing is recorded: your browser turns what you say
+            into words.
+          </p>
+          {microphone.listening && !microphone.error ? (
+            <p className="mt-3 font-medium">Allow the microphone when your browser asks.</p>
+          ) : (
+            <Button type="button" className="mt-3 h-10 px-4" onClick={turnOnMicrophone}>
+              <Mic aria-hidden="true" />
+              {microphone.error ? "Try again" : "Turn on my microphone"}
+            </Button>
+          )}
+          {microphone.error && (
+            <p role="alert" className="mt-3 text-destructive">
+              {microphone.error}
             </p>
-            {microphone.listening && !microphone.error ? (
-              <p className="mt-3 font-medium">Allow the microphone when your browser asks.</p>
-            ) : (
-              <Button type="button" className="mt-3 h-10 px-4" onClick={turnOnMicrophone}>
-                <Mic aria-hidden="true" />
-                {microphone.error ? "Try again" : "Turn on my microphone"}
-              </Button>
-            )}
-            {microphone.error && (
-              <p role="alert" className="mt-3 text-destructive">
-                {microphone.error}
-              </p>
-            )}
-          </Callout>
-        )}
-      </HeldRunScreen>
-    );
+          )}
+        </Callout>
+      );
+    body = <HeldRunScreen run={TUTORIAL_RUN} caption="Tutorial" spotlight={SPOTLIGHT[step]} callout={callout} />;
   }
 
   return (
@@ -173,15 +173,20 @@ export function TutorialPanel({ plan }: { plan: Plan }) {
 }
 
 /**
- * One of the Tutorial's pointers: what to notice, and Next. Focus moves to it as it appears, so the steps
- * read in order with a keyboard or a screen reader.
+ * One of the Tutorial's pointers: what to notice, hanging from the part it is about with a notch pointing
+ * at it, and — before the clock runs — which step of the three this is and Next. Focus moves to it as it
+ * appears, so the steps read in order with a keyboard or a screen reader.
  */
 function Callout({
-  align = "start",
+  pointer = "up-start",
+  step,
   onNext,
   children,
 }: {
-  align?: "start" | "end";
+  /** Where the notch is: up at a part above it, or down at Submit below; at the start or end of its edge. */
+  pointer?: "up-start" | "up-end" | "down-start";
+  /** Which of the steps before the clock runs this is, shown as blazes along the way. */
+  step?: number;
   onNext?: () => void;
   children: React.ReactNode;
 }) {
@@ -195,16 +200,43 @@ function Callout({
       role="note"
       tabIndex={-1}
       className={cn(
-        "max-w-sm rounded-md bg-primary/5 p-3 text-sm ring-1 ring-primary/30 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-        align === "end" && "ml-auto",
+        "relative max-w-sm rounded-lg border border-primary/40 bg-card p-4 text-sm outline-none",
+        pointer === "up-end" && "ml-auto",
       )}
     >
+      <span
+        aria-hidden="true"
+        className={cn(
+          "absolute size-3 rotate-45 border-primary/40 bg-card",
+          pointer === "down-start" ? "-bottom-[7px] border-r border-b" : "-top-[7px] border-t border-l",
+          pointer === "up-end" ? "right-8" : "left-6",
+        )}
+      />
       {children}
-      {onNext && (
-        <div className="mt-3">
-          <Button type="button" variant="outline" className="h-9 px-3" onClick={onNext}>
-            Next
-          </Button>
+      {(step || onNext) && (
+        <div className="mt-4 flex items-center justify-between gap-3">
+          {step && (
+            <span className="flex items-center gap-1">
+              <span className="sr-only">
+                Step {step} of {HELD_STEPS.length}
+              </span>
+              {HELD_STEPS.map((_, index) => (
+                <span
+                  key={index}
+                  aria-hidden="true"
+                  className={cn(
+                    "h-3 w-1.5 rounded-[1px]",
+                    index < step ? "bg-primary" : "border border-muted-foreground/50",
+                  )}
+                />
+              ))}
+            </span>
+          )}
+          {onNext && (
+            <Button type="button" className="ml-auto h-9 px-4" onClick={onNext}>
+              Next
+            </Button>
+          )}
         </div>
       )}
     </div>
@@ -225,11 +257,14 @@ export function TutorialOffer({ newToSimulator, linkOtherwise = false }: { newTo
   }
   if (!newToSimulator || seen) {
     return linkOtherwise ? (
-      <p className="mt-2 text-sm">
-        <Link href="/interview/tutorial" className="font-medium text-primary underline-offset-3 hover:underline">
-          Take the tutorial
-        </Link>
-        <span className="text-muted-foreground"> to see how a run works.</span>
+      <p className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+        <Button asChild variant="outline" className="h-9 gap-2 px-3.5 text-foreground">
+          <Link href="/interview/tutorial">
+            <Signpost aria-hidden="true" />
+            Take the tutorial
+          </Link>
+        </Button>
+        One question to show how a run works.
       </p>
     ) : null;
   }
@@ -247,8 +282,11 @@ export function TutorialOffer({ newToSimulator, linkOtherwise = false }: { newTo
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button asChild className="h-10 px-5">
-          <Link href="/interview/tutorial">Take the tutorial</Link>
+        <Button asChild className="h-10 gap-2 px-5">
+          <Link href="/interview/tutorial">
+            <Signpost aria-hidden="true" />
+            Take the tutorial
+          </Link>
         </Button>
         <Button type="button" variant="ghost" className="h-10 px-4" onClick={remember}>
           Skip

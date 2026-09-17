@@ -96,6 +96,24 @@ describe("the Tutorial's steps (practice feedback ticket 06)", () => {
     expect(speech.recognisers).toHaveLength(0);
   });
 
+  it("TU-U1b: each step blazes the part of the run it is about — the count, the clock, then where the answer is heard — and says which step it is", async () => {
+    const user = userEvent.setup();
+    const { container } = renderTutorial();
+    const spotlit = () => container.querySelectorAll("[data-spotlit]");
+
+    expect(spotlit()).toHaveLength(1);
+    expect(spotlit()[0]).toHaveTextContent("Question 1 of 1");
+    expect(screen.getByRole("note")).toHaveTextContent("Step 1 of 3");
+
+    await user.click(next());
+    expect(spotlit()[0]).toContainElement(screen.getByRole("timer"));
+    expect(screen.getByRole("note")).toHaveTextContent("Step 2 of 3");
+
+    await user.click(next());
+    expect(spotlit()[0].querySelector("[data-mic]")).toHaveAttribute("data-mic", "off");
+    expect(screen.getByRole("note")).toHaveTextContent("Step 3 of 3");
+  });
+
   it("TU-U2: turning the microphone on asks the browser for it inside the tap, and once allowed the question is read and it is the Tenant's turn", async () => {
     const user = userEvent.setup();
     renderTutorial();

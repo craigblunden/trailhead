@@ -387,6 +387,25 @@
   animation: 240ms ease-out 80ms both page-fade;
 }
 
+/*
+ * The Tutorial's steps (practice feedback ticket 06). The part a step is about is blazed: painted round in
+ * the trail colour, with one soft beacon as the step arrives to catch the eye, then still.
+ */
+.tutorial-blaze {
+  outline: 2px solid var(--primary);
+  outline-offset: 6px;
+  animation: tutorial-beacon 1.1s ease-out 2;
+}
+
+@keyframes tutorial-beacon {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary) 35%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 18px color-mix(in oklch, var(--primary) 0%, transparent);
+  }
+}
+
 @keyframes page-fade {
   from {
     opacity: 0;
@@ -397,7 +416,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .loading-trail-path {
+  .loading-trail-path,
+  .tutorial-blaze {
     animation: none;
   }
   /* Still bars, drawn at a height per state, so the state stays visible without the motion. The words

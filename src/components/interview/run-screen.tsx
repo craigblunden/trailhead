@@ -291,18 +291,20 @@ function RunHeader({
   caption,
   question,
   seconds,
+  spotlight,
 }: {
   run: TimedRun;
   caption: string;
   question: RunQuestion;
   seconds: number;
+  spotlight?: Spotlight;
 }) {
   const position = run.questions.findIndex((candidate) => candidate.id === question.id);
   return (
     <>
       <p className="text-sm text-muted-foreground">{caption}</p>
       <div className="sticky top-[calc(3.75rem+1px)] z-20 -mx-4 mt-1 flex items-center justify-between gap-6 border-b border-border bg-background/95 px-4 py-2 backdrop-blur sm:static sm:mx-0 sm:mt-3 sm:items-start sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
-        <div className="min-w-0 space-y-3">
+        <div data-spotlit={spotlight === "count" || undefined} className={cn("min-w-0 space-y-3 rounded-lg", spotlit(spotlight, "count"))}>
           <div className="hidden sm:block">
             <QuestionTrail questions={run.questions} current={position} />
           </div>
@@ -315,24 +317,56 @@ function RunHeader({
             </span>
           </p>
         </div>
-        <Clock seconds={seconds} />
+        <div data-spotlit={spotlight === "clock" || undefined} className={cn("rounded-lg", spotlit(spotlight, "clock"))}>
+          <Clock seconds={seconds} />
+        </div>
       </div>
     </>
   );
 }
 
+/** What one of the Tutorial's steps is about, on a run held before its clock starts. */
+export type Spotlight = "count" | "clock" | "answer";
+
 /**
- * A run on its first question with nothing yet running: the header as the run will show it — how many
- * questions, and the whole countdown standing still — with `children` where the question will be. The
- * Tutorial's steps point at it before the clock ever starts (practice feedback ticket 06).
+ * On a held run, the part a step is about is blazed — painted round, as a trail marks the way — and the
+ * rest recedes, in place, so the page still reads as the run it will become.
  */
-export function HeldRunScreen({ run, caption, children }: { run: TimedRun; caption: string; children: React.ReactNode }) {
+function spotlit(spotlight: Spotlight | undefined, part: Spotlight): string {
+  if (!spotlight) return "";
+  return spotlight === part ? "tutorial-blaze" : "opacity-40";
+}
+
+/**
+ * A run on its first question with nothing yet running, for the Tutorial's steps (practice feedback ticket
+ * 06): the header as the run will show it — how many questions, and the whole countdown standing still —
+ * then where the question and the answer will be. The part `spotlight` names is blazed and the rest
+ * recedes; `callout` hangs directly beneath that part.
+ */
+export function HeldRunScreen({
+  run,
+  caption,
+  spotlight,
+  callout,
+}: {
+  run: TimedRun;
+  caption: string;
+  spotlight: Spotlight;
+  callout: React.ReactNode;
+}) {
   const question = nextQuestion(run);
   if (!question) return null;
   return (
     <div className="mx-auto max-w-3xl">
-      <RunHeader run={run} caption={caption} question={question} seconds={secondsLeft(run)} />
-      <div className="mt-6 sm:mt-12">{children}</div>
+      <RunHeader run={run} caption={caption} question={question} seconds={secondsLeft(run)} spotlight={spotlight} />
+      {spotlight !== "answer" && <div className="mt-5">{callout}</div>}
+      <p aria-hidden="true" className="mt-8 font-heading text-2xl leading-snug text-muted-foreground opacity-40 sm:mt-12 sm:text-3xl lg:text-4xl">
+        Your question appears here
+      </p>
+      <div data-spotlit={spotlight === "answer" || undefined} className={cn("mt-8 w-fit rounded-full", spotlit(spotlight, "answer"))}>
+        <Soundwave state="off" />
+      </div>
+      {spotlight === "answer" && <div className="mt-5">{callout}</div>}
     </div>
   );
 }
