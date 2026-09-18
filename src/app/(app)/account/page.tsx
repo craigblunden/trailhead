@@ -11,7 +11,7 @@ import { accountSummary } from "@/server/data/account";
 import { generationQuota } from "@/server/data/generation";
 import { interviewQuota } from "@/server/data/interview";
 import { currentPlan, limits } from "@/server/data/plans";
-import { prefetch } from "@/server/prefetch";
+import { ignore, prefetch } from "@/server/prefetch";
 
 export const metadata: Metadata = { title: "Account" };
 
@@ -19,12 +19,14 @@ export default async function AccountPage() {
   await requirePageSession();
   const state = await prefetch((queryClient) =>
     Promise.all([
-      queryClient.prefetchQuery(accountCache.options(accountSummary)),
-      queryClient.prefetchQuery(limitsCache.options(limits)),
-      queryClient.prefetchQuery(lettersCache.options(() => generationQuota())),
+      queryClient.query(accountCache.options(accountSummary)).catch(ignore),
+      queryClient.query(limitsCache.options(limits)).catch(ignore),
+      queryClient.query(lettersCache.options(() => generationQuota())).catch(ignore),
       // Only a Plan that can start an Attempt is shown its count (ADR-0005).
       currentPlan().then((plan) =>
-        canStartAttempt(plan) ? queryClient.prefetchQuery(interviewsCache.options(() => interviewQuota())) : undefined,
+        canStartAttempt(plan)
+          ? queryClient.query(interviewsCache.options(() => interviewQuota())).catch(ignore)
+          : undefined,
       ),
     ]),
   );

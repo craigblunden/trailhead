@@ -7,7 +7,7 @@ import { documentsCache, limitsCache } from "@/lib/documents-client";
 import { requirePageSession } from "@/server/auth/session";
 import { listDocuments } from "@/server/data/documents";
 import { limits } from "@/server/data/plans";
-import { prefetch } from "@/server/prefetch";
+import { ignore, prefetch } from "@/server/prefetch";
 
 export const metadata: Metadata = { title: "Documents" };
 
@@ -15,8 +15,8 @@ export default async function DocumentsPage() {
   await requirePageSession();
   const state = await prefetch((queryClient) =>
     Promise.all([
-      queryClient.prefetchQuery(documentsCache.options(listDocuments)),
-      queryClient.prefetchQuery(limitsCache.options(limits)),
+      queryClient.query(documentsCache.options(listDocuments)).catch(ignore),
+      queryClient.query(limitsCache.options(limits)).catch(ignore),
     ]),
   );
   return (

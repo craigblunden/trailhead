@@ -18,8 +18,16 @@ import { jobsCache } from "@/lib/jobs-cache";
  * worth it.
  */
 export async function prefetchJobs(fetchJobs: () => Promise<Job[]>) {
-  return prefetch((queryClient) => queryClient.prefetchQuery(jobsCache.options(fetchJobs)));
+  return prefetch((queryClient) => queryClient.query(jobsCache.options(fetchJobs)).catch(ignore));
 }
+
+/**
+ * Swallows one query's failure. `query` rejects where the deprecated `prefetchQuery` resolved, and
+ * a prefetch is an optimisation: the page still renders, and the client fetches for itself. Caught
+ * per query rather than around the whole fill, so one failure does not cut short its siblings and
+ * cost them their place in the dehydrated state.
+ */
+export function ignore() {}
 
 /**
  * A per-request QueryClient filled by `fill` and dehydrated. Awaited for the reason given above.
