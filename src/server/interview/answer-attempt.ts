@@ -21,6 +21,8 @@ import {
   getAttempt,
   interviewSources,
   recordAnswer,
+  refundScoring,
+  reserveScoring,
   scoredAttemptCount,
   storeScores,
 } from "@/server/data/interview";
@@ -37,6 +39,11 @@ import { scoreAnswers, type ScoredAnswer } from "./claude";
  * Neither of these touches the quota. An Attempt's cost was taken when it was started, and nothing
  * about answering or scoring it can raise or lower that — scoring is part of the Attempt the Tenant
  * already paid for, so a scoring failure they can retry never costs them a second one.
+ *
+ * Scoring is still bounded, by a counter on the Attempt rather than by the quota: `MAX_SCORE_RUNS`
+ * successful scorings each, because the route behind it is a model call and "spends no quota" would
+ * otherwise mean "costs nothing to repeat for ever". Failures are given back, so the retry this
+ * promises is real.
  */
 
 export type AnswerOutcome =
@@ -111,13 +118,16 @@ export async function scoreAttempt(
   { client }: { client: Anthropic | null },
 ): Promise<ScoreOutcome> {
   const { userId: tenant } = await requireSession();
+  /** Set once a run has been taken and not yet given back, so the catch below can give it back. */
+  let reserved = false;
 
   try {
     const attempt = await getAttempt(attemptId);
     if (!attempt.completedAt && !isComplete(attempt)) {
       throw new RuleError("incomplete", INTERVIEW_FAILURES.incomplete);
     }
-    // Scored before: this is a re-score, which never asks how the Simulator is going again.
+    // Scored before: this is a re-score, which never asks how the Simulator is going again. How many
+    // more are left is the Attempt's own counter, taken below.
     const scoredBefore = isScored(attempt);
 
     const questions = [...attempt.questions].sort((a, b) => a.order - b.order);
@@ -127,6 +137,11 @@ export async function scoreAttempt(
     let takeaway: TakeawayPoint[] = [];
     if (answered.length > 0) {
       if (!client) return { ok: false, reason: "unavailable" };
+      // One of this Attempt's scoring runs, taken before the call and given back if it fails. Only
+      // this branch takes one: an Attempt with nothing reached is scored without a model call, so
+      // there is no cost to bound and it stays scoreable however often it is asked for.
+      await reserveScoring(attemptId);
+      reserved = true;
       const sources = await interviewSources(attempt.jobId);
       const outcome = await scoreAnswers(
         {
@@ -140,8 +155,13 @@ export async function scoreAttempt(
         { client, tenant },
       );
       // A scoring failure costs the Tenant nothing: the Attempt is already paid for, its Answers are
-      // still stored, and scoring it again spends no quota. So a failure is passed on as it is.
-      if (!outcome.ok) return { ok: false, reason: outcome.reason };
+      // still stored, and scoring it again spends no quota. So the run is given back and the failure
+      // passed on as it is.
+      if (!outcome.ok) {
+        reserved = false;
+        await giveScoringBack(attemptId, tenant);
+        return { ok: false, reason: outcome.reason };
+      }
       scores = outcome.scores;
       takeaway = outcome.takeaway;
     }
@@ -170,7 +190,19 @@ export async function scoreAttempt(
     const askForFeedback = !scoredBefore && (await scoredAttemptCount()) === ASK_FOR_FEEDBACK_AT;
     return { ok: true, attempt: stored, scorecard, askForFeedback };
   } catch (error) {
+    // Scored, but something after the call threw before the Scorecard was stored: the Tenant has
+    // nothing to show for the run, so give it back. A `rescored` refusal took no run to give back.
+    if (reserved) await giveScoringBack(attemptId, tenant);
     return failure(error, { tenant, operation: "interview.score" });
+  }
+}
+
+/** Gives a scoring run back, never letting that failing take the place of what is being reported. */
+async function giveScoringBack(attemptId: string, tenant: string): Promise<void> {
+  try {
+    await refundScoring(attemptId);
+  } catch (error) {
+    logError({ operation: "interview.score.refund", tenant }, error);
   }
 }
 

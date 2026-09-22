@@ -259,6 +259,10 @@ model Attempt {
   /// The Takeaway once scored: two or three { point, from } objects (interview second pass ticket 05).
   /// Empty on an Attempt scored before there was one, and on one with nothing reached to score.
   takeaway      Json              @default("[]")
+  /// How many times this Attempt has been scored successfully, capped at `MAX_SCORE_RUNS`. Scoring
+  /// spends no quota, so this is the only thing bounding the model call behind it; a failed scoring
+  /// is given back, so a retry is still free. Internal — never on the Attempt DTO.
+  scoreRuns     Int       @default(0)
   questions     AttemptQuestion[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
