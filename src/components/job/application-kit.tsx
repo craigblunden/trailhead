@@ -8,6 +8,7 @@ import {
   useLimits,
 } from "@/components/documents/documents-provider";
 import { UploadDocument } from "@/components/documents/upload-document";
+import { LetterFooting } from "@/components/job/footing";
 import { useSessionUser } from "@/components/session-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,6 +78,10 @@ export function ApplicationKitCard({ job }: { job: Job }) {
               documents={documents.data}
               onChoose={(id) => kit.choose("cover_letter", id)}
             />
+            {/* The Footing's Letter dimension sits here — beside the letter it scored, and apart from
+                the four that make up the overall (footing ticket 04). Here rather than by the Cover
+                letter section below, because what it read is the attached Document, never the Draft. */}
+            <LetterFooting job={job} />
             <SupportingDocumentsPreview pro={plan === "pro"} />
             <section aria-labelledby="kit-upload-heading" className="border-t border-border pt-4">
               <h3 id="kit-upload-heading" className="font-sans text-sm font-bold">

@@ -5,6 +5,7 @@ import { weekStartOf } from "@/lib/dates";
 import {
   ATTEMPT_LENGTHS,
   INTERVIEW_FAILURES,
+  MAX_SCORE_RUNS,
   attemptSeconds,
   interviewQuotaStatus,
   isKnownLength,
@@ -401,6 +402,53 @@ export async function completeAttempt(
     });
   });
   return toAttemptDto(row);
+}
+
+/**
+ * Takes one of this Attempt's scoring runs, atomically, before the scoring call is made. Refused as
+ * `rescored` once `MAX_SCORE_RUNS` have been taken.
+ *
+ * The conditional UPDATE is the whole point: a check followed by an increment would let a handful of
+ * concurrent requests all read the same count and all go on to call the model. Written as one
+ * statement, Postgres serialises them and only the runs under the cap return a row — the same shape
+ * as `reserveAttempt()` above, for the same reason.
+ *
+ * A missing or foreign Attempt is `no-attempt`, as everywhere else: the policy makes another
+ * Tenant's Attempt simply not there to update.
+ */
+export async function reserveScoring(attemptId: string): Promise<void> {
+  const { userId } = await requireSession();
+  const rows = await withTenant(userId, (tx) => tx.$queryRaw<{ scoreRuns: number }[]>`
+    update "Attempt"
+       set "scoreRuns" = "scoreRuns" + 1, "updatedAt" = now()
+     where "id" = ${attemptId}
+       and "userId" = ${userId}::uuid
+       and "scoreRuns" < ${MAX_SCORE_RUNS}
+    returning "scoreRuns"
+  `);
+  if (rows.length > 0) return;
+
+  // Nothing updated: either the Attempt is not this Tenant's, or the cap is reached. Only the
+  // second is worth its own message, so tell them apart before choosing one.
+  const exists = await withTenant(userId, (tx) =>
+    tx.attempt.findFirst({ where: { id: attemptId, userId }, select: { id: true } }),
+  );
+  if (!exists) throw new RuleError("no-attempt", INTERVIEW_FAILURES["no-attempt"]);
+  throw new RuleError("rescored", INTERVIEW_FAILURES.rescored);
+}
+
+/**
+ * Gives back a scoring run reserved for an Attempt whose scoring then failed, so a retry is free.
+ * Never below zero, and never throws: a scoring failure is already being reported, and losing the
+ * give-back costs the Tenant one of three runs rather than the result they were waiting for.
+ */
+export async function refundScoring(attemptId: string): Promise<void> {
+  const { userId } = await requireSession();
+  await withTenant(userId, (tx) => tx.$executeRaw`
+    update "Attempt"
+       set "scoreRuns" = greatest("scoreRuns" - 1, 0), "updatedAt" = now()
+     where "id" = ${attemptId} and "userId" = ${userId}::uuid
+  `);
 }
 
 /**

@@ -6,7 +6,7 @@ spec's table.
 
 **Blocked by:** 01.
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 Category mix by length, from the spec:
 

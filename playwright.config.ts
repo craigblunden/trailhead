@@ -32,6 +32,14 @@ export default defineConfig({
       timeout: 30_000,
     },
     {
+      // A fake of the TypeSafe systemOne API (tests/fakes/typesafe-server.mjs): a Footing is scored
+      // end to end without a key and without spending anything.
+      command: "node tests/fakes/typesafe-server.mjs",
+      url: "http://127.0.0.1:54398/health",
+      reuseExistingServer: !process.env.CI,
+      timeout: 30_000,
+    },
+    {
       // Runs the production build: dev-mode overlays and HMR sockets skew both
       // the axe results and the overflow measurements.
       command: `npm run build && npx next start --port ${PORT}`,
@@ -49,6 +57,11 @@ export default defineConfig({
         ANTHROPIC_API_KEY: "e2e-fake-anthropic-key",
         ANTHROPIC_BASE_URL: "http://127.0.0.1:54397",
         GENERATION_TIMEOUT_MS: "8000",
+        // The Footing goes to the fake above, the same way. The key is a marker e2e/bundle.spec.ts
+        // looks for in the client bundles; the short timeout lets the timeout path run in seconds.
+        TYPESAFE_API_KEY: "e2e-fake-typesafe-key",
+        TYPESAFE_BASE_URL: "http://127.0.0.1:54398",
+        FOOTING_TIMEOUT_MS: "8000",
       },
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,

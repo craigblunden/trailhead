@@ -200,7 +200,13 @@ tenant and the source (`feedback` or `hidden`) and never the text.
 2. Add every variable from `.env.example` except the test-only `TEST_*` variables (`TEST_MAIL_API_URL`, and `TEST_POSTGRES_URL` — the local `postgres` superuser, which must never reach a hosted project) to _Production_ and
    _Preview_. `ANTHROPIC_API_KEY` is a key created for this project alone, so it can be revoked
    without touching anything else.
-3. Deploy. Then add the deployment URL to the Supabase redirect allow-list (step 6 above).
+3. `TYPESAFE_API_KEY` is the second AI provider, which scores a Footing (footing ticket 01). Create it
+   in the TypeSafe dashboard **for this project alone**, for the same reason: it can then be revoked
+   on its own, without taking cover letters and the Interview Simulator down with it. Without it the
+   Footing card is absent rather than broken, so a deploy that forgets it degrades rather than fails.
+   Before setting it, check that `/privacy` still describes this provider correctly — that page is
+   what the Tenant agreed to.
+4. Deploy. Then add the deployment URL to the Supabase redirect allow-list (step 6 above).
 
 ## App feedback mail
 

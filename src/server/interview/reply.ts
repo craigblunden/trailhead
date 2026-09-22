@@ -36,6 +36,7 @@ export const INTERVIEW_STATUS: Record<InterviewFailure, number> = {
   "no-attempt": 404,
   incomplete: 409,
   "bad-answer": 400,
+  rescored: 429,
 };
 
 /**

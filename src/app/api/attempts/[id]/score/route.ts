@@ -13,6 +13,10 @@ import { logError } from "@/server/log";
  *
  * Takes no body: what is scored is what was already recorded. Scoring spends no quota — the Attempt
  * was counted when it was started — so a failure here is always safe to retry.
+ *
+ * It is not, however, unbounded. This is the one model call in the application that no quota stands
+ * in front of, so an Attempt may be scored `MAX_SCORE_RUNS` times successfully and then answers
+ * `rescored` (429). A failed scoring gives its run back and does not count.
  */
 
 /** Seconds. The Claude call gives up well before this, so the handler always answers. */

@@ -273,6 +273,7 @@ describe("scoring an Attempt (ticket 03)", () => {
     ["failed", 502],
     ["timed-out", 504],
     ["unavailable", 503],
+    ["rescored", 429],
   ])("IV-R12: %s is a %i that says what happened", async (reason, status) => {
     orchestration.scoreAttempt.mockResolvedValue({ ok: false, reason });
 

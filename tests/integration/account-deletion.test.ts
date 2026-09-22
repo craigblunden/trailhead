@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { signOut } from "./session-mock";
 
+import { TERMS_VERSION } from "@/lib/terms";
 import { ACCOUNT_DELETION_FAILURES } from "@/server/action-result";
 import { deleteAccountAction } from "@/server/actions/account";
 import { accountSummary, deleteAccount } from "@/server/data/account";
@@ -80,6 +81,9 @@ const TENANT_TABLES = [
   "InterviewQuota",
   "PracticeRound",
   "PracticeQuestion",
+  "Footing",
+  "FootingDimension",
+  "TermsAcceptance",
 ] as const;
 
 type Counts = Record<(typeof TENANT_TABLES)[number], number>;
@@ -131,6 +135,19 @@ async function seedTenant(userId: string) {
         questions: { create: { userId, category: "behavioural", order: 0, text: "Tell me about a mistake." } },
       },
     });
+    await tx.footing.create({
+      data: {
+        userId,
+        jobId: job.id,
+        resumeId: document.id,
+        coverLetterId: null,
+        resumeHash: "r",
+        descriptionHash: "d",
+        coverLetterHash: "",
+        dimensions: { create: { userId, dimension: "skills", score: 75, confidence: 0.8 } },
+      },
+    });
+    await tx.termsAcceptance.create({ data: { userId, version: TERMS_VERSION } });
   });
   await setPlan(userId, "pro");
 }
@@ -425,6 +442,8 @@ describe("account issue 04: deleting an Account in the data layer", () => {
       email: alex.email,
       providers: ["email"],
       plan: "basic",
+      // Nothing asked for: the summary carries the Upgrade request only while one is outstanding.
+      upgradeRequest: null,
       jobs: 1,
       documents: 2,
       contacts: 1,

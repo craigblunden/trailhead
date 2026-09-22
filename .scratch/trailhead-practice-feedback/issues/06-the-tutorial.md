@@ -9,7 +9,7 @@ See `spec.md` → 6. The Tutorial. Glossary: **Tutorial** (`CONTEXT.md`).
 **Blocked by:** 03, 04 (it relies on the primed voice, "Your turn", and the phone layout; 05's failure
 message is reused if it has landed, otherwise the plain error)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review (manual iPhone check pending on the user)
 
 - [ ] `/interview/tutorial`: a static segment (like `practice`), open to every Plan, behind
       `requirePageSession`. Nothing is fetched or stored: the run is an in-memory `TimedRun` with one

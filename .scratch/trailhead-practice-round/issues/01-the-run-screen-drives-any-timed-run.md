@@ -10,7 +10,7 @@ See `spec.md` → A Practice round ("Answering is identical to an Attempt").
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] The shared timing and progress functions take a minimal run shape; an Attempt satisfies it
       unchanged, and nothing in that shape names a Job, a length, a score, or a Category mix.

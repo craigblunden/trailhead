@@ -10,6 +10,7 @@ import {
   CATEGORIES,
   ATTEMPT_LENGTHS,
   CATEGORY_MIX,
+  MAX_SCORE_RUNS,
   attemptSeconds,
   nextQuestion,
   remainingSeconds,
@@ -746,6 +747,93 @@ describe("ticket 03: scoring a completed Attempt", () => {
     reply = { body: scores(5) };
     expect(await scoreAttempt(started.attempt.id, { client: claude() })).toMatchObject({ ok: true });
     expect(await usedThisWeek(userId)).toBe(1);
+  });
+
+  /**
+   * Scoring spends no quota, which left it as the one model call in the application that nothing
+   * bounded. `MAX_SCORE_RUNS` successful scorings per Attempt is that bound — and because a failure
+   * gives its run back, the retry the rule above promises still costs nothing.
+   */
+  describe("re-scoring is bounded", () => {
+    /** Scores `times` times over, asserting each one succeeded. */
+    async function scoreTimes(attemptId: string, times: number) {
+      for (let run = 0; run < times; run += 1) {
+        reply = { body: scores(5) };
+        expect(await scoreAttempt(attemptId, { client: claude() })).toMatchObject({ ok: true });
+      }
+    }
+
+    async function finished() {
+      const { userId, jobId } = await proTenantWithJob();
+      const started = await start(jobId);
+      if (!started.ok) throw new Error("expected a started Attempt");
+      await answerAll(started.attempt.id, started.attempt.questions, 20);
+      return { userId, jobId, attemptId: started.attempt.id };
+    }
+
+    it("an Attempt can be scored MAX_SCORE_RUNS times, and the next one is refused without calling Claude", async () => {
+      const { jobId, attemptId } = await finished();
+
+      await scoreTimes(attemptId, MAX_SCORE_RUNS);
+
+      reply = { body: scores(5) };
+      prompts = [];
+      expect(await scoreAttempt(attemptId, { client: claude() })).toMatchObject({
+        ok: false,
+        reason: "rescored",
+      });
+      // Refused before the call, not after it — the whole point of the cap.
+      expect(prompts).toHaveLength(0);
+      // And the Scorecard they already have is untouched: the refusal takes nothing away.
+      expect((await latestAttempt(jobId))?.overallScore).toBe(72);
+    });
+
+    it("a failed scoring gives its run back, so failures never use the cap up", async () => {
+      const { jobId, attemptId } = await finished();
+      vi.spyOn(console, "error").mockImplementation(() => {});
+
+      // As many failures as the cap allows runs, and then some.
+      for (let run = 0; run < MAX_SCORE_RUNS + 2; run += 1) {
+        reply = { status: 529, body: { type: "error", error: { type: "overloaded_error", message: "Overloaded" } } };
+        expect(await scoreAttempt(attemptId, { client: claude() })).toMatchObject({ ok: false, reason: "failed" });
+      }
+
+      // Every run is still there to be spent.
+      await scoreTimes(attemptId, MAX_SCORE_RUNS);
+      expect(await scoreAttempt(attemptId, { client: claude() })).toMatchObject({ ok: false, reason: "rescored" });
+      expect((await latestAttempt(jobId))?.overallScore).toBe(72);
+    });
+
+    it("an Attempt with nothing reached is never capped: there is no call to bound", async () => {
+      const { jobId } = await proTenantWithJob();
+      const started = await start(jobId);
+      if (!started.ok) throw new Error("expected a started Attempt");
+      await endAttempt(started.attempt.id);
+      prompts = [];
+
+      for (let run = 0; run < MAX_SCORE_RUNS + 2; run += 1) {
+        expect(await scoreAttempt(started.attempt.id, { client: claude() })).toMatchObject({ ok: true });
+      }
+      expect(prompts).toHaveLength(0);
+    });
+
+    it("the cap is per Attempt, not per Tenant: a second rehearsal starts with its runs intact", async () => {
+      const { jobId, attemptId } = await finished();
+      await scoreTimes(attemptId, MAX_SCORE_RUNS);
+      expect(await scoreAttempt(attemptId, { client: claude() })).toMatchObject({ ok: false, reason: "rescored" });
+
+      // The fake is still answering with scores; a start wants a question set.
+      reply = { body: QUESTIONS() };
+      const second = await start(jobId, 15, true);
+      if (!second.ok) throw new Error("expected a second Attempt");
+      await answerAll(second.attempt.id, second.attempt.questions, 20);
+
+      await scoreTimes(second.attempt.id, MAX_SCORE_RUNS);
+      expect(await scoreAttempt(second.attempt.id, { client: claude() })).toMatchObject({
+        ok: false,
+        reason: "rescored",
+      });
+    });
   });
 });
 

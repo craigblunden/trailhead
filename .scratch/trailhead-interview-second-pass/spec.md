@@ -1,6 +1,6 @@
 # Interview Simulator, second pass: fairer scoring, clearer feedback, and a history of Attempts
 
-**Status:** ready-for-agent
+**Status:** implemented
 
 Settled in a grilling session on 2026-09-17, after the owner used the shipped Interview Simulator
 (`.scratch/trailhead-interview-simulator/`). The glossary gained **Missed point**, **Unreached

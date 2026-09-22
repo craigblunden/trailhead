@@ -7,7 +7,7 @@ See `spec.md` → 5. The microphone failing mid-run.
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] When `useSpeech` reports an error (permission refused, no microphone, network, or repeated quick
       stops), the run screen's clock stops, the same way it stands still while submitting. The question's

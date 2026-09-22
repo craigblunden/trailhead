@@ -6,7 +6,13 @@ import { STAGES, STAGE_META, pluralize, type Job } from "@/lib/jobs";
 import { ActionError } from "@/components/action-client";
 import { fakeTransfer } from "../fakes/data-transfer";
 import { SEED_JOBS } from "../fixtures/jobs";
-import { fireEvent, renderWithJobs, screen, waitFor, within } from "../test-utils";
+import {
+  fireEvent,
+  renderWithJobs,
+  screen,
+  waitFor,
+  within,
+} from "../test-utils";
 
 /** The column `<section>` for a stage, located by its visible heading. */
 function column(stage: (typeof STAGES)[number]) {
@@ -53,8 +59,12 @@ describe("board columns", () => {
   it("BOARD-1: reads the count to screen readers in grammatical English", () => {
     renderWithJobs(<BoardView />, { initialJobs: [SEED_JOBS[0]] });
 
-    expect(within(column("interested")).getByText("1 application")).toBeInTheDocument();
-    expect(within(column("offer")).getByText("0 applications")).toBeInTheDocument();
+    expect(
+      within(column("interested")).getByText("1 application"),
+    ).toBeInTheDocument();
+    expect(
+      within(column("offer")).getByText("0 applications"),
+    ).toBeInTheDocument();
   });
 
   it("BOARD-3: files each job under exactly one column — its own stage", () => {
@@ -68,13 +78,17 @@ describe("board columns", () => {
   });
 
   it("BOARD-4: explains an empty column instead of leaving it blank", () => {
-    const onlyInterested = SEED_JOBS.filter((job) => job.stage === "interested");
+    const onlyInterested = SEED_JOBS.filter(
+      (job) => job.stage === "interested",
+    );
     renderWithJobs(<BoardView />, { initialJobs: onlyInterested });
 
     expect(
       within(column("offer")).getByText("Nothing at this stage yet."),
     ).toBeInTheDocument();
-    expect(within(column("interested")).getAllByRole("listitem")).toHaveLength(1);
+    expect(within(column("interested")).getAllByRole("listitem")).toHaveLength(
+      1,
+    );
   });
 
   it("BOARD-5: replaces the columns with a call to action on an empty board", () => {
@@ -84,7 +98,9 @@ describe("board columns", () => {
       screen.getByRole("heading", { name: "No roles on the board yet" }),
     ).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Interested" })).toBeNull();
-    expect(screen.getAllByRole("button", { name: /add job/i }).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByRole("button", { name: /add job/i }).length,
+    ).toBeGreaterThan(0);
   });
 
   it("BOARD-6: pairs every stage colour with the stage name in text", () => {
@@ -104,7 +120,9 @@ describe("active application count", () => {
     renderWithJobs(<BoardView />);
 
     const active = SEED_JOBS.filter((job) => job.stage !== "rejected").length;
-    expect(screen.getByText(`${active} active applications`)).toBeInTheDocument();
+    expect(
+      screen.getByText(`${active} active applications`),
+    ).toBeInTheDocument();
   });
 
   it("BOARD-2: uses the singular for a board with one active job", () => {
@@ -140,8 +158,12 @@ describe("searching the board", () => {
 
     await user.type(search(), "Staff UX Designer");
 
-    expect(screen.getByRole("link", { name: "Staff UX Designer" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Product Designer, Growth" })).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Staff UX Designer" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Product Designer, Growth" }),
+    ).toBeNull();
   });
 
   it("SEARCH-1: filters cards by company", async () => {
@@ -149,8 +171,12 @@ describe("searching the board", () => {
 
     await user.type(search(), "Fernwood");
 
-    expect(screen.getByRole("link", { name: "Product Designer, Growth" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Staff UX Designer" })).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Product Designer, Growth" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Staff UX Designer" }),
+    ).toBeNull();
   });
 
   it("SEARCH-1: matches case-insensitively and on a partial word", async () => {
@@ -158,7 +184,9 @@ describe("searching the board", () => {
 
     await user.type(search(), "cobalt");
 
-    expect(screen.getByRole("link", { name: "Staff UX Designer" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Staff UX Designer" }),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole("listitem")).toHaveLength(1);
   });
 
@@ -177,8 +205,12 @@ describe("searching the board", () => {
     for (const role of matches) {
       expect(screen.getByRole("link", { name: role })).toBeInTheDocument();
     }
-    expect(screen.queryByRole("link", { name: "Staff UX Designer" })).toBeNull();
-    expect(screen.queryByRole("link", { name: "Senior UX Designer" })).toBeNull();
+    expect(
+      screen.queryByRole("link", { name: "Staff UX Designer" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("link", { name: "Senior UX Designer" }),
+    ).toBeNull();
   });
 
   it("SEARCH-1: tells a stage with no matches apart from a stage with no jobs", async () => {
@@ -191,7 +223,9 @@ describe("searching the board", () => {
       within(column("interested")).getByText("No matches in this stage."),
     ).toBeInTheDocument();
     expect(
-      within(column("applied")).queryByText(/no matches|nothing at this stage/i),
+      within(column("applied")).queryByText(
+        /no matches|nothing at this stage/i,
+      ),
     ).toBeNull();
   });
 
@@ -208,7 +242,9 @@ describe("searching the board", () => {
     await user.click(screen.getByRole("button", { name: "Clear search" }));
 
     expect(search()).toHaveValue("");
-    expect(screen.getByRole("link", { name: "Staff UX Designer" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Staff UX Designer" }),
+    ).toBeInTheDocument();
   });
 
   it("SEARCH-3: leaves the empty-board state alone when there are no jobs at all", () => {
@@ -222,7 +258,9 @@ describe("searching the board", () => {
 });
 
 describe("job card", () => {
-  const job = SEED_JOBS.find((j) => j.id === "fernwood-product-designer-growth")!;
+  const job = SEED_JOBS.find(
+    (j) => j.id === "fernwood-product-designer-growth",
+  )!;
 
   it("CARD-1: shows role, company, location and salary band", () => {
     renderWithJobs(<BoardView />);
@@ -306,7 +344,9 @@ describe("job card", () => {
 });
 
 describe("moving a job between stages", () => {
-  const job = SEED_JOBS.find((j) => j.id === "fernwood-product-designer-growth")!;
+  const job = SEED_JOBS.find(
+    (j) => j.id === "fernwood-product-designer-growth",
+  )!;
 
   it("DND-2: dropping a card on another column moves the job to that stage", async () => {
     const { trail } = renderWithJobs(<BoardView />);
@@ -314,7 +354,9 @@ describe("moving a job between stages", () => {
     dragTo(card(job.role), column("interviewing"));
 
     await waitFor(() =>
-      expect(column("interviewing")).toContainElement(screen.getByRole("link", { name: job.role })),
+      expect(column("interviewing")).toContainElement(
+        screen.getByRole("link", { name: job.role }),
+      ),
     );
     expect(trail.jobs.setStage).toHaveBeenCalledWith(job.id, "interviewing");
     expect(trail.jobs.setStage).toHaveBeenCalledTimes(1);
@@ -328,7 +370,9 @@ describe("moving a job between stages", () => {
     // Give a write every chance to have been sent before concluding it was not.
     await act(async () => {});
     expect(trail.jobs.setStage).not.toHaveBeenCalled();
-    expect(column(job.stage)).toContainElement(screen.getByRole("link", { name: job.role }));
+    expect(column(job.stage)).toContainElement(
+      screen.getByRole("link", { name: job.role }),
+    );
   });
 
   it("DND-4: ignores a drop that carries no job — text dragged in from outside", async () => {
@@ -378,24 +422,36 @@ describe("moving a job between stages", () => {
     const { user, trail } = renderWithJobs(<BoardView />);
 
     await user.click(
-      within(card(job.role)).getByRole("button", { name: `Move ${job.role} at ${job.company}` }),
+      within(card(job.role)).getByRole("button", {
+        name: `Move ${job.role} at ${job.company}`,
+      }),
     );
     const menu = await screen.findByRole("menu");
-    expect(within(menu).getAllByRole("menuitem").map((item) => item.textContent)).toEqual(
-      STAGES.filter((stage) => stage !== job.stage).map((stage) => STAGE_META[stage].label),
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent),
+    ).toEqual(
+      STAGES.filter((stage) => stage !== job.stage).map(
+        (stage) => STAGE_META[stage].label,
+      ),
     );
 
     await user.click(within(menu).getByRole("menuitem", { name: "Offer" }));
 
     await waitFor(() =>
-      expect(column("offer")).toContainElement(screen.getByRole("link", { name: job.role })),
+      expect(column("offer")).toContainElement(
+        screen.getByRole("link", { name: job.role }),
+      ),
     );
     expect(trail.jobs.setStage).toHaveBeenCalledWith(job.id, "offer");
   });
 
   it("DND-6: the Move to menu works from the keyboard alone", async () => {
     const { user, trail } = renderWithJobs(<BoardView />);
-    const trigger = within(card(job.role)).getByRole("button", { name: /^Move / });
+    const trigger = within(card(job.role)).getByRole("button", {
+      name: /^Move /,
+    });
 
     trigger.focus();
     await user.keyboard("{Enter}");
@@ -404,7 +460,9 @@ describe("moving a job between stages", () => {
     await user.keyboard("{Enter}");
 
     await waitFor(() =>
-      expect(column("interested")).toContainElement(screen.getByRole("link", { name: job.role })),
+      expect(column("interested")).toContainElement(
+        screen.getByRole("link", { name: job.role }),
+      ),
     );
     expect(trail.jobs.setStage).toHaveBeenCalledWith(job.id, "interested");
   });
@@ -414,13 +472,19 @@ describe("moving a job between stages", () => {
 
     dragTo(card(job.role), column("interviewing"));
     await waitFor(() =>
-      expect(screen.getByRole("status")).toHaveTextContent(`Moved ${job.role} to Interviewing`),
+      expect(screen.getByRole("status")).toHaveTextContent(
+        `Moved ${job.role} to Interviewing`,
+      ),
     );
 
-    await user.click(within(card(job.role)).getByRole("button", { name: /^Move / }));
-    await user.click(await screen.findByRole("menuitem", { name: "Rejected" }));
+    await user.click(
+      within(card(job.role)).getByRole("button", { name: /^Move / }),
+    );
+    await user.click(await screen.findByRole("menuitem", { name: "Closed" }));
     await waitFor(() =>
-      expect(screen.getByRole("status")).toHaveTextContent(`Moved ${job.role} to Rejected`),
+      expect(screen.getByRole("status")).toHaveTextContent(
+        `Moved ${job.role} to Closed`,
+      ),
     );
   });
 
@@ -468,20 +532,37 @@ describe("moving a job between stages", () => {
     trail.jobs.setStage.mockImplementationOnce(
       () =>
         new Promise((_, fail) =>
-          setTimeout(() => fail(new ActionError("failed", "The trail is closed for maintenance.")), 150),
+          setTimeout(
+            () =>
+              fail(
+                new ActionError(
+                  "failed",
+                  "The trail is closed for maintenance.",
+                ),
+              ),
+            150,
+          ),
         ),
     );
 
     dragTo(card(job.role), column("offer"));
     await waitFor(() =>
-      expect(column("offer")).toContainElement(screen.getByRole("link", { name: job.role })),
+      expect(column("offer")).toContainElement(
+        screen.getByRole("link", { name: job.role }),
+      ),
     );
 
     await waitFor(() =>
-      expect(column(job.stage)).toContainElement(screen.getByRole("link", { name: job.role })),
+      expect(column(job.stage)).toContainElement(
+        screen.getByRole("link", { name: job.role }),
+      ),
     );
-    expect(screen.getByRole("alert")).toHaveTextContent("The trail is closed for maintenance.");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The trail is closed for maintenance.",
+    );
     // The board stays usable: the Move to menu is still there to try again.
-    expect(within(card(job.role)).getByRole("button", { name: /^Move / })).toBeEnabled();
+    expect(
+      within(card(job.role)).getByRole("button", { name: /^Move / }),
+    ).toBeEnabled();
   });
 });

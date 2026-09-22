@@ -1,6 +1,6 @@
 # Account: see your account and Plan, and delete the Account for good
 
-**Status:** ready
+**Status:** implemented
 
 Settled in a grilling session on 2026-09-15. The glossary terms are **Account** and **Account
 deletion** (`CONTEXT.md`, added in that session), beside **Tenant**, **Plan**, and **Limit**. The

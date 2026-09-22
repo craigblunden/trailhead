@@ -30,6 +30,8 @@ This file describes the pages a signed-in user works with and what each form acc
 
 - [Get started](${SITE_URL}/signup): create an account
 - [Sign in](${SITE_URL}/login)
+- [Terms](${SITE_URL}/terms)
+- [Privacy](${SITE_URL}/privacy): what text is sent to which AI company, and what each one commits to
 
 ## The board
 
@@ -59,6 +61,7 @@ Opening a card shows the job's page:
 - Rejection letter: shown only while the job is Rejected, with the description folded away above it ("Show description" opens it). Paste the message the company sent, up to ${chars(JOB_LIMITS.rejectionLetter)}, kept for reference.
 - Application kit: the resume and cover letter sent with this job, each chosen from the user's Documents
 - Cover letters: "Write cover letter" writes a letter for this job from its resume and job description. Under a letter, "What should change?" takes short feedback (up to ${chars(FEEDBACK_MAX_CHARS)}) about the letter, and "Rewrite" writes it again with that feedback. Each write counts toward the week's cover letters.
+- Your footing: "Check my footing" reads this job's description against the resume and cover letter in its application kit, and says how the user stands on five things — skills, experience, domain, proof of work, and the attached cover letter. Each shows a word, not a number: Strong, Solid, Developing, or Not there yet. The four about the user make one overall word; the cover letter's is shown beside the letter and is never part of it. It says where to look, not what to write, so it never suggests wording. It runs only when asked, is kept so a later reading can be compared with it, and is marked as out of date — never quietly rerun — when the description, the resume or the letter changes afterwards. Available on every plan, and it needs both a job description and a resume.
 - Practice interview: opens this job's Interview Simulator, described below
 - Contacts: the people linked to this job
 - Activity: a dated history the app writes itself, such as "Moved to Interviewing"; it cannot be typed into
@@ -103,9 +106,14 @@ The rest is filled in on the Contact's own page:
 - Last spoke: a date, never later than today
 - Notes: up to ${chars(CONTACT_LIMITS.notes)}
 
+## What leaves the product
+
+Text the user enters is sent to two AI companies, and to nobody else, to do the writing and scoring above: Anthropic for cover letters, interview questions and interview scoring, and TypeSafe for a footing. Each receives extracted text only — never an uploaded file — and both commit in writing not to train models on it. [Privacy](${SITE_URL}/privacy) says exactly which text goes where and how long each keeps it, and every account agrees to it after signing in.
+
 ## Optional
 
 - Account page: who the user is signed in as, their plan, and deleting the account for good. Each plan sets how many Documents can be held, how many cover letters can be written a week, and how many Interview Simulator interviews can be started a week.
+- Asking for a higher plan: there is nothing to buy. A button on the account page asks to be moved to the next plan up, which emails the person who runs Trailhead; they move the account across by hand. While a request is outstanding the button says so and cannot be pressed again, and an unanswered request expires after two weeks so it can be asked again.
 `;
 
 export function GET() {

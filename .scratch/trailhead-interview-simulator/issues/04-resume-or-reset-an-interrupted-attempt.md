@@ -7,7 +7,7 @@ start fresh and have quota left, they can reset into a new Attempt instead of re
 
 **Blocked by:** 02.
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] An Attempt's active-time budget accumulates only while it is open and in progress — it does
       not keep counting down while the Tenant is away (active-time accounting, not a wall-clock

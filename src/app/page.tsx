@@ -6,6 +6,7 @@ import { TrailScene } from "@/components/trail-scene";
 import { Button } from "@/components/ui/button";
 import { EveryThingYouNeed } from "@/components/landing/everything-you-need";
 import { ReadyToHitTheTrail } from "@/components/landing/ready-to-hit-the-trail";
+import { SiteFooter } from "@/components/site-footer";
 
 export default function LandingPage() {
   return (
@@ -41,6 +42,8 @@ export default function LandingPage() {
         <EveryThingYouNeed />
         <ReadyToHitTheTrail />
       </main>
+
+      <SiteFooter />
     </div>
   );
 }

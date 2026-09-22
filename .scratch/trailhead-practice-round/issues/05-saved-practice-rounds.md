@@ -7,7 +7,7 @@ See `spec.md` → A Practice round ("Saved rounds").
 
 **Blocked by:** 04 (the read-back it reuses)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] A tenant-scoped read lists finished Practice rounds, newest first: id, date started, how many
       questions were answered. Tested for tenant isolation.

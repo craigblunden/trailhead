@@ -6,7 +6,7 @@ Job's Attempt, skipping the picker.
 
 **Blocked by:** 01.
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] "Interview Simulator" appears in the primary navigation for every Plan.
 - [ ] The hub page's Job picker searches by role or company, reusing the Contact-link

@@ -14,7 +14,8 @@ export const SEED_JOBS: Job[] = [
     salaryMin: 150,
     salaryMax: 180,
     stage: "interested",
-    postingUrl: "https://meridianlabs.example.com/careers/senior-product-designer",
+    postingUrl:
+      "https://meridianlabs.example.com/careers/senior-product-designer",
     addedOn: "2026-07-22",
     appliedOn: null,
     resume: null,
@@ -27,7 +28,9 @@ export const SEED_JOBS: Job[] = [
       "Referral from Priya — she can intro to the hiring manager once I've tailored the resume.",
     rejectionLetter: "",
     contacts: [],
-    activity: [{ id: "a1", label: "Added to board — Interested", date: "2026-07-22" }],
+    activity: [
+      { id: "a1", label: "Added to board — Interested", date: "2026-07-22" },
+    ],
     accent: "moss",
   },
   {
@@ -41,7 +44,10 @@ export const SEED_JOBS: Job[] = [
     postingUrl: "https://fernwood.example.com/jobs/product-designer-growth",
     addedOn: "2026-07-11",
     appliedOn: "2026-07-15",
-    resume: { id: "seed-resume_growth_v2.pdf", fileName: "resume_growth_v2.pdf" },
+    resume: {
+      id: "seed-resume_growth_v2.pdf",
+      fileName: "resume_growth_v2.pdf",
+    },
     coverLetter: null,
     draft: "",
     draftWrittenAt: null,
@@ -92,7 +98,11 @@ export const SEED_JOBS: Job[] = [
     rejectionLetter: "",
     contacts: [],
     activity: [
-      { id: "a1", label: "Applied with resume_staff_v1.pdf", date: "2026-07-09" },
+      {
+        id: "a1",
+        label: "Applied with resume_staff_v1.pdf",
+        date: "2026-07-09",
+      },
       { id: "a2", label: "Added to board — Interested", date: "2026-07-02" },
     ],
     accent: "teal",
@@ -140,7 +150,11 @@ export const SEED_JOBS: Job[] = [
     activity: [
       { id: "a1", label: "Portfolio review scheduled", date: "2026-07-20" },
       { id: "a2", label: "Moved to Interviewing", date: "2026-07-14" },
-      { id: "a3", label: "Applied with resume_lead_v1.pdf", date: "2026-06-30" },
+      {
+        id: "a3",
+        label: "Applied with resume_lead_v1.pdf",
+        date: "2026-06-30",
+      },
       { id: "a4", label: "Added to board — Interested", date: "2026-06-26" },
     ],
     accent: "wheat",
@@ -156,7 +170,10 @@ export const SEED_JOBS: Job[] = [
     postingUrl: "https://northbeam.example.com/jobs/product-designer-ii",
     addedOn: "2026-06-28",
     appliedOn: "2026-07-04",
-    resume: { id: "seed-resume_generalist_v3.pdf", fileName: "resume_generalist_v3.pdf" },
+    resume: {
+      id: "seed-resume_generalist_v3.pdf",
+      fileName: "resume_generalist_v3.pdf",
+    },
     coverLetter: null,
     draft: "",
     draftWrittenAt: null,
@@ -197,13 +214,17 @@ export const SEED_JOBS: Job[] = [
     postingUrl: "https://bramble.example.com/careers/senior-ux-designer",
     addedOn: "2026-06-08",
     appliedOn: "2026-06-14",
-    resume: { id: "seed-resume_senior_v4.pdf", fileName: "resume_senior_v4.pdf" },
+    resume: {
+      id: "seed-resume_senior_v4.pdf",
+      fileName: "resume_senior_v4.pdf",
+    },
     coverLetter: null,
     draft: "",
     draftWrittenAt: null,
     description:
       "Bramble is a family scheduling app. The Senior UX role owns the shared-calendar experience across web and mobile.",
-    notes: "Offer verbal on Jul 21. Written offer expected this week — compare against Harvest.",
+    notes:
+      "Offer verbal on Jul 21. Written offer expected this week — compare against Harvest.",
     rejectionLetter: "",
     contacts: [
       {
@@ -219,7 +240,11 @@ export const SEED_JOBS: Job[] = [
     activity: [
       { id: "a1", label: "Verbal offer received", date: "2026-07-21" },
       { id: "a2", label: "Final round complete", date: "2026-07-16" },
-      { id: "a3", label: "Applied with resume_senior_v4.pdf", date: "2026-06-14" },
+      {
+        id: "a3",
+        label: "Applied with resume_senior_v4.pdf",
+        date: "2026-06-14",
+      },
       { id: "a4", label: "Added to board — Interested", date: "2026-06-08" },
     ],
     accent: "slate",
@@ -235,17 +260,21 @@ export const SEED_JOBS: Job[] = [
     postingUrl: "https://quillhealth.example.com/jobs/product-designer",
     addedOn: "2026-06-19",
     appliedOn: "2026-06-24",
-    resume: { id: "seed-resume_generalist_v3.pdf", fileName: "resume_generalist_v3.pdf" },
+    resume: {
+      id: "seed-resume_generalist_v3.pdf",
+      fileName: "resume_generalist_v3.pdf",
+    },
     coverLetter: null,
     draft: "",
     draftWrittenAt: null,
     description:
       "Quill Health builds intake software for small clinics. The role covers patient-facing forms and scheduling.",
-    notes: "Passed after the screen — they wanted more healthcare domain depth.",
+    notes:
+      "Passed after the screen — they wanted more healthcare domain depth.",
     rejectionLetter: "",
     contacts: [],
     activity: [
-      { id: "a1", label: "Moved to Rejected", date: "2026-07-06" },
+      { id: "a1", label: "Moved to Closed", date: "2026-07-06" },
       {
         id: "a2",
         label: "Applied with resume_generalist_v3.pdf",

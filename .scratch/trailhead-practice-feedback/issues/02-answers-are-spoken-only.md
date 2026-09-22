@@ -7,7 +7,7 @@ See `spec.md` → 2. Speaking only.
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] The run screen has no typed notepad, no "Type instead", no "Speak instead", and no
       `mode`/`onModeChange` props. `InputMode`/`INPUT_MODES` and `TypedNotepad` are deleted if nothing

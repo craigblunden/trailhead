@@ -12,11 +12,15 @@ const APPLICATION_TABLES = [
   "Attempt",
   "PracticeQuestion",
   "PracticeRound",
+  "FootingDimension",
+  "Footing",
   "Job",
   "Contact",
   "Document",
   "GenerationQuota",
   "InterviewQuota",
+  "TermsAcceptance",
+  "UpgradeRequest",
   "UserPlan",
 ] as const;
 

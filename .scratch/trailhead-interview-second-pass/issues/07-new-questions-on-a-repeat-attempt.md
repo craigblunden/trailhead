@@ -9,7 +9,7 @@ See `spec.md` → History and variety.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] Starting an Attempt reads the questions of this Job's three most recent earlier Attempts,
       including reset and unscored ones, from the Tenant's own data only.

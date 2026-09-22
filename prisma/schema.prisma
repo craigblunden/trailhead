@@ -73,42 +73,43 @@ enum IngestionState {
 
 /// One role at one company the user is pursuing, from lead to outcome.
 model Job {
-  id          String    @id @default(cuid(2))
-  userId      String    @db.Uuid
-  company     String
-  role        String
+  id              String          @id @default(cuid(2))
+  userId          String          @db.Uuid
+  company         String
+  role            String
   /// Free text as it reads on the card, e.g. "Hybrid · Brisbane".
-  location    String
+  location        String
   /// Thousands per year. Null on either end means that bound is unknown.
-  salaryMin   Int?
-  salaryMax   Int?
-  stage       Stage     @default(interested)
-  postingUrl  String    @default("")
+  salaryMin       Int?
+  salaryMax       Int?
+  stage           Stage           @default(interested)
+  postingUrl      String          @default("")
   /// Dates, not timestamps: a timestamp reintroduces the timezone drift the string form prevents.
-  addedOn     DateTime  @db.Date
-  appliedOn   DateTime? @db.Date
-  description String    @default("")
-  notes       String    @default("")
+  addedOn         DateTime        @db.Date
+  appliedOn       DateTime?       @db.Date
+  description     String          @default("")
+  notes           String          @default("")
   /// The message the company sent turning the user down, pasted for reference. Kept when the Job
   /// leaves rejected; the page shows it only while the Job is rejected.
-  rejectionLetter String @default("")
-  accent      Accent
+  rejectionLetter String          @default("")
+  accent          Accent
   /// The resume sent with this Job, if any. Deleting the Document leaves the Job intact.
   /// Renamed from `documentId` when cover letters got their own reference (ticket 17).
-  resumeId      String?
-  resume        Document? @relation("JobResume", fields: [resumeId], references: [id], onDelete: SetNull)
+  resumeId        String?
+  resume          Document?       @relation("JobResume", fields: [resumeId], references: [id], onDelete: SetNull)
   /// The cover letter sent with this Job, if any. The tenant policy checks both kinds.
-  coverLetterId String?
-  coverLetter   Document? @relation("JobCoverLetter", fields: [coverLetterId], references: [id], onDelete: SetNull)
+  coverLetterId   String?
+  coverLetter     Document?       @relation("JobCoverLetter", fields: [coverLetterId], references: [id], onDelete: SetNull)
   /// The last letter written for this Job (ADR-0002): its Draft. Empty when none has been written.
   /// Each write replaces it; it goes with the Job, and it is never a Document.
-  draft          String    @default("")
-  draftWrittenAt DateTime?
-  contacts    JobContact[]
-  activity    ActivityEntry[]
-  attempts    Attempt[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  draft           String          @default("")
+  draftWrittenAt  DateTime?
+  contacts        JobContact[]
+  activity        ActivityEntry[]
+  attempts        Attempt[]
+  footings        Footing[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   /// The board lists a user's jobs in creation order, so reloads never reshuffle.
   @@index([userId, createdAt])
@@ -135,24 +136,24 @@ model ActivityEntry {
 /// A person the user knows in connection with their search, owned by the user rather than by
 /// any one Job. Agency is a field, not an entity.
 model Contact {
-  id           String      @id @default(cuid(2))
-  userId       String      @db.Uuid
+  id           String       @id @default(cuid(2))
+  userId       String       @db.Uuid
   name         String
-  kind         ContactKind @default(other)
+  kind         ContactKind  @default(other)
   /// Their title where they work, e.g. "Design Manager".
-  title        String      @default("")
-  email        String      @default("")
-  phone        String      @default("")
+  title        String       @default("")
+  email        String       @default("")
+  phone        String       @default("")
   /// The independent firm a recruiter works for, when it differs from the company hiring.
-  agency       String      @default("")
-  notes        String      @default("")
+  agency       String       @default("")
+  notes        String       @default("")
   /// http(s) only, sanitised on write like `Job.postingUrl` (ticket 14). Blank means none.
-  linkedinUrl  String      @default("")
+  linkedinUrl  String       @default("")
   /// Set by the user; activity entries are job-scoped, so there is nothing to derive it from.
-  lastSpokenOn DateTime?   @db.Date
+  lastSpokenOn DateTime?    @db.Date
   jobs         JobContact[]
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
   /// The contacts route lists a user's contacts by name.
   @@index([userId, name])
@@ -228,6 +229,107 @@ model UserPlan {
   updatedAt DateTime @default(now())
 }
 
+/// An Upgrade request (CONTEXT.md; ADR-0009): a Tenant asking to be moved to the next Plan up.
+///
+/// Insert-only. `trailhead_app` holds `select` and `insert` and deliberately NOT `update` or
+/// `delete`: whether a request is still **pending** is derived from the Tenant's Plan and
+/// `requestedAt` — do NOT add a `status`, `resolvedAt` or `declinedAt` column here. Granting the
+/// Plan is what resolves a request, and a status nobody remembers to flip is worse than none.
+///
+/// A row that ASKS for a Plan is not a Plan: `UserPlan` keeps the grants ADR-0001 gave it, and
+/// nothing reads an UpgradeRequest when deciding a Limit.
+model UpgradeRequest {
+  id          String   @id @default(cuid(2))
+  userId      String   @db.Uuid
+  /// The Plan asked for — the next one up from the Tenant's Plan when the request was made.
+  plan        Plan
+  requestedAt DateTime @default(now())
+
+  /// Pending reads the newest row for the Tenant; the rest are the history of who has been asking.
+  @@index([userId, requestedAt])
+}
+
+/// An Account's record of having agreed to one version of the terms (CONTEXT.md; ADR-0008).
+/// Append-only: a new version is a new row, never an edit to the old one, so the history says who
+/// accepted what and when. `acceptedAt` is the only timestamp for the same reason a Footing has only
+/// `scoredAt`: an `updatedAt` would imply a row that can be updated, and nothing updates one.
+///
+/// Deliberately NOT Supabase `user_metadata`. That is writable by the user it belongs to, so it
+/// cannot hold a record ABOUT that same user — do not "simplify" this table away into it.
+model TermsAcceptance {
+  userId     String   @db.Uuid
+  /// `TERMS_VERSION` in `src/lib/terms.ts` as it stood when this was accepted.
+  version    String
+  acceptedAt DateTime @default(now())
+
+  @@id([userId, version])
+}
+
+/// The five things a Footing scores. Members match `FOOTING_DIMENSIONS` in `src/lib/footing.ts`;
+/// `enum-assertions.ts` fails the typecheck if they drift.
+///
+/// Named `Dimension` rather than `FootingDimension` only because the table below already has that
+/// name, which is the glossary's term for one scored dimension of one Footing. The enum says which
+/// dimension; the table says how that dimension scored.
+enum Dimension {
+  skills
+  experience
+  domain
+  proof_of_work
+  letter
+}
+
+/// A **Footing** (CONTEXT.md; ADR-0007): the kept result of scoring one Job's posting against its
+/// Application kit. **Append-only** — scoring inserts, and nothing ever updates or deletes one. The
+/// newest row for a Job is "the Footing"; the rest are its history, which is what makes "is my
+/// rewritten resume actually doing better here" answerable at all.
+///
+/// **The overall is not a column.** It is computed from the four weighted dimensions at read time, so
+/// changing the weights re-reads history correctly instead of leaving a number no formula explains.
+///
+/// No `createdAt`/`updatedAt`, unlike most tables here, and deliberately: `scoredAt` is when this row
+/// came to exist, and an `updatedAt` would imply a row that can be updated. Nothing updates one.
+///
+/// The staleness stamp is hashes rather than copies — `Document.text` already "doubles as the content
+/// hash for later comparison" — and `resumeId`/`coverLetterId` are plain columns with **no relation**
+/// on purpose: a Footing whose Document was later deleted is kept and reads permanently stale, so the
+/// stamp has to outlive the Document rather than cascade away with it.
+model Footing {
+  id              String             @id @default(cuid(2))
+  userId          String             @db.Uuid
+  jobId           String
+  job             Job                @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  scoredAt        DateTime           @default(now())
+  /// The Documents that were in the Application kit when this ran. Not foreign keys — see above.
+  resumeId        String?
+  coverLetterId   String?
+  /// SHA-256 of each text as it stood. Empty string where there was nothing to hash.
+  resumeHash      String
+  descriptionHash String
+  coverLetterHash String
+  dimensions      FootingDimension[]
+
+  /// The job page asks for this Job's Footings, newest first.
+  @@index([userId, jobId, scoredAt(sort: Desc)])
+}
+
+/// One **Footing dimension** of one Footing: where it landed, and how sure the provider was.
+/// One row per dimension per Footing, so a dimension is a column a later cross-Job pass can query
+/// (ADR-0007) rather than a field inside a JSON blob.
+model FootingDimension {
+  footingId  String
+  userId     String    @db.Uuid
+  footing    Footing   @relation(fields: [footingId], references: [id], onDelete: Cascade)
+  dimension  Dimension
+  /// 0–100, already normalised from the rubric's levels. Shown as a band, never as a number.
+  score      Int
+  /// The provider's own confidence in that position, 0–1.
+  confidence Float
+
+  @@id([footingId, dimension])
+  @@index([userId])
+}
+
 /// The five fixed dimensions an Attempt's questions are drawn from. Members match `CATEGORIES` in
 /// `src/lib/interview.ts`; `enum-assertions.ts` fails the typecheck if they drift.
 enum Category {
@@ -243,15 +345,15 @@ enum Category {
 /// the first time. `activeSeconds` is active-time accounting, not a wall-clock deadline: it grows
 /// only while questions are actually being answered, so a closed tab does not drain the budget.
 model Attempt {
-  id            String    @id @default(cuid(2))
-  userId        String    @db.Uuid
+  id            String            @id @default(cuid(2))
+  userId        String            @db.Uuid
   jobId         String
-  job           Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job           Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
   /// Minutes. One of `ATTEMPT_LENGTHS`; which are offered depends on the Tenant's Plan.
   length        Int
-  startedAt     DateTime  @default(now())
+  startedAt     DateTime          @default(now())
   /// Seconds this Attempt has been answered for. The countdown is `length * 60` less this.
-  activeSeconds Int       @default(0)
+  activeSeconds Int               @default(0)
   /// Set once every question has an Answer, or the countdown ran out mid-question.
   completedAt   DateTime?
   /// The Scorecard's overall score, 0–100. Null until the Attempt is scored.
@@ -259,9 +361,13 @@ model Attempt {
   /// The Takeaway once scored: two or three { point, from } objects (interview second pass ticket 05).
   /// Empty on an Attempt scored before there was one, and on one with nothing reached to score.
   takeaway      Json              @default("[]")
+  /// How many times this Attempt has been scored successfully, capped at `MAX_SCORE_RUNS`. Scoring
+  /// spends no quota, so this is the only thing bounding the model call behind it; a failed scoring
+  /// is given back, so a retry is still free. Internal — never on the Attempt DTO.
+  scoreRuns     Int               @default(0)
   questions     AttemptQuestion[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
   /// The Job's detail page and the hub both ask for this Job's newest Attempt.
   @@index([userId, jobId, startedAt(sort: Desc)])
@@ -270,18 +376,18 @@ model Attempt {
 /// One generated question in an Attempt, with its Category and its place in the order. Persisted at
 /// generation time and never regenerated. Its Answer is the same row: a question has at most one.
 model AttemptQuestion {
-  id        String   @id @default(cuid(2))
-  userId    String   @db.Uuid
-  attemptId String
-  attempt   Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  category  Category
+  id           String    @id @default(cuid(2))
+  userId       String    @db.Uuid
+  attemptId    String
+  attempt      Attempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  category     Category
   /// Position in the Attempt, from 0.
-  order     Int
-  text      String
+  order        Int
+  text         String
   /// What the Tenant said, spoken or typed — the two input modes write the same field. Empty until
   /// answered; a question left mid-answer when the Tenant navigated away stays empty.
-  transcript  String    @default("")
-  answeredAt  DateTime?
+  transcript   String    @default("")
+  answeredAt   DateTime?
   /// The Answer's score, 0–100. Null until the Attempt is scored.
   score        Int?
   /// Why it was marked that way, as Answers were scored before interview second pass ticket 05. Empty since.
@@ -313,16 +419,16 @@ model InterviewQuota {
 /// purpose (ADR-0006): it has no Job, no length, no quota, and no Scorecard. Its countdown is fixed
 /// (`PRACTICE_SECONDS`), so only the seconds answered for are stored.
 model PracticeRound {
-  id            String              @id @default(cuid(2))
-  userId        String              @db.Uuid
-  startedAt     DateTime            @default(now())
+  id            String             @id @default(cuid(2))
+  userId        String             @db.Uuid
+  startedAt     DateTime           @default(now())
   /// Seconds this round has been answered for. The countdown is `PRACTICE_SECONDS` less this.
-  activeSeconds Int                 @default(0)
+  activeSeconds Int                @default(0)
   /// Set once every question has an Answer, or the countdown ran out mid-question.
   completedAt   DateTime?
   questions     PracticeQuestion[]
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 
   /// The unfinished round, the previous round's questions, and the hub's list all read newest first.
   @@index([userId, startedAt(sort: Desc)])

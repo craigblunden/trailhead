@@ -1,6 +1,6 @@
 # Interview Simulator: a Practice round for free and basic, and questions asked aloud
 
-**Status:** ready-for-agent
+**Status:** implemented
 
 The owner approved the fixed question set below on 2026-09-17.
 

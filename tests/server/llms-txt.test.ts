@@ -51,6 +51,25 @@ describe("/llms.txt", () => {
   });
 
   /**
+   * The user-facing half of footing ticket 06: an LLM helping someone use this product should know
+   * that what they paste in reaches two named companies, and where to read the detail.
+   */
+  it("LLM-6: names both AI providers, links the disclosure pages, and never gives a footing as a number", async () => {
+    const { text } = await llmsTxt();
+
+    expect(text).toContain("(https://www.trailtooffer.com/privacy)");
+    expect(text).toContain("(https://www.trailtooffer.com/terms)");
+    expect(text).toContain("## What leaves the product");
+    expect(text).toMatch(/Anthropic for cover letters, interview questions and interview scoring, and TypeSafe for a footing/);
+    expect(text).toMatch(/never an uploaded file/);
+
+    const footing = text.split("\n").find((line) => line.startsWith("- Your footing:"))!;
+    expect(footing).toContain("Strong, Solid, Developing, or Not there yet");
+    expect(footing).toMatch(/a word, not a number/);
+    expect(footing).not.toMatch(/\d+\s*%/);
+  });
+
+  /**
    * The file is for a user's own LLM, so it says what the simulator needs from them and what it does
    * with what they say. Plan numbers stay out, as everywhere else here: they change with pricing.
    */

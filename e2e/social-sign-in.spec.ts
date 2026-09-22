@@ -7,7 +7,7 @@ import {
   startFakeProvider,
   type FakeProvider,
 } from "../tests/fakes/oauth-provider";
-import { SIGNED_OUT, createJob, expect, newAccount, signUpAndVerify, test } from "./fixtures";
+import { SIGNED_OUT, acceptTerms, createJob, expect, newAccount, signUpAndVerify, test } from "./fixtures";
 
 /**
  * Social sign-in end to end (ticket 07), through the real buttons, the real browser client, the
@@ -94,7 +94,12 @@ for (const { label, id, from } of [
   });
 }
 
-test("SOC-10: a first-time social sign-in lands on a new, empty board", async ({ page, context }) => {
+/**
+ * The terms gate is the reason acceptance is taken after authentication rather than on the sign-up
+ * form (ADR-0008): this Account never renders that form. If the gate ever moved onto it, this test
+ * is what fails.
+ */
+test("SOC-10: a first-time social sign-in meets the terms gate, then lands on a new, empty board", async ({ page, context }) => {
   await routeProviderToFake(context);
   const stranger = newAccount("social-new");
   provider.setIdentity({ providerUserId: newProviderUserId(), email: stranger.email, emailVerified: true, name: "Dana Okafor" });
@@ -103,6 +108,11 @@ test("SOC-10: a first-time social sign-in lands on a new, empty board", async ({
   await page.getByRole("button", { name: "Continue with GitHub" }).click();
 
   await expect(page).toHaveURL(/\/board$/);
+  await expect(page.getByRole("heading", { level: 1, name: "Before you carry on" })).toBeVisible();
+  // Gated means gated: the board is not behind it, it is not rendered at all.
+  await expect(page.getByRole("heading", { name: "No roles on the board yet" })).toBeHidden();
+  await acceptTerms(page);
+
   await expect(page.getByRole("heading", { name: "No roles on the board yet" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Account menu for Dana Okafor/ })).toBeVisible();
 });

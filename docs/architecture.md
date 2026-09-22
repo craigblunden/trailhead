@@ -1,11 +1,24 @@
 # Architecture
 
 Trailhead is one Next.js application deployed to Vercel, backed by one Supabase project (Postgres,
-Auth, Storage), with outbound AI calls to the Anthropic API — one to write a cover letter, one to
-prepare an Interview Simulator Attempt's questions, one to score its Answers — and one outbound mail
-call to Resend, which carries App feedback to the owner. There is no queue, no worker, and no second
-service: generation, interviews, document ingestion, and that mail run in-request, and `pg_cron` runs
-a janitor with two jobs.
+Auth, Storage), with outbound AI calls to **two providers** and one outbound mail call to Resend,
+which carries App feedback to the owner. There is no queue, no worker, and no second service:
+generation, interviews, footings, document ingestion, and that mail run in-request, and `pg_cron`
+runs a janitor with two jobs.
+
+Which text goes where matters more than which company, so it is stated here rather than implied:
+
+| Provider | Call | What is sent |
+| --- | --- | --- |
+| **Anthropic** (`claude-sonnet-5`) | Write a cover letter | The Job's description, the resume Document's extracted text, and — on a Rewrite — the previous Draft and the Tenant's Feedback |
+| **Anthropic** | Prepare an Attempt's questions | The Job's company, role and description, the resume Document's text, and the questions earlier Attempts asked |
+| **Anthropic** | Score an Attempt | The same context, plus every question and the Answer's transcribed words |
+| **TypeSafe** (`jev-latest`) | Score a Footing | The Job's company, role and description, the resume Document's text, and the attached cover-letter Document's text |
+
+Neither provider ever receives a **file**: both read text only, so what leaves is the text extracted
+at upload and the uploaded object stays in the private bucket. Neither receives an email address, a
+name, a Contact, or a Job's private notes. `/privacy` is the user-facing version of this table, and
+the two must not disagree.
 
 The terms below are the glossary's (`CONTEXT.md`): a **Job**, a **Contact**, a **Document**, a
 **Tenant**.
@@ -20,7 +33,7 @@ flowchart LR
     proxy["proxy.ts<br/>optimistic redirects only"]
     pages["Server Components<br/>pages + TanStack prefetch"]
     actions["Server Actions<br/>validate → data layer"]
-    route["Route Handlers<br/>cover letter · interview<br/>start, answer, score"]
+    route["Route Handlers<br/>cover letter · interview<br/>start, answer, score · footing"]
     dal["Data access layer<br/>requireSession · withTenant"]
     ingest["Ingestion<br/>unpdf · mammoth"]
   end
@@ -34,19 +47,21 @@ flowchart LR
   end
 
   anthropic["Anthropic API<br/>claude-sonnet-5"]
+  typesafe["TypeSafe API<br/>jev-latest"]
   smtp["SMTP<br/>(Mailpit locally)"]
   resend["Resend API<br/>App feedback to the owner"]
 
   browser -->|"pages, navigation"| proxy --> pages
   browser -->|"Server Action POSTs"| actions
-  browser -->|"fetch: cover letter, interview"| route
+  browser -->|"fetch: cover letter, interview, footing"| route
   browser -->|"sign in, OAuth, session cookie"| auth
   browser -->|"PUT file bytes via signed upload URL"| storage
 
   pages --> dal
   actions --> dal
   route --> dal
-  route --> anthropic
+  route -->|"posting · resume · letter · Answers"| anthropic
+  route -->|"posting · resume · letter"| typesafe
   actions -->|"requireSession, then send"| resend
   dal -->|"validate session: getUser"| auth
   dal -->|"trailhead_app, tenant set per transaction"| pooler --> pg
@@ -274,6 +289,64 @@ to a status, and the same four test seams. What differs is worth saying:
   `PracticeQuestion` rather than as an Attempt without a Job. The two share the run screen and the
   timing rules over `TimedRun`, and nothing else.
 
+## Scoring a Footing
+
+A **Footing** (`CONTEXT.md`; **ADR-0007**) is the kept result of scoring one Job's posting against its
+Application kit. It reuses the same shape as the other two model calls — a server-only provider module
+that reads the key and nowhere else does, an orchestration layer that owns the order things happen in,
+and a Route Handler that only maps an outcome to a status — against a different provider.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant B as Browser (job page)
+  participant R as Route Handler
+  participant S as Footing module
+  participant D as Data layer
+  participant PG as Postgres
+  participant T as TypeSafe API
+
+  B->>R: POST /api/jobs/:id/footing · no body
+  R->>S: footingScore(job, TypeSafe client)
+  S->>D: footingSources(job) — not yours, no resume, or no description: refused before anything is spent
+  S->>D: footingsToday() — the per-Tenant daily ceiling, a circuit breaker rather than a Limit
+  D->>PG: count of today's Footings under RLS
+  S->>T: systemOne — one state, one score question per dimension, evaluated in parallel
+  alt every dimension answered within its rubric
+    T-->>S: a position and a confidence per dimension
+    S->>D: footingHistory(job) — what this one is replacing, for the comparison sentence
+    S->>D: storeFooting() — one Footing row and one row per dimension, in one transaction
+    S-->>R: the Footing · the one before it
+    R-->>B: 200 · bands only; the 0–100 is computed, banded, and never rendered
+  else no key, not ready, ceiling, timeout, provider error, or a score outside the rubric
+    S-->>R: the reason · nothing stored
+    R-->>B: 4xx/5xx · the reason, in the words the page shows
+  end
+```
+
+What is different from the other two, and why:
+
+- **No Limit, and no Plan check.** A Footing costs about $0.0002, so it is on every Plan with nothing
+  in `PLAN_LIMITS` about it (**ADR-0007**). The daily ceiling in `src/server/data/footing.ts` is a
+  circuit breaker so a re-score loop from a bug costs cents and stops — never shown, never in the Plan
+  comparison, never an upsell. It lives server-side precisely so no component can import it.
+- **Nothing is reserved, so nothing is refunded.** A failure stores nothing and costs nothing, which
+  is why there is no counterpart to the quota dance the letter and the Attempt both do.
+- **Append-only.** Scoring inserts; nothing updates or deletes a Footing. The newest row for a Job is
+  "the Footing" and the rest are its history — the only feedback loop the feature has, since it is what
+  makes "did the rewritten resume actually score better" answerable.
+- **The overall band is derived, never stored.** Only each dimension's own 0–100 is, so tuning the
+  weights in `src/lib/footing.ts` re-reads history correctly instead of leaving a number no formula
+  explains.
+- **Staleness is stamped, not recomputed.** Each Footing keeps SHA-256 hashes of the description, the
+  resume text and the letter text, plus the Document ids. Reading a Job compares them; a stale Footing
+  is shown with a line saying what moved, and running it again is the Tenant's act. The hashes outlive
+  the Documents, so a Footing whose resume was deleted is kept and reads permanently stale — which is
+  why `resumeId` and `coverLetterId` carry no foreign key.
+- **A smaller injection surface.** The rubrics are fixed by us, the state is pure data, nothing is
+  generated and there are no tools, so the worst a hostile posting can do is nudge a level. It still
+  gets `stripInvisible` on the way in, for consistency rather than necessity.
+
 ## The data model
 
 ```mermaid
@@ -286,6 +359,8 @@ erDiagram
   Job ||--o{ Attempt : "rehearsed for"
   Attempt ||--o{ AttemptQuestion : "asks"
   PracticeRound ||--o{ PracticeQuestion : "asks"
+  Job ||--o{ Footing : "scored against"
+  Footing ||--o{ FootingDimension : "scores"
 
   Job {
     string id
@@ -376,10 +451,52 @@ erDiagram
     string text
     string transcript
   }
+  Footing {
+    string id
+    uuid userId
+    string jobId
+    timestamp scoredAt
+    string resumeId
+    string coverLetterId
+    string resumeHash
+    string descriptionHash
+    string coverLetterHash
+  }
+  FootingDimension {
+    string footingId
+    uuid userId
+    enum dimension
+    int score
+    float confidence
+  }
+  TermsAcceptance {
+    uuid userId
+    string version
+    timestamp acceptedAt
+  }
+  UpgradeRequest {
+    string id
+    uuid userId
+    enum plan
+    timestamp requestedAt
+  }
 ```
+
+`Footing.resumeId` and `Footing.coverLetterId` are plain columns, not foreign keys: a Footing whose
+Document was later deleted is kept and reads permanently stale, so the stamp has to outlive the
+Document rather than cascade away with it. `TermsAcceptance` records which version of the terms an
+Account agreed to and when (**ADR-0008**); it is append-only, and it is a table rather than Supabase
+`user_metadata` because the subject can write their own metadata and so it cannot hold a record about
+that subject.
 
 Every table carries its own `userId`, so every policy tests a column rather than reaching through a
 parent. Users themselves live in Supabase's `auth` schema, which Prisma does not model.
+
+`UpgradeRequest` is the mirror of that table and the one the application role may insert into but
+never update or delete (**ADR-0009**): it records a Tenant asking to be moved up a Plan. Whether a
+request is still pending is derived from the Tenant's Plan and `requestedAt` rather than stored, so
+granting the Plan resolves it and an unanswered one lapses after fourteen days. A row that asks for a
+Plan is not a Plan, and nothing reads one when enforcing a Limit.
 
 `UserPlan` is the one table the application role can read but not write (ADR-0001): a Tenant's
 Plan decides its Limits — Documents held, cover letters per week, Interview Simulator Attempts per

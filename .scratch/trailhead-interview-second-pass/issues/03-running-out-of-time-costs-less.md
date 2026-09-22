@@ -9,7 +9,7 @@ See `spec.md` → Scoring and time, and the **Unreached question** entry in `CON
 
 **Blocked by:** 02 (Not reached rows sit where the star display goes)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] When the countdown reaches zero, non-empty typed or transcribed text on the current question is
       recorded as its Answer before the Attempt ends; empty text records nothing.

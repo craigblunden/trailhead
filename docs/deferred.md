@@ -19,8 +19,18 @@ typed Requirements, documents into typed Evidence, a Gap being a Requirement wit
 Evidence); per-job gap analysis and the `Analysis` entity with its staleness rules and re-run
 affordance and its job states; and the portfolio review — the cross-job pass, its "twice per user per month" trial quota, its staleness hint, and the suggested sample
 projects. The two are entangled: structured extraction existed largely to make the portfolio pass a
-query rather than an inference call. The glossary terms (`Requirement`, `Evidence`, `Gap`,
-`Analysis`, `Portfolio review`, `Stale`) remain in `CONTEXT.md` for when this returns.
+query rather than an inference call. The glossary terms `Requirement`, `Evidence`, `Gap`,
+`Analysis` and `Portfolio review` remain in `CONTEXT.md` for when this returns. `Stale` no longer
+waits with them: a **Footing** uses it now, unchanged.
+
+**What shipped instead, and what it does not close.** A **Footing** (`CONTEXT.md`, **ADR-0007**) scores
+a posting against an Application kit through TypeSafe's `score` primitive, which needs none of the five
+questions below — nothing is parsed into typed things on either side. It ships *instead of nothing*, not
+instead of this. A Footing finds no Gaps, cites nothing, and cannot say why, so the motivating sentence
+about proof of work is still unwritten; what it does give is a **Footing dimension per Job as a stored
+row**, which makes the aggregate half of the portfolio pass a query, which is the property structured
+extraction was mostly wanted for. If this work returns, it returns for the per-Job explanation — the
+Gap, and what to add — and every question below is still open and still first.
 
 **Open questions — nothing below was answered. Start here.**
 

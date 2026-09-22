@@ -467,6 +467,8 @@ export const INTERVIEW_FAILURES = {
   "no-attempt": "That interview has already finished, or was never started.",
   incomplete: "Answer every question before scoring this interview.",
   "bad-answer": "That answer couldn’t be read. Keep it to plain text and try again.",
+  rescored:
+    "This interview has been scored as many times as it can be. Its scorecard is still here — rehearse again for a fresh one.",
 } as const;
 
 export type InterviewFailure = keyof typeof INTERVIEW_FAILURES;
@@ -531,6 +533,19 @@ export type RecordAnswerResponse = { ok: true; attempt: Attempt } | InterviewErr
  * (interview second pass ticket 08): enough to have an opinion, early enough to still shape it.
  */
 export const ASK_FOR_FEEDBACK_AT = 2;
+
+/**
+ * How many times one Attempt may be scored successfully. Scoring spends no quota — the Attempt was
+ * counted when it was started — so without this the score route is an unbounded model call behind a
+ * session, and the only one in this application.
+ *
+ * Three, not one: a scoring the Tenant never saw the result of (a dropped connection, a closed tab
+ * between the model answering and the response landing) has still been counted, and they should be
+ * able to ask again. A failed scoring is given back and does not count at all, so this bounds
+ * repetition rather than retries. Nothing in the UI re-scores on its own: a past Scorecard is read
+ * from storage.
+ */
+export const MAX_SCORE_RUNS = 3;
 
 /**
  * What the score route returns: the Attempt with every Answer scored, and its Scorecard. `askForFeedback`
