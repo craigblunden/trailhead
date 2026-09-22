@@ -34,7 +34,12 @@ describe("a seeded account is one the app could have produced", () => {
             addedDaysAgo: 12,
             moves: [{ stage: "rejected", daysAgo: 3 }],
           },
-          { company: "Quill Health", role: "Product Designer", location: "Remote (US)", addedDaysAgo: 2 },
+          {
+            company: "Quill Health",
+            role: "Product Designer",
+            location: "Remote (US)",
+            addedDaysAgo: 2,
+          },
         ],
       }),
       TODAY,
@@ -68,7 +73,7 @@ describe("a seeded account is one the app could have produced", () => {
         accent: "forest",
         activity: [
           { label: "Added to board — Interested", date: "2026-08-30" },
-          { label: "Moved to Rejected", date: "2026-09-08" },
+          { label: "Moved to Closed", date: "2026-09-08" },
         ],
       },
       {
@@ -76,7 +81,9 @@ describe("a seeded account is one the app could have produced", () => {
         addedOn: "2026-09-09",
         appliedOn: null,
         accent: "teal",
-        activity: [{ label: "Added to board — Interested", date: "2026-09-09" }],
+        activity: [
+          { label: "Added to board — Interested", date: "2026-09-09" },
+        ],
       },
     ]);
   });
@@ -96,7 +103,10 @@ describe("a seeded account is one the app could have produced", () => {
             key: "letter",
             kind: "cover_letter",
             fileName: "fernwood-cover-letter.pdf",
-            lines: ["Dear Fernwood team,", "I would love to build your referral loop."],
+            lines: [
+              "Dear Fernwood team,",
+              "I would love to build your referral loop.",
+            ],
             uploadedDaysAgo: 14,
           },
         ],
@@ -121,14 +131,24 @@ describe("a seeded account is one the app could have produced", () => {
             resume: "resume",
             coverLetter: "letter",
           },
-          { company: "Quill Health", role: "Product Designer", location: "Remote (US)", addedDaysAgo: 2 },
+          {
+            company: "Quill Health",
+            role: "Product Designer",
+            location: "Remote (US)",
+            addedDaysAgo: 2,
+          },
         ],
         lettersUsed: 2,
       }),
       TODAY,
     );
 
-    expect(planned.documents.map(({ bytes, ...rest }) => ({ ...rest, isPdf: Buffer.from(bytes.subarray(0, 5)).toString() === "%PDF-" }))).toEqual([
+    expect(
+      planned.documents.map(({ bytes, ...rest }) => ({
+        ...rest,
+        isPdf: Buffer.from(bytes.subarray(0, 5)).toString() === "%PDF-",
+      })),
+    ).toEqual([
       {
         key: "resume",
         kind: "resume",
@@ -174,7 +194,13 @@ describe("a seeded account is one the app could have produced", () => {
         lastSpokenOn: null,
       },
     ]);
-    expect(planned.jobs.map(({ contacts, resume, coverLetter }) => ({ contacts, resume, coverLetter }))).toEqual([
+    expect(
+      planned.jobs.map(({ contacts, resume, coverLetter }) => ({
+        contacts,
+        resume,
+        coverLetter,
+      })),
+    ).toEqual([
       { contacts: ["dana", "ravi"], resume: "resume", coverLetter: "letter" },
       { contacts: [], resume: null, coverLetter: null },
     ]);
@@ -183,20 +209,35 @@ describe("a seeded account is one the app could have produced", () => {
   });
 
   it("SEED-4: an account is held to its own Plan's Limits, and the default Plan is free", () => {
-    const resume = { kind: "resume", fileName: "resume.pdf", lines: ["Sam Rivera"], uploadedDaysAgo: 5 } as const;
+    const resume = {
+      kind: "resume",
+      fileName: "resume.pdf",
+      lines: ["Sam Rivera"],
+      uploadedDaysAgo: 5,
+    } as const;
     const four = ["a", "b", "c", "d"].map((key) => ({ ...resume, key }));
 
-    const pro = planAccount(account({ plan: "pro", documents: four, lettersUsed: 7 }), TODAY);
+    const pro = planAccount(
+      account({ plan: "pro", documents: four, lettersUsed: 7 }),
+      TODAY,
+    );
     expect(pro.plan).toBe("pro");
     expect(pro.documents).toHaveLength(4);
     expect(pro.lettersUsed).toBe(7);
 
     expect(planAccount(account(), TODAY).plan).toBe("free");
-    expect(() => planAccount(account({ documents: four }), TODAY)).toThrow(/on free holds at most 3 documents/);
+    expect(() => planAccount(account({ documents: four }), TODAY)).toThrow(
+      /on free holds at most 3 documents/,
+    );
   });
 
   it("SEED-5: refuses an account the app could never have produced, and says what is wrong", () => {
-    const job = { company: "Fernwood", role: "Product Designer", location: "Remote (US)", addedDaysAgo: 10 };
+    const job = {
+      company: "Fernwood",
+      role: "Product Designer",
+      location: "Remote (US)",
+      addedDaysAgo: 10,
+    };
     const resume = {
       key: "resume",
       kind: "resume",
@@ -204,25 +245,69 @@ describe("a seeded account is one the app could have produced", () => {
       lines: ["Sam Rivera - Product Designer"],
       uploadedDaysAgo: 5,
     } as const;
-    const dana = { key: "dana", name: "Dana Whitfield", kind: "recruiter" } as const;
+    const dana = {
+      key: "dana",
+      name: "Dana Whitfield",
+      kind: "recruiter",
+    } as const;
 
     const refusals: [string, Partial<SeedAccount>, RegExp][] = [
-      ["an unknown contact", { jobs: [{ ...job, contacts: ["nobody"] }] }, /contact "nobody"/],
-      ["an unknown document", { jobs: [{ ...job, resume: "missing" }] }, /document "missing"/],
-      ["a resume sent as a cover letter", { documents: [resume], jobs: [{ ...job, coverLetter: "resume" }] }, /cover letter/],
+      [
+        "an unknown contact",
+        { jobs: [{ ...job, contacts: ["nobody"] }] },
+        /contact "nobody"/,
+      ],
+      [
+        "an unknown document",
+        { jobs: [{ ...job, resume: "missing" }] },
+        /document "missing"/,
+      ],
+      [
+        "a resume sent as a cover letter",
+        { documents: [resume], jobs: [{ ...job, coverLetter: "resume" }] },
+        /cover letter/,
+      ],
       [
         "more documents than the cap",
         { documents: ["a", "b", "c", "d"].map((key) => ({ ...resume, key })) },
         /at most 3 documents/,
       ],
       ["a key used twice", { contacts: [dana, dana] }, /"dana" twice/],
-      ["a document the app would not accept", { documents: [{ ...resume, fileName: "resume.docx" }] }, /\.pdf/],
-      ["a file name longer than an upload allows", { documents: [{ ...resume, fileName: `${"r".repeat(252)}.pdf` }] }, /fileName/],
-      ["more letters than the quota", { lettersUsed: 6 }, /on free holds at most 5 cover letters/],
-      ["more letters than basic's week", { plan: "basic", lettersUsed: 16 }, /on basic holds at most 15 cover letters/],
-      ["more letters than pro's week", { plan: "pro", lettersUsed: 26 }, /on pro holds at most 25 cover letters/],
-      ["a move to the stage it is in", { jobs: [{ ...job, moves: [{ stage: "interested", daysAgo: 5 }] }] }, /already/],
-      ["a move before it was added", { jobs: [{ ...job, moves: [{ stage: "applied", daysAgo: 12 }] }] }, /before/],
+      [
+        "a document the app would not accept",
+        { documents: [{ ...resume, fileName: "resume.docx" }] },
+        /\.pdf/,
+      ],
+      [
+        "a file name longer than an upload allows",
+        { documents: [{ ...resume, fileName: `${"r".repeat(252)}.pdf` }] },
+        /fileName/,
+      ],
+      [
+        "more letters than the quota",
+        { lettersUsed: 6 },
+        /on free holds at most 5 cover letters/,
+      ],
+      [
+        "more letters than basic's week",
+        { plan: "basic", lettersUsed: 16 },
+        /on basic holds at most 15 cover letters/,
+      ],
+      [
+        "more letters than pro's week",
+        { plan: "pro", lettersUsed: 26 },
+        /on pro holds at most 25 cover letters/,
+      ],
+      [
+        "a move to the stage it is in",
+        { jobs: [{ ...job, moves: [{ stage: "interested", daysAgo: 5 }] }] },
+        /already/,
+      ],
+      [
+        "a move before it was added",
+        { jobs: [{ ...job, moves: [{ stage: "applied", daysAgo: 12 }] }] },
+        /before/,
+      ],
       [
         "moves out of order",
         {
@@ -238,14 +323,32 @@ describe("a seeded account is one the app could have produced", () => {
         },
         /before/,
       ],
-      ["a date in the future", { jobs: [{ ...job, addedDaysAgo: -1 }] }, /future/],
-      ["a job field validation refuses", { jobs: [{ ...job, postingUrl: "javascript:alert(1)" }] }, /postingUrl/],
-      ["a contact field validation refuses", { contacts: [{ ...dana, email: "not-an-email" }] }, /email/],
-      ["data on an account that never signed in", { verified: false, jobs: [job] }, /unverified/],
+      [
+        "a date in the future",
+        { jobs: [{ ...job, addedDaysAgo: -1 }] },
+        /future/,
+      ],
+      [
+        "a job field validation refuses",
+        { jobs: [{ ...job, postingUrl: "javascript:alert(1)" }] },
+        /postingUrl/,
+      ],
+      [
+        "a contact field validation refuses",
+        { contacts: [{ ...dana, email: "not-an-email" }] },
+        /email/,
+      ],
+      [
+        "data on an account that never signed in",
+        { verified: false, jobs: [job] },
+        /unverified/,
+      ],
     ];
 
     for (const [why, overrides, message] of refusals) {
-      expect(() => planAccount(account(overrides), TODAY), why).toThrow(message);
+      expect(() => planAccount(account(overrides), TODAY), why).toThrow(
+        message,
+      );
     }
   });
 });

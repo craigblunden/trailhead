@@ -16,7 +16,8 @@ export const STAGE_META: Record<Stage, { label: string; dot: string }> = {
   applied: { label: "Applied", dot: "var(--stage-applied)" },
   interviewing: { label: "Interviewing", dot: "var(--stage-interviewing)" },
   offer: { label: "Offer", dot: "var(--stage-offer)" },
-  rejected: { label: "Rejected", dot: "var(--stage-rejected)" },
+  rejected: { label: "Closed", dot: "var(--stage-rejected)" },
+  // rejected: { label: "Rejected", dot: "var(--stage-rejected)" },
 };
 
 /** A stage is "active" while the outcome is still open. */
@@ -114,7 +115,9 @@ export function formatLongDate(iso: string): string {
   });
 }
 
-export function formatSalary(job: Pick<Job, "salaryMin" | "salaryMax">): string {
+export function formatSalary(
+  job: Pick<Job, "salaryMin" | "salaryMax">,
+): string {
   const { salaryMin, salaryMax } = job;
   if (salaryMin === null && salaryMax === null) return "Salary TBD";
   if (salaryMin === null) return `Up to $${salaryMax}k`;
@@ -158,6 +161,12 @@ export function kitSlot(job: Job, kind: DocumentKind): AttachedDocument | null {
 }
 
 /** The Job with one kit slot set, the other left as it was. */
-export function withKitSlot(job: Job, kind: DocumentKind, value: AttachedDocument | null): Job {
-  return kind === "resume" ? { ...job, resume: value } : { ...job, coverLetter: value };
+export function withKitSlot(
+  job: Job,
+  kind: DocumentKind,
+  value: AttachedDocument | null,
+): Job {
+  return kind === "resume"
+    ? { ...job, resume: value }
+    : { ...job, coverLetter: value };
 }

@@ -9,7 +9,13 @@ import { STAGES, type Job, type Stage } from "@/lib/jobs";
 import type { JobPatch, JobsClient } from "@/lib/jobs-client";
 import { createTrail } from "../fakes/trail";
 import { SEED_JOBS } from "../fixtures/jobs";
-import { freezeClock, renderWithJobs, screen, waitFor, within } from "../test-utils";
+import {
+  freezeClock,
+  renderWithJobs,
+  screen,
+  waitFor,
+  within,
+} from "../test-utils";
 
 const navigation = vi.hoisted(() => ({
   push: vi.fn(),
@@ -18,7 +24,11 @@ const navigation = vi.hoisted(() => ({
 }));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: navigation.push, replace: navigation.replace, prefetch: vi.fn() }),
+  useRouter: () => ({
+    push: navigation.push,
+    replace: navigation.replace,
+    prefetch: vi.fn(),
+  }),
   usePathname: () => navigation.pathname,
   useSelectedLayoutSegment: () => null,
 }));
@@ -71,7 +81,9 @@ describe("rendering a job", () => {
   it("DET-1: leads with the role, company and location", () => {
     renderWithJobs(<JobDetail jobId={HARVEST} />);
 
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(harvest.role);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      harvest.role,
+    );
     expect(
       screen.getByText(`${harvest.company} · ${harvest.location}`),
     ).toBeInTheDocument();
@@ -95,7 +107,9 @@ describe("rendering a job", () => {
     renderWithJobs(<JobDetail jobId="meridian-senior-product-designer" />);
 
     expect(within(detailsPanel()).getByText("Added")).toBeInTheDocument();
-    expect(within(detailsPanel()).getByText("July 22, 2026")).toBeInTheDocument();
+    expect(
+      within(detailsPanel()).getByText("July 22, 2026"),
+    ).toBeInTheDocument();
   });
 
   it("DET-2: explains an unknown job rather than crashing", () => {
@@ -104,10 +118,9 @@ describe("rendering a job", () => {
     expect(
       screen.getByRole("heading", { name: /This job isn’t on your trail/ }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back to your trail" })).toHaveAttribute(
-      "href",
-      "/board",
-    );
+    expect(
+      screen.getByRole("link", { name: "Back to your trail" }),
+    ).toHaveAttribute("href", "/board");
   });
 
   it("DET-14: a failed list load says so, with a way to retry — not 'this job isn't on your trail'", async () => {
@@ -132,13 +145,18 @@ describe("rendering a job", () => {
     ).toBeNull();
 
     await user.click(within(alert).getByRole("button", { name: /try again/i }));
-    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(harvest.role);
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent(
+      harvest.role,
+    );
   });
 
   it("DET-15: a job opened at the optimistic id it was added under follows the redirect once the server assigns its own", async () => {
-    const { queryClient } = renderWithJobs(<JobDetail jobId="optimistic-new" />, {
-      initialJobs: [],
-    });
+    const { queryClient } = renderWithJobs(
+      <JobDetail jobId="optimistic-new" />,
+      {
+        initialJobs: [],
+      },
+    );
     const cache = jobCache(queryClient);
     const send = deferred<Job>();
 
@@ -148,13 +166,17 @@ describe("rendering a job", () => {
     });
     // Shown at once from the optimistic entry — no redirect yet, nothing to wait on.
     await waitFor(() =>
-      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(harvest.role),
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+        harvest.role,
+      ),
     );
     expect(navigation.replace).not.toHaveBeenCalled();
 
     send.resolve({ ...harvest, id: "server-assigned-id" });
     await waitFor(() =>
-      expect(navigation.replace).toHaveBeenCalledWith("/board/server-assigned-id"),
+      expect(navigation.replace).toHaveBeenCalledWith(
+        "/board/server-assigned-id",
+      ),
     );
   });
 });
@@ -166,9 +188,9 @@ describe("changing the stage", () => {
 
     await selectStage(user, "Offer");
 
-    expect(screen.getByRole("combobox", { name: "Application stage" })).toHaveTextContent(
-      "Offer",
-    );
+    expect(
+      screen.getByRole("combobox", { name: "Application stage" }),
+    ).toHaveTextContent("Offer");
     expect(activityEntries()[0]).toBe("Moved to Offer Jul 25");
   });
 
@@ -181,7 +203,9 @@ describe("changing the stage", () => {
     await selectStage(user, "Applied");
 
     expect(within(detailsPanel()).getByText("Applied")).toBeInTheDocument();
-    expect(within(detailsPanel()).getByText("July 25, 2026")).toBeInTheDocument();
+    expect(
+      within(detailsPanel()).getByText("July 25, 2026"),
+    ).toBeInTheDocument();
   });
 
   it("DET-4: never invents an applied date when moving back to Interested", async () => {
@@ -203,7 +227,9 @@ describe("changing the stage", () => {
 
     await selectStage(user, "Offer");
 
-    expect(within(detailsPanel()).getByText("June 30, 2026")).toBeInTheDocument();
+    expect(
+      within(detailsPanel()).getByText("June 30, 2026"),
+    ).toBeInTheDocument();
   });
 
   it("DET-5: re-selecting the current stage logs nothing", async () => {
@@ -220,24 +246,36 @@ describe("editing the applied date", () => {
   it("DET-16: corrects a backfilled applied date by picking a day, saving and closing at once", async () => {
     const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />);
 
-    await user.click(within(detailsPanel()).getByRole("button", { name: "June 30, 2026" }));
+    await user.click(
+      within(detailsPanel()).getByRole("button", { name: "June 30, 2026" }),
+    );
     await user.click(screen.getByRole("button", { name: /June 20th, 2026/ }));
 
     expect(
       within(detailsPanel()).getByRole("button", { name: "June 20, 2026" }),
     ).toBeInTheDocument();
     // The popover is gone, not just visually replaced: its own controls no longer exist.
-    expect(screen.queryByRole("button", { name: "Go to the Next Month" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Go to the Next Month" }),
+    ).toBeNull();
   });
 
   it("DET-16: never offers a day after today", async () => {
     const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />);
 
-    await user.click(within(detailsPanel()).getByRole("button", { name: "June 30, 2026" }));
-    await user.click(screen.getByRole("button", { name: "Go to the Next Month" }));
+    await user.click(
+      within(detailsPanel()).getByRole("button", { name: "June 30, 2026" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Go to the Next Month" }),
+    );
 
-    expect(screen.getByRole("button", { name: /July 26th, 2026/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /July 24th, 2026/ })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: /July 26th, 2026/ }),
+    ).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /July 24th, 2026/ }),
+    ).toBeEnabled();
   });
 
   it("DET-16: a job never applied to has no calendar to open — only the read-only added date", () => {
@@ -251,7 +289,8 @@ describe("editing the applied date", () => {
 });
 
 describe("editing free text", () => {
-  const saveButton = () => screen.getByRole("button", { name: "Save description" });
+  const saveButton = () =>
+    screen.getByRole("button", { name: "Save description" });
 
   it("DET-6: saves the description when asked, not while typing, then closes back to its excerpt", async () => {
     const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
@@ -273,7 +312,9 @@ describe("editing free text", () => {
     expect(trail.jobs.update).toHaveBeenCalledWith(HARVEST, {
       description: "Rewritten description.",
     });
-    expect(screen.queryByRole("textbox", { name: "Job description" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Job description" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Rewritten description.")).toBeInTheDocument();
     expect(editDescription()).toBeInTheDocument();
   });
@@ -295,11 +336,13 @@ describe("editing free text", () => {
 
   it("DET-6: a refused description save says why, keeps the text to fix, and stays open", async () => {
     const trail = createTrail({ jobs: SEED_JOBS });
-    const update = vi.fn<(id: string, patch: JobPatch) => Promise<Job>>().mockRejectedValue(
-      new ActionError("invalid", "Check the highlighted fields.", {
-        description: "Keep the description under 20,000 characters",
-      }),
-    );
+    const update = vi
+      .fn<(id: string, patch: JobPatch) => Promise<Job>>()
+      .mockRejectedValue(
+        new ActionError("invalid", "Check the highlighted fields.", {
+          description: "Keep the description under 20,000 characters",
+        }),
+      );
     const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, {
       trail,
       client: { ...trail.jobs, update },
@@ -349,12 +392,17 @@ describe("editing free text", () => {
     const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
     await user.click(editDescription());
 
-    await user.type(screen.getByRole("textbox", { name: "Job description" }), " More.");
+    await user.type(
+      screen.getByRole("textbox", { name: "Job description" }),
+      " More.",
+    );
     await user.type(screen.getByRole("textbox", { name: "Notes" }), " Later.");
     await user.click(screen.getByRole("button", { name: "Save notes" }));
 
     expect(trail.jobs.update).toHaveBeenCalledTimes(1);
-    expect(trail.jobs.update).toHaveBeenCalledWith(HARVEST, { notes: `${harvest.notes} Later.` });
+    expect(trail.jobs.update).toHaveBeenCalledWith(HARVEST, {
+      notes: `${harvest.notes} Later.`,
+    });
     expect(saveButton()).toBeEnabled();
   });
 });
@@ -365,7 +413,9 @@ describe("how much of a box is left", () => {
    * for "20,000" would match either count and pass for the wrong reason.
    */
   const countIn = (section: string) =>
-    within(screen.getByRole("region", { name: section })).queryByText(/^[\d,]+ of [\d,]+$/);
+    within(screen.getByRole("region", { name: section })).queryByText(
+      /^[\d,]+ of [\d,]+$/,
+    );
 
   const expected = (length: number, max: number) =>
     `${length.toLocaleString("en-US")} of ${max.toLocaleString("en-US")}`;
@@ -374,10 +424,9 @@ describe("how much of a box is left", () => {
     const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />);
     await user.click(editDescription());
 
-    expect(screen.getByRole("textbox", { name: "Job description" })).toHaveAttribute(
-      "maxLength",
-      String(JOB_LIMITS.description),
-    );
+    expect(
+      screen.getByRole("textbox", { name: "Job description" }),
+    ).toHaveAttribute("maxLength", String(JOB_LIMITS.description));
     expect(screen.getByRole("textbox", { name: "Notes" })).toHaveAttribute(
       "maxLength",
       String(JOB_LIMITS.notes),
@@ -403,7 +452,10 @@ describe("how much of a box is left", () => {
       initialJobs: [{ ...harvest, notes: "Ask." }],
     });
 
-    await user.type(screen.getByRole("textbox", { name: "Notes" }), " Then ask again.");
+    await user.type(
+      screen.getByRole("textbox", { name: "Notes" }),
+      " Then ask again.",
+    );
 
     expect(countIn("Notes")).toHaveTextContent(expected(20, JOB_LIMITS.notes));
   });
@@ -411,7 +463,9 @@ describe("how much of a box is left", () => {
   it("DET-20: a description folded away to its excerpt has no box, so it shows no count", () => {
     renderWithJobs(<JobDetail jobId={HARVEST} />);
 
-    expect(screen.queryByRole("textbox", { name: "Job description" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Job description" }),
+    ).not.toBeInTheDocument();
     expect(countIn("Job description")).not.toBeInTheDocument();
   });
 });
@@ -420,15 +474,19 @@ describe("the description excerpt", () => {
   it("DET-19: a saved description opens as an excerpt, and Edit reveals the full field", async () => {
     const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />);
 
-    expect(screen.queryByRole("textbox", { name: "Job description" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Job description" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText(harvest.description)).toBeInTheDocument();
 
     await user.click(editDescription());
 
-    expect(screen.getByRole("textbox", { name: "Job description" })).toHaveValue(
-      harvest.description,
-    );
-    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Job description" }),
+    ).toHaveValue(harvest.description);
+    expect(
+      screen.queryByRole("button", { name: "Edit" }),
+    ).not.toBeInTheDocument();
   });
 
   it("DET-19: an empty description has nothing to excerpt, so it opens straight to the editable field", () => {
@@ -436,28 +494,41 @@ describe("the description excerpt", () => {
       initialJobs: [{ ...harvest, description: "" }],
     });
 
-    expect(screen.getByRole("textbox", { name: "Job description" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("textbox", { name: "Job description" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Edit" }),
+    ).not.toBeInTheDocument();
   });
 
   it("DET-19: applies the same way to a rejected job — no longer folded away completely", () => {
     renderWithJobs(<JobDetail jobId={QUILL} />);
 
-    expect(screen.getByRole("heading", { name: "Job description" })).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "Job description" })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Job description" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Job description" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText(quill.description)).toBeInTheDocument();
   });
 });
 
 describe("a rejected job", () => {
-  const rejectionLetterField = () => screen.getByRole("textbox", { name: "Rejection letter" });
-  const saveRejectionLetter = () => screen.getByRole("button", { name: "Save rejection letter" });
+  const rejectionLetterField = () =>
+    screen.getByRole("textbox", { name: "Rejection letter" });
+  const saveRejectionLetter = () =>
+    screen.getByRole("button", { name: "Save rejection letter" });
 
   it("DET-17: saves the Rejection letter when asked, not while typing", async () => {
     const { user, trail } = renderWithJobs(<JobDetail jobId={QUILL} />);
     expect(saveRejectionLetter()).toBeDisabled();
 
-    await user.type(rejectionLetterField(), "We have decided to move forward with other candidates.");
+    await user.type(
+      rejectionLetterField(),
+      "We have decided to move forward with other candidates.",
+    );
     await user.tab();
 
     expect(trail.jobs.update).not.toHaveBeenCalled();
@@ -467,14 +538,18 @@ describe("a rejected job", () => {
     expect(trail.jobs.update).toHaveBeenCalledWith(QUILL, {
       rejectionLetter: "We have decided to move forward with other candidates.",
     });
-    expect(rejectionLetterField()).toHaveValue("We have decided to move forward with other candidates.");
+    expect(rejectionLetterField()).toHaveValue(
+      "We have decided to move forward with other candidates.",
+    );
     expect(saveRejectionLetter()).toBeDisabled();
   });
 
   it("DET-17: a job in an Active stage has no Rejection letter to add", () => {
     renderWithJobs(<JobDetail jobId={HARVEST} />);
 
-    expect(screen.queryByRole("textbox", { name: "Rejection letter" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Rejection letter" }),
+    ).not.toBeInTheDocument();
   });
 
   it("DET-17: a Rejection letter is kept, out of sight, while the job is off rejected, and back when it returns", async () => {
@@ -484,9 +559,11 @@ describe("a rejected job", () => {
     expect(rejectionLetterField()).toHaveValue("Thank you for your time.");
 
     await selectStage(user, "Interviewing");
-    expect(screen.queryByRole("textbox", { name: "Rejection letter" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: "Rejection letter" }),
+    ).not.toBeInTheDocument();
 
-    await selectStage(user, "Rejected");
+    await selectStage(user, "Closed");
     expect(rejectionLetterField()).toHaveValue("Thank you for your time.");
   });
 });
@@ -503,17 +580,24 @@ describe("editing the job's details", () => {
     expect(form.getByLabelText("Company")).toHaveValue(harvest.company);
     expect(form.getByLabelText("Role title")).toHaveValue(harvest.role);
     expect(form.getByLabelText("Location")).toHaveValue(harvest.location);
-    expect(form.getByLabelText("Application link")).toHaveValue(harvest.postingUrl);
+    expect(form.getByLabelText("Application link")).toHaveValue(
+      harvest.postingUrl,
+    );
 
     await user.clear(form.getByLabelText("Role title"));
     await user.type(form.getByLabelText("Role title"), "  Design Director ");
     await user.clear(form.getByLabelText("Application link"));
-    await user.type(form.getByLabelText("Application link"), "https://harvest.example.com/jobs/9");
+    await user.type(
+      form.getByLabelText("Application link"),
+      "https://harvest.example.com/jobs/9",
+    );
     await user.click(form.getByRole("button", { name: "Save details" }));
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(editButton()).toHaveFocus();
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Design Director");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Design Director",
+    );
     expect(screen.getByRole("link", { name: /Open posting/ })).toHaveAttribute(
       "href",
       "https://harvest.example.com/jobs/9",
@@ -530,10 +614,16 @@ describe("editing the job's details", () => {
 
     await user.click(editButton());
     await user.clear(within(dialog()).getByLabelText("Location"));
-    await user.click(within(dialog()).getByRole("button", { name: "Save details" }));
+    await user.click(
+      within(dialog()).getByRole("button", { name: "Save details" }),
+    );
 
-    expect(trail.jobs.update).toHaveBeenCalledWith(HARVEST, { location: LOCATION_FALLBACK });
-    expect(screen.getByText(`${harvest.company} · ${LOCATION_FALLBACK}`)).toBeInTheDocument();
+    expect(trail.jobs.update).toHaveBeenCalledWith(HARVEST, {
+      location: LOCATION_FALLBACK,
+    });
+    expect(
+      screen.getByText(`${harvest.company} · ${LOCATION_FALLBACK}`),
+    ).toBeInTheDocument();
 
     await user.click(editButton());
     expect(within(dialog()).getByLabelText("Location")).toHaveValue("");
@@ -546,11 +636,15 @@ describe("editing the job's details", () => {
     const link = within(dialog()).getByLabelText("Application link");
     await user.clear(link);
     await user.type(link, "javascript:alert(1)");
-    await user.click(within(dialog()).getByRole("button", { name: "Save details" }));
+    await user.click(
+      within(dialog()).getByRole("button", { name: "Save details" }),
+    );
 
     expect(dialog()).toBeInTheDocument();
     expect(link).toHaveAttribute("aria-invalid", "true");
-    expect(link).toHaveAccessibleDescription("Enter a web address starting with http:// or https://");
+    expect(link).toHaveAccessibleDescription(
+      "Enter a web address starting with http:// or https://",
+    );
     expect(trail.jobs.update).not.toHaveBeenCalled();
   });
 
@@ -558,33 +652,48 @@ describe("editing the job's details", () => {
     const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
 
     await user.click(editButton());
-    await user.click(within(dialog()).getByRole("button", { name: "Save details" }));
+    await user.click(
+      within(dialog()).getByRole("button", { name: "Save details" }),
+    );
     expect(screen.queryByRole("dialog")).toBeNull();
 
     await user.click(editButton());
     await user.type(within(dialog()).getByLabelText("Company"), " Group");
     await user.click(within(dialog()).getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.getByText(`${harvest.company} · ${harvest.location}`)).toBeInTheDocument();
+    expect(
+      screen.getByText(`${harvest.company} · ${harvest.location}`),
+    ).toBeInTheDocument();
 
     expect(trail.jobs.update).not.toHaveBeenCalled();
   });
 
   it("DET-13: a refused save rolls back and says why, in the server's own words", async () => {
     const trail = createTrail({ jobs: SEED_JOBS });
-    const update = vi.fn<(id: string, patch: JobPatch) => Promise<Job>>().mockRejectedValue(
-      new ActionError("invalid", "Check the highlighted fields.", {
-        company: "Keep this under 120 characters",
-      }),
-    );
-    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { trail, client: { ...trail.jobs, update } });
+    const update = vi
+      .fn<(id: string, patch: JobPatch) => Promise<Job>>()
+      .mockRejectedValue(
+        new ActionError("invalid", "Check the highlighted fields.", {
+          company: "Keep this under 120 characters",
+        }),
+      );
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, {
+      trail,
+      client: { ...trail.jobs, update },
+    });
 
     await user.click(editButton());
     await user.type(within(dialog()).getByLabelText("Company"), " Group");
-    await user.click(within(dialog()).getByRole("button", { name: "Save details" }));
+    await user.click(
+      within(dialog()).getByRole("button", { name: "Save details" }),
+    );
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Keep this under 120 characters");
-    expect(screen.getByText(`${harvest.company} · ${harvest.location}`)).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Keep this under 120 characters",
+    );
+    expect(
+      screen.getByText(`${harvest.company} · ${harvest.location}`),
+    ).toBeInTheDocument();
   });
 });
 
@@ -593,10 +702,9 @@ describe("supporting panels", () => {
     renderWithJobs(<JobDetail jobId={HARVEST} />);
     const contacts = screen.getByRole("region", { name: "Contacts" });
 
-    expect(within(contacts).getByRole("link", { name: "Tom Okafor" })).toHaveAttribute(
-      "href",
-      "/contacts/c1",
-    );
+    expect(
+      within(contacts).getByRole("link", { name: "Tom Okafor" }),
+    ).toHaveAttribute("href", "/contacts/c1");
     expect(within(contacts).getByText("Hiring manager")).toBeInTheDocument();
     expect(
       within(contacts).getByRole("link", { name: "t.okafor@harvest.co" }),
@@ -625,8 +733,12 @@ describe("supporting panels", () => {
   it("DET-9: offers to write a cover letter, with the letters left this week", async () => {
     renderWithJobs(<JobDetail jobId={HARVEST} />);
 
-    expect(await screen.findByText("5 of 5 left this week")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Write cover letter" })).toBeEnabled();
+    expect(
+      await screen.findByText("5 of 5 left this week"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Write cover letter" }),
+    ).toBeEnabled();
   });
 });
 
@@ -646,7 +758,9 @@ describe("the posting link", () => {
     });
 
     expect(screen.queryByRole("link", { name: /posting/i })).toBeNull();
-    expect(screen.getByRole("button", { name: /No posting link/ })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /No posting link/ }),
+    ).toBeDisabled();
   });
 
   it("DET-10: treats a javascript: URL as no link at all", () => {
@@ -655,20 +769,29 @@ describe("the posting link", () => {
     });
 
     expect(screen.queryByRole("link", { name: /posting/i })).toBeNull();
-    expect(screen.getByRole("button", { name: /No posting link/ })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /No posting link/ }),
+    ).toBeDisabled();
   });
 });
 
 describe("a refused edit (architecture ticket 01)", () => {
   it("DET-12: a salary the server refuses says why, in the server's own words", async () => {
     const trail = createTrail({ jobs: SEED_JOBS });
-    const update = vi.fn<(id: string, patch: JobPatch) => Promise<Job>>().mockRejectedValue(
-      new ActionError("invalid", "Check the highlighted fields.", {
-        salaryMin: "Enter a whole number of thousands",
-      }),
+    const update = vi
+      .fn<(id: string, patch: JobPatch) => Promise<Job>>()
+      .mockRejectedValue(
+        new ActionError("invalid", "Check the highlighted fields.", {
+          salaryMin: "Enter a whole number of thousands",
+        }),
+      );
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, {
+      trail,
+      client: { ...trail.jobs, update },
+    });
+    const minimum = screen.getByLabelText(
+      "Minimum salary expectation, in thousands",
     );
-    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { trail, client: { ...trail.jobs, update } });
-    const minimum = screen.getByLabelText("Minimum salary expectation, in thousands");
 
     await user.clear(minimum);
     await user.type(minimum, "1.5");
@@ -683,7 +806,10 @@ describe("a refused edit (architecture ticket 01)", () => {
 
 describe("deleting the job", () => {
   const deleteButton = () => screen.getByRole("button", { name: "Delete job" });
-  const confirmDialog = () => screen.getByRole("dialog", { name: `Delete ${harvest.role} at ${harvest.company}?` });
+  const confirmDialog = () =>
+    screen.getByRole("dialog", {
+      name: `Delete ${harvest.role} at ${harvest.company}?`,
+    });
 
   it("DET-20: asks for confirmation before deleting anything", async () => {
     const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
@@ -698,19 +824,25 @@ describe("deleting the job", () => {
     const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
 
     await user.click(deleteButton());
-    await user.click(within(confirmDialog()).getByRole("button", { name: "Keep job" }));
+    await user.click(
+      within(confirmDialog()).getByRole("button", { name: "Keep job" }),
+    );
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(trail.jobs.remove).not.toHaveBeenCalled();
     expect(navigation.push).not.toHaveBeenCalled();
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(harvest.role);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      harvest.role,
+    );
   });
 
   it("DET-20: confirming deletes the job and leaves for the board", async () => {
     const { user, trail } = renderWithJobs(<JobDetail jobId={HARVEST} />);
 
     await user.click(deleteButton());
-    await user.click(within(confirmDialog()).getByRole("button", { name: "Delete job" }));
+    await user.click(
+      within(confirmDialog()).getByRole("button", { name: "Delete job" }),
+    );
 
     expect(trail.jobs.remove).toHaveBeenCalledWith(HARVEST);
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith("/board"));
@@ -723,14 +855,23 @@ describe("deleting the job", () => {
     // Gates the store's own removal behind `send`, so the fake behaves like a real request that has
     // not yet answered — rather than a bare stub that would leave the store, and so the eventual
     // refetch, none the wiser about the delete at all.
-    const remove = vi.fn((id: string) => send.promise.then(() => trail.jobs.remove(id)));
-    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { trail, client: { ...trail.jobs, remove } });
+    const remove = vi.fn((id: string) =>
+      send.promise.then(() => trail.jobs.remove(id)),
+    );
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, {
+      trail,
+      client: { ...trail.jobs, remove },
+    });
 
     await user.click(deleteButton());
-    await user.click(within(confirmDialog()).getByRole("button", { name: "Delete job" }));
+    await user.click(
+      within(confirmDialog()).getByRole("button", { name: "Delete job" }),
+    );
 
     const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByRole("button", { name: "Keep job" })).toBeDisabled();
+    expect(
+      within(dialog).getByRole("button", { name: "Keep job" }),
+    ).toBeDisabled();
     await user.click(within(dialog).getByRole("button", { name: "Keep job" }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     await user.keyboard("{Escape}");
@@ -743,18 +884,27 @@ describe("deleting the job", () => {
   it("DET-20: never flashes 'not on your trail' between the delete landing and leaving for the board", async () => {
     const trail = createTrail({ jobs: SEED_JOBS });
     const send = deferred<void>();
-    const remove = vi.fn((id: string) => send.promise.then(() => trail.jobs.remove(id)));
-    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { trail, client: { ...trail.jobs, remove } });
+    const remove = vi.fn((id: string) =>
+      send.promise.then(() => trail.jobs.remove(id)),
+    );
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, {
+      trail,
+      client: { ...trail.jobs, remove },
+    });
 
     await user.click(deleteButton());
-    await user.click(within(confirmDialog()).getByRole("button", { name: "Delete job" }));
+    await user.click(
+      within(confirmDialog()).getByRole("button", { name: "Delete job" }),
+    );
     send.resolve();
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith("/board"));
 
     // The mocked router doesn't actually navigate away, so whatever renders next is what a real
     // user would see for the render or two before the route change lands — and it must be a loading
     // state, not "This job isn't on your trail".
-    expect(screen.queryByRole("heading", { name: /This job isn.t on your trail/ })).toBeNull();
+    expect(
+      screen.queryByRole("heading", { name: /This job isn.t on your trail/ }),
+    ).toBeNull();
     expect(screen.getByText("Loading this job…")).toBeInTheDocument();
   });
 
@@ -762,17 +912,31 @@ describe("deleting the job", () => {
     const trail = createTrail({ jobs: SEED_JOBS });
     const remove = vi
       .fn<(id: string) => Promise<null>>()
-      .mockRejectedValue(new ActionError("failed", "That job wasn't deleted. Check your connection and try again."));
-    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, { trail, client: { ...trail.jobs, remove } });
+      .mockRejectedValue(
+        new ActionError(
+          "failed",
+          "That job wasn't deleted. Check your connection and try again.",
+        ),
+      );
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, {
+      trail,
+      client: { ...trail.jobs, remove },
+    });
 
     await user.click(deleteButton());
-    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Delete job" }));
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Delete job",
+      }),
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "That job wasn't deleted. Check your connection and try again.",
     );
     expect(navigation.push).not.toHaveBeenCalled();
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(harvest.role);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      harvest.role,
+    );
   });
 });
 
@@ -782,16 +946,19 @@ describe("panel structure", () => {
 
     for (const name of ["Details", "Contacts", "Activity"]) {
       const region = screen.getByRole("region", { name });
-      expect(within(region).getByRole("heading", { level: 2 })).toHaveTextContent(
-        name,
-      );
+      expect(
+        within(region).getByRole("heading", { level: 2 }),
+      ).toHaveTextContent(name);
     }
   });
 });
 
 describe("the summit attempt", () => {
   const attempt = () => screen.getByRole("list", { name: "Summit attempt" });
-  const currentStep = () => within(attempt()).getByText((_, node) => node?.getAttribute("aria-current") === "step");
+  const currentStep = () =>
+    within(attempt()).getByText(
+      (_, node) => node?.getAttribute("aria-current") === "step",
+    );
 
   it("SUM-1: tells the Stage as a phase of the climb, and follows a Stage change", async () => {
     const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />);
@@ -808,9 +975,9 @@ describe("the summit attempt", () => {
   it("SUM-2: a rejected Job is off the route, regrouping for the next attempt", async () => {
     const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />);
 
-    await selectStage(user, "Rejected");
+    await selectStage(user, "Closed");
 
-    expect(currentStep()).toHaveTextContent("Regroup, Rejected");
+    expect(currentStep()).toHaveTextContent("Regroup, Closed");
     expect(within(attempt()).getAllByRole("listitem")).toHaveLength(5);
     expect(screen.getByText("Regroup at camp.")).toBeInTheDocument();
   });
@@ -819,23 +986,32 @@ describe("the summit attempt", () => {
     const trail = createTrail({ jobs: SEED_JOBS });
     let refuse = false;
     const setStage = (id: string, stage: Stage) =>
-      refuse ? Promise.reject(new ActionError("failed", "Couldn't move the job.")) : trail.jobs.setStage(id, stage);
-    const { user, container } = renderWithJobs(<JobDetail jobId={HARVEST} scenes={<SummitScenes />} />, {
-      trail,
-      client: { ...trail.jobs, setStage },
-    });
-    const shown = () => container.querySelector("[data-summit]")?.getAttribute("data-summit");
+      refuse
+        ? Promise.reject(new ActionError("failed", "Couldn't move the job."))
+        : trail.jobs.setStage(id, stage);
+    const { user, container } = renderWithJobs(
+      <JobDetail jobId={HARVEST} scenes={<SummitScenes />} />,
+      {
+        trail,
+        client: { ...trail.jobs, setStage },
+      },
+    );
+    const shown = () =>
+      container.querySelector("[data-summit]")?.getAttribute("data-summit");
 
     const pictures = container.querySelectorAll("svg[data-summit-part]");
-    expect([...pictures].map((svg) => svg.getAttribute("data-summit-part"))).toEqual([...STAGES]);
-    for (const svg of pictures) expect(svg).toHaveAttribute("aria-hidden", "true");
+    expect(
+      [...pictures].map((svg) => svg.getAttribute("data-summit-part")),
+    ).toEqual([...STAGES]);
+    for (const svg of pictures)
+      expect(svg).toHaveAttribute("aria-hidden", "true");
     expect(shown()).toBe("interviewing");
 
     await selectStage(user, "Offer");
     expect(shown()).toBe("offer");
 
     refuse = true;
-    await selectStage(user, "Rejected");
+    await selectStage(user, "Closed");
     await screen.findByRole("alert");
     expect(shown()).toBe("offer");
   });
@@ -846,7 +1022,9 @@ describe("the summit attempt", () => {
       renders += 1;
       return <svg data-testid="scenes" />;
     }
-    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} scenes={<Scenes />} />);
+    const { user } = renderWithJobs(
+      <JobDetail jobId={HARVEST} scenes={<Scenes />} />,
+    );
 
     await selectStage(user, "Offer");
     await selectStage(user, "Applied");
