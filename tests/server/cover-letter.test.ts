@@ -205,6 +205,17 @@ describe("what the prompt receives (ticket 18; feedback issue 03)", () => {
     const at = order.map((heading) => system.indexOf(heading));
     expect(at).toEqual([...at].sort((a, b) => a - b));
   });
+
+  it("GEN-P9: the applicant may say they are excited to apply — only the openers that say nothing are habits to avoid", () => {
+    const { system } = buildCoverLetterPrompt(inputs);
+
+    expect(system).toMatch(/excited to apply for this role is fine/);
+    // The openers that would fit any letter are still out.
+    expect(system).toMatch(/"I am writing to express my interest"/);
+    expect(system).toMatch(/"I believe I would be a great fit"/);
+    // And the habits list does not take back what the shape allows.
+    expect(system.slice(system.indexOf("Avoid the habits"))).not.toMatch(/excited to apply/);
+  });
 });
 
 describe("the Claude call (tickets 18, 19; feedback issue 03)", () => {
