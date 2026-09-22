@@ -15,7 +15,7 @@ shimmer, no slide, exactly one status region.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] The cause is confirmed (e.g. by reproducing on the dev server) and recorded in a comment on this
       ticket before the fix.

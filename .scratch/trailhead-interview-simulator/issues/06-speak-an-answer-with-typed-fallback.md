@@ -6,7 +6,7 @@ explanation of why speaking is recommended. Unsupported browsers get typing auto
 
 **Blocked by:** 02.
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] On a browser with speech-recognition support, the default input mode is speaking, shown with
       copy explaining why it's recommended.

@@ -10,7 +10,7 @@ See `spec.md` → Scoring and time, and **Category** in `CONTEXT.md`.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] Answer times per Category: personal 1½, behavioural 2½, stakeholder 2, technical 3, design 4
       minutes.

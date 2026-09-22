@@ -1,6 +1,6 @@
 # Interview Simulator: rehearse for the real interview against a timed, scored Attempt
 
-**Status:** ready-for-agent
+**Status:** implemented
 
 Settled in a grilling session on 2026-09-16. The glossary terms are **Interview Simulator**,
 **Attempt**, **Category**, **Answer**, and **Scorecard** (`CONTEXT.md`, added in that session),

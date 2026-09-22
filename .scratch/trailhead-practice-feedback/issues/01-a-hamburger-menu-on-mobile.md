@@ -8,7 +8,7 @@ See `spec.md` → 1. Mobile navigation.
 
 **Blocked by:** None
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] Below `md`, `AppHeader` shows a hamburger button (accessible name such as "Menu") where the avatar
       is. The Feedback button stays. The loading placeholder matches the new button's size.

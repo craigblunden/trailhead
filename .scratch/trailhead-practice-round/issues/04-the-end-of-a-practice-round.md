@@ -7,7 +7,7 @@ See `spec.md` → A Practice round ("After it ends").
 
 **Blocked by:** 03 (take a Practice round)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] Titled "That's the practice round" when every question was answered, "Time's up" when the
       countdown ran out.

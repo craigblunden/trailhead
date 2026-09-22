@@ -9,7 +9,7 @@ See `spec.md` → History and variety.
 **Blocked by:** 01 (the Interview Simulator's loading boundary the new page's wait relies on), 02 (stars
 on each row)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] A tenant-scoped read lists the Tenant's scored Attempts across all Jobs plus any in-progress
       Attempt, newest first, leaving out reset and never-scored ones; each row carries the Job's

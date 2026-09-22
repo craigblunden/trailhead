@@ -9,7 +9,7 @@ See `spec.md` → The Scorecard, and **Missed point**, **Takeaway**, **Scorecard
 
 **Blocked by:** 02 (the star display), 03 (Not reached rows, and which Answers reach the scorer)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] The scoring call's structured output carries, per Answer, a score, `whatLanded` (one sentence) and
       one to three Missed points; and for the Attempt, a Takeaway of two or three points. The schema

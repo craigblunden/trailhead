@@ -8,7 +8,7 @@ at whatever length ticket 01 hardcodes.
 
 **Blocked by:** 01.
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] A single countdown for the whole Attempt runs only while a question is actively being
       answered.

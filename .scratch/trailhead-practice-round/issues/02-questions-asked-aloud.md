@@ -8,7 +8,7 @@ See `spec.md` → Questions asked aloud.
 **Blocked by:** None (can start immediately; touches the run screen alongside 01, so whichever lands
 second rebases)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] A client hook reads a question's text with `SpeechSynthesisUtterance` in the page language and
       reports when it has been asked: on the utterance's end, on an error, on skip, on cancel, or on a

@@ -6,7 +6,7 @@ overall score, so the Tenant understands why it was marked as it was.
 
 **Blocked by:** 02.
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] Scoring a completed Attempt sends its questions and their Answers to the scoring Anthropic
       call and receives a score plus rationale for each Answer.

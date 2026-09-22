@@ -1,6 +1,6 @@
 # Interview Simulator: fixes from the first phone test of a Practice round
 
-**Status:** ready-for-agent
+**Status:** implemented
 
 Settled in a grilling session on 2026-09-17, after the owner watched a first-time user take a free
 Practice round on an iPhone. The glossary gained **Tutorial**, and **Answer** now says every Answer is

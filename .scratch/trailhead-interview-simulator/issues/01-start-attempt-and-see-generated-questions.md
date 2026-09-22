@@ -9,7 +9,7 @@ proven end to end before any interaction polish.
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 Schema shape settled in the spec:
 

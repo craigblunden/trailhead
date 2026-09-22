@@ -9,7 +9,7 @@ See `spec.md` → Who gets what, A Practice round, The fixed question set. Stora
 
 **Blocked by:** 01 (the run screen drives any timed run)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] A Practice round and its questions are stored in tables of their own (the round: tenant, active
       seconds, completed-at, timestamps; each question: tenant, round, Category, order, text,

@@ -7,7 +7,7 @@ See `spec.md` → 4. The run screen on a phone.
 
 **Blocked by:** 02 (the controls it lays out are the speaking-only ones)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] Below `sm`, a bar sticks under the sticky app header (offset by the header's height), showing the
       clock (with its low-time amber) and "Question N of M". The large corner clock shows at `sm` and up

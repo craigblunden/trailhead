@@ -7,7 +7,7 @@ indicator for them.
 
 **Blocked by:** 05, 07.
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] A `free` or `basic` Tenant sees a `pro`-only indicator next to "Interview Simulator" in the
       primary navigation.

@@ -8,7 +8,7 @@ See `spec.md` → 3. Reading aloud, and the handover.
 
 **Blocked by:** None (touches the run screen alongside 02; whichever lands second rebases)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review (manual iPhone check pending on the user)
 
 - [ ] A small helper primes speech synthesis synchronously (for example, speaking an empty or silent
       utterance) and is called at the top of the click handlers for Go (Attempt and Practice round),

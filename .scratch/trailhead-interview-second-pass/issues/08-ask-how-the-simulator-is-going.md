@@ -10,7 +10,7 @@ This is **App feedback** (to the people who make Trailhead), not **Feedback** (a
 
 **Blocked by:** 05 (the card sits below the final Scorecard layout)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] Scoring an Attempt reports whether it is the Tenant's second scored Attempt across all Jobs;
       re-scoring or reopening an Attempt never reports it again. Nothing new is stored to remember the

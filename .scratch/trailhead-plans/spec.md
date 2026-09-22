@@ -1,6 +1,6 @@
 # Plans: a Tenant on `pro` has bigger Limits
 
-**Status:** ready
+**Status:** implemented
 
 Settled in a grilling session on 2026-09-12. The glossary terms are **Plan** and **Limit**
 (`CONTEXT.md`); the placement decision is ADR-0001.
