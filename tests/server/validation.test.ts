@@ -215,15 +215,26 @@ describe("the contact a new job may carry", () => {
 });
 
 describe("jobPatchSchema", () => {
-  it("VAL-8: allows description, notes, and the salary expectation, bounded", () => {
+  it("VAL-8: allows description, notes, and the salary expectation", () => {
     const result = parseInput(jobPatchSchema, { description: "New", notes: "Ask about team size" });
     expect(result).toEqual({ ok: true, data: { description: "New", notes: "Ask about team size" } });
 
     const salary = parseInput(jobPatchSchema, { salaryMin: "150", salaryMax: "" });
     expect(salary).toEqual({ ok: true, data: { salaryMin: 150, salaryMax: null } });
+  });
 
-    const tooLong = parseInput(jobPatchSchema, { notes: "n".repeat(JOB_LIMITS.notes + 1) });
-    expect(tooLong.ok).toBe(false);
+  it("VAL-8: strips the description and the notes past their limits rather than refusing them", () => {
+    for (const field of ["description", "notes"] as const) {
+      const limit = JOB_LIMITS[field];
+      const atLimit = "n".repeat(limit);
+
+      const kept = parseInput(jobPatchSchema, { [field]: atLimit });
+      expect(kept.ok && kept.data[field], `${field} at limit`).toBe(atLimit);
+
+      const past = parseInput(jobPatchSchema, { [field]: `${atLimit}${"o".repeat(20_000)}` });
+      expect(past.ok, `${field} past limit`).toBe(true);
+      expect(past.ok && past.data[field]).toBe(atLimit);
+    }
   });
 
   it("VAL-8: allows the Rejection letter, bounded", () => {

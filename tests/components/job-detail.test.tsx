@@ -4,7 +4,7 @@ import { ActionError } from "@/components/action-client";
 import { jobCache } from "@/components/job-cache";
 import { JobDetail } from "@/components/job/job-detail";
 import { SummitScenes } from "@/components/job/summit-scenes";
-import { LOCATION_FALLBACK } from "@/lib/job-fields";
+import { JOB_LIMITS, LOCATION_FALLBACK } from "@/lib/job-fields";
 import { STAGES, type Job, type Stage } from "@/lib/jobs";
 import type { JobPatch, JobsClient } from "@/lib/jobs-client";
 import { createTrail } from "../fakes/trail";
@@ -356,6 +356,63 @@ describe("editing free text", () => {
     expect(trail.jobs.update).toHaveBeenCalledTimes(1);
     expect(trail.jobs.update).toHaveBeenCalledWith(HARVEST, { notes: `${harvest.notes} Later.` });
     expect(saveButton()).toBeEnabled();
+  });
+});
+
+describe("how much of a box is left", () => {
+  /**
+   * Scoped to its own section, since the description and the notes share a cap: a bare text query
+   * for "20,000" would match either count and pass for the wrong reason.
+   */
+  const countIn = (section: string) =>
+    within(screen.getByRole("region", { name: section })).queryByText(/^[\d,]+ of [\d,]+$/);
+
+  const expected = (length: number, max: number) =>
+    `${length.toLocaleString("en-US")} of ${max.toLocaleString("en-US")}`;
+
+  it("DET-20: both boxes stop typing at their cap, so no oversized text is ever sent", async () => {
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />);
+    await user.click(editDescription());
+
+    expect(screen.getByRole("textbox", { name: "Job description" })).toHaveAttribute(
+      "maxLength",
+      String(JOB_LIMITS.description),
+    );
+    expect(screen.getByRole("textbox", { name: "Notes" })).toHaveAttribute(
+      "maxLength",
+      String(JOB_LIMITS.notes),
+    );
+  });
+
+  it("DET-20: each box counts what it holds against its cap, from the very first character", async () => {
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, {
+      initialJobs: [{ ...harvest, notes: "" }],
+    });
+
+    // An empty box still says how much room there is — a count nobody sees is no count at all.
+    expect(countIn("Notes")).toHaveTextContent(expected(0, JOB_LIMITS.notes));
+
+    await user.click(editDescription());
+    expect(countIn("Job description")).toHaveTextContent(
+      expected(harvest.description.length, JOB_LIMITS.description),
+    );
+  });
+
+  it("DET-20: the count follows what is typed, not what is saved", async () => {
+    const { user } = renderWithJobs(<JobDetail jobId={HARVEST} />, {
+      initialJobs: [{ ...harvest, notes: "Ask." }],
+    });
+
+    await user.type(screen.getByRole("textbox", { name: "Notes" }), " Then ask again.");
+
+    expect(countIn("Notes")).toHaveTextContent(expected(20, JOB_LIMITS.notes));
+  });
+
+  it("DET-20: a description folded away to its excerpt has no box, so it shows no count", () => {
+    renderWithJobs(<JobDetail jobId={HARVEST} />);
+
+    expect(screen.queryByRole("textbox", { name: "Job description" })).not.toBeInTheDocument();
+    expect(countIn("Job description")).not.toBeInTheDocument();
   });
 });
 

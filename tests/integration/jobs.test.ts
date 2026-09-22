@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { JOB_LIMITS } from "@/lib/job-fields";
 import { createJobAction, deleteJobAction, setJobStageAction, updateJobAction } from "@/server/actions/jobs";
 import { createContact, linkContact, listContacts } from "@/server/data/contacts";
 import { NotFoundError } from "@/server/data/errors";
@@ -245,6 +246,28 @@ describe("ticket 11: the detail page is real, and stage and notes persist", () =
       "Moved to Applied",
       "Added to board — Interested",
     ]);
+  });
+
+  it("stores no more of the description or the notes than their cap, however much is sent", async () => {
+    signInAs(newUserId());
+    const job = await createJob(input, FROZEN);
+
+    const saved = await updateJobAction(job.id, {
+      description: "e".repeat(JOB_LIMITS.description + 1),
+      notes: "n".repeat(JOB_LIMITS.notes * 3),
+    });
+    expect(saved.ok).toBe(true);
+
+    const reread = await getJob(job.id);
+    expect(reread?.description).toHaveLength(JOB_LIMITS.description);
+    expect(reread?.notes).toHaveLength(JOB_LIMITS.notes);
+
+    // Adding a Job refuses instead, because that form answers with an inline message.
+    const added = await createJobAction({
+      ...input,
+      description: "d".repeat(JOB_LIMITS.description + 1),
+    });
+    expect(added).toMatchObject({ ok: false, error: "invalid" });
   });
 
   it("edits to description and notes persist, and the patch is an allowlist", async () => {

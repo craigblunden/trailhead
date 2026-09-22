@@ -7,6 +7,7 @@ import { Copy, RotateCcw, Sparkles, TriangleAlert } from "lucide-react";
 import { jobCache } from "@/components/job-cache";
 import { coverLetterClient } from "@/components/job/cover-letter-client";
 import { Button } from "@/components/ui/button";
+import { CharacterCount } from "@/components/ui/character-count";
 import { Excerpt } from "@/components/ui/excerpt";
 import {
   Dialog,
@@ -312,11 +313,7 @@ export function CoverLetterCard({ job, id }: { job: Job; id?: string }) {
                   placeholder="Shorter, and lead with the marketplace redesign."
                   className="mt-2 min-h-20 resize-y"
                 />
-                {feedback.length >= COUNT_FROM && (
-                  <p className="mt-1 text-xs text-muted-foreground tabular-nums" aria-live="polite">
-                    {feedback.length} of {FEEDBACK_MAX_CHARS}
-                  </p>
-                )}
+                <CharacterCount length={feedback.length} max={FEEDBACK_MAX_CHARS} from={COUNT_FROM} />
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-3">

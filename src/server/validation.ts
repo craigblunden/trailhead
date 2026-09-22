@@ -20,7 +20,7 @@ import {
   type KnownLength,
 } from "@/lib/interview";
 import { stripInvisible } from "@/lib/invisible";
-import { JOB_LIMITS, locationOrFallback, salaryFromText } from "@/lib/job-fields";
+import { JOB_LIMITS, capText, locationOrFallback, salaryFromText } from "@/lib/job-fields";
 import { STAGES } from "@/lib/jobs";
 
 /**
@@ -42,6 +42,19 @@ export const idSchema = z.string().trim().min(1).max(64);
 const SALARY_MAX = 100_000;
 
 const boundedText = (max: number) => z.string().trim().max(max, `Keep this under ${max} characters`);
+
+/**
+ * A long free-text body the user edits in place: trimmed, and cut to `max` with the excess stripped
+ * rather than refused (`capText`). Used by the job page's description and notes, whose boxes carry
+ * the same `max` as `maxLength` and count up to it — so the cut is unreachable from the app, and what
+ * a caller going around those boxes is owed is a bounded row rather than a message naming the bound.
+ *
+ * Adding a Job still refuses a description past the bound (`jobFields`), because there the user is
+ * filling a form that answers with inline errors, and a message beats losing the tail of a paste.
+ * The short fields refuse everywhere, for the same reason.
+ */
+const cappedText = (max: number) =>
+  z.string("This field must be text").transform((text) => capText(text, max));
 
 const requiredText = (max: number) =>
   boundedText(max).min(1, "This field is required");
@@ -136,8 +149,8 @@ export const jobPatchSchema = z.strictObject({
   role: jobFields.role.optional(),
   location: jobFields.location.optional(),
   postingUrl: jobFields.postingUrl.optional(),
-  description: boundedText(JOB_LIMITS.description).optional(),
-  notes: boundedText(JOB_LIMITS.notes).optional(),
+  description: cappedText(JOB_LIMITS.description).optional(),
+  notes: cappedText(JOB_LIMITS.notes).optional(),
   rejectionLetter: boundedText(JOB_LIMITS.rejectionLetter).optional(),
   salaryMin: salaryBound.optional(),
   salaryMax: salaryBound.optional(),

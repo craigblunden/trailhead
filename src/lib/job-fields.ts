@@ -5,7 +5,16 @@
  * nothing.
  */
 
-/** The longest each typed-in field may be. Validation refuses past these; the forms stop typing at them. */
+/**
+ * The longest each typed-in field may be. Validation holds every field to them, by one of two rules:
+ * the short ones refuse past the bound, because a name or a link that long is a mistake worth a
+ * message rather than text worth keeping most of; the long free-text bodies — the description and
+ * the notes — strip the excess instead, since a body that long is a paste to be kept, not a mistake.
+ *
+ * Stripping is for the two boxes on the job page that edit a body in place: they carry the bound as
+ * `maxLength` and count up to it, so what the server cuts is only ever what a caller going around
+ * them sent. Everywhere a field is refused instead, the form answers with the message.
+ */
 export const JOB_LIMITS = {
   company: 120,
   role: 120,
@@ -15,6 +24,24 @@ export const JOB_LIMITS = {
   notes: 20_000,
   rejectionLetter: 20_000,
 } as const;
+
+/**
+ * Text as the database will hold it: trimmed, and cut to `max` with the excess stripped rather than
+ * refused. The boxes stop typing at the same `max`, so this only ever bites on a caller going around
+ * them — for whom a silent cut is the right answer: an unbounded text column is what a bloated row
+ * is written through, and there is nothing here for an error message to tell them.
+ *
+ * Counted in the UTF-16 units the box's `maxLength` and its count both count, but never cut through
+ * the middle of a surrogate pair: half an emoji is not valid UTF-8, and Postgres refuses to store it.
+ */
+export function capText(value: string, max: number): string {
+  const trimmed = value.trim();
+  if (trimmed.length <= max) return trimmed;
+  const cut = trimmed.slice(0, max);
+  const last = cut.charCodeAt(max - 1);
+  const whole = last >= 0xd800 && last <= 0xdbff ? cut.slice(0, -1) : cut;
+  return whole.trimEnd();
+}
 
 export const LOCATION_FALLBACK = "Location TBD";
 

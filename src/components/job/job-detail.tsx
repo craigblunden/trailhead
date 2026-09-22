@@ -25,6 +25,7 @@ import { JobLoading } from "@/components/page-loading";
 import { PageMain } from "@/components/page-main";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CharacterCount } from "@/components/ui/character-count";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { JOB_LIMITS } from "@/lib/job-fields";
 import { STAGES, STAGE_META, webLink, type Job, type Stage } from "@/lib/jobs";
 
 /**
@@ -514,7 +516,12 @@ function JobDetailView({
                       aria-describedby="description-hint"
                       value={description.value}
                       onChange={(event) => description.set(event.target.value)}
+                      maxLength={JOB_LIMITS.description}
                       className="mt-3 min-h-56 resize-y"
+                    />
+                    <CharacterCount
+                      length={description.value.length}
+                      max={JOB_LIMITS.description}
                     />
                     <SaveRow
                       changed={description.changed}
@@ -570,8 +577,10 @@ function JobDetailView({
                   placeholder="Interview prep, follow-ups, anything worth remembering."
                   value={notes.value}
                   onChange={(event) => notes.set(event.target.value)}
+                  maxLength={JOB_LIMITS.notes}
                   className="mt-3 min-h-32 resize-y"
                 />
+                <CharacterCount length={notes.value.length} max={JOB_LIMITS.notes} />
                 <SaveRow changed={notes.changed} onSave={notes.save}>
                   Save notes
                 </SaveRow>
