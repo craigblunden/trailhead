@@ -7,7 +7,7 @@ See `spec.md` → The provider. **ADR-0007** → Consequences.
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] `README.md`: the stack line, the mermaid diagram (a TypeSafe node beside the Anthropic one), and
       the security-model sentence at line ~54 that presently describes one AI call. The env-var section

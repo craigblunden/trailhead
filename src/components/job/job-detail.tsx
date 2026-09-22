@@ -14,6 +14,7 @@ import { ApplicationKitCard } from "@/components/job/application-kit";
 import { ContactsCard } from "@/components/job/job-contacts";
 import { CoverLetterCard } from "@/components/job/cover-letter";
 import { DetailsCard } from "@/components/job/details-card";
+import { FootingCard } from "@/components/job/footing";
 import { EditJobDialog } from "@/components/job/edit-job-dialog";
 import {
   SummitHeaderFrame,
@@ -585,6 +586,7 @@ function JobDetailView({
                 <InterviewJumpCard job={job} />
                 <DetailsCard job={job} onChange={onPatch} />
                 <ApplicationKitCard job={job} />
+                <FootingCard job={job} />
               </div>
               <div className="min-w-0 space-y-6">
                 <ContactsCard job={job} />

@@ -81,6 +81,8 @@ const TENANT_TABLES = [
   "InterviewQuota",
   "PracticeRound",
   "PracticeQuestion",
+  "Footing",
+  "FootingDimension",
   "TermsAcceptance",
 ] as const;
 
@@ -131,6 +133,18 @@ async function seedTenant(userId: string) {
       data: {
         userId,
         questions: { create: { userId, category: "behavioural", order: 0, text: "Tell me about a mistake." } },
+      },
+    });
+    await tx.footing.create({
+      data: {
+        userId,
+        jobId: job.id,
+        resumeId: document.id,
+        coverLetterId: null,
+        resumeHash: "r",
+        descriptionHash: "d",
+        coverLetterHash: "",
+        dimensions: { create: { userId, dimension: "skills", score: 75, confidence: 0.8 } },
       },
     });
     await tx.termsAcceptance.create({ data: { userId, version: TERMS_VERSION } });

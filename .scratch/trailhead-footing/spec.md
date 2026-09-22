@@ -1,6 +1,6 @@
 # Footing: how securely a Tenant stands against one Job
 
-**Status:** not started
+**Status:** implemented
 
 Settled in a grilling session on 2026-09-22. The glossary gained **Footing** and **Footing dimension**,
 and **Stale** now covers both a Footing and an Analysis (`CONTEXT.md`). **ADR-0007** records why this

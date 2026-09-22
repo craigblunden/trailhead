@@ -7,7 +7,7 @@ See `spec.md` → The five dimensions, The levels, The provider.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] `npm install @typesafe-ai/sdk`. It is server-side, Node 20+.
 - [ ] `src/lib/footing.ts` exports the five `FOOTING_DIMENSIONS`, their labels and blurbs, the four

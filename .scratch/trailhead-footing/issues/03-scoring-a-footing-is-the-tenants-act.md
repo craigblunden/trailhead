@@ -7,7 +7,7 @@ See `spec.md` â†’ When it happens, Confidence, Plans and bounds. **ADR-0007** â†
 
 **Blocked by:** 01, 02
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] Refuse before spending anything when the Job has no resume in its Application kit or a
       description below the minimum length, reusing `readinessOf()` and `NOT_READY_LABEL` rather than

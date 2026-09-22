@@ -13,7 +13,8 @@ the real roles and policies, and the Playwright suite — all of it on every pus
 and why the integration tier exists at all, is under [Testing](#testing).
 
 Next.js 16 (App Router) · TypeScript · Tailwind CSS v4 · shadcn/ui (Radix) · TanStack Query ·
-Supabase (Postgres, Auth, Storage) · Prisma 7 · `@anthropic-ai/sdk` (`claude-sonnet-5`) · Vercel
+Supabase (Postgres, Auth, Storage) · Prisma 7 · `@anthropic-ai/sdk` (`claude-sonnet-5`) ·
+`@typesafe-ai/sdk` (`jev-latest`) · Vercel
 
 ## What it does
 
@@ -41,6 +42,13 @@ missed — drawn from the posting or the resume — plus two or three takeaways 
 Plans without the full simulator get an unscored **practice round** (four general questions, eight
 minutes), and every plan gets a one-question **tutorial** first.
 
+**Footing.** How securely the user stands against one job: the job's posting scored against its
+application kit across five dimensions — skills, experience, domain, proof of work, and the attached
+cover letter — each with its own band, and one overall band across the four that describe the user.
+Kept as history, so a rewritten resume can be scored against the same posting and compared. Run on
+the user's own request, never on a save, and shown only on the job page. It says where to look; it
+cannot say what to write, and does not pretend to (`docs/adr/0007-*`).
+
 **Plans and limits.** `free`, `basic`, `pro` set how many documents a tenant may hold and how many
 letters and interviews they may start per week. There is no billing integration — a plan is granted
 with `npm run db:plan`. Changing plan never deletes anything.
@@ -50,15 +58,17 @@ transaction. No grace period, nothing to restore.
 
 ## Architecture
 
-One Next.js application on Vercel, one Supabase project behind it, and outbound calls to the
-Anthropic API for letters, question sets, and scoring. Postgres row-level security enforces tenancy.
-File bytes go browser-direct to Storage, and nothing anywhere holds a key that bypasses either.
+One Next.js application on Vercel, one Supabase project behind it, and outbound calls to **two** AI
+providers: the Anthropic API for letters, question sets and interview scoring, and the TypeSafe API
+for a footing. Each receives extracted text only — never an uploaded file — and `/privacy` says which
+text goes to which company. Postgres row-level security enforces tenancy. File bytes go
+browser-direct to Storage, and nothing anywhere holds a key that bypasses either.
 
 ```mermaid
 flowchart LR
   browser(["Browser"])
   subgraph vercel["Vercel — Next.js"]
-    app["Server Components · Server Actions<br/>cover-letter + interview Route Handlers"]
+    app["Server Components · Server Actions<br/>cover-letter · interview · footing Route Handlers"]
     dal["Data access layer<br/>requireSession · withTenant"]
   end
   subgraph supabase["Supabase"]
@@ -68,6 +78,7 @@ flowchart LR
     cron["pg_cron janitor"]
   end
   anthropic["Anthropic API"]
+  typesafe["TypeSafe API"]
 
   browser --> app --> dal
   browser -->|"sign in"| auth
@@ -75,7 +86,8 @@ flowchart LR
   dal -->|"trailhead_app"| pg
   dal --> auth
   dal --> storage
-  app -->|"letters · questions · scoring"| anthropic
+  app -->|"posting · resume · letter · answers"| anthropic
+  app -->|"posting · resume · letter"| typesafe
   cron --> pg
 ```
 
@@ -87,7 +99,7 @@ cover-letter and Interview Simulator flows as sequence diagrams, and the data mo
 The rule is that Server Actions are the write path. Generation breaks it deliberately: Next dispatches
 a client's Server Actions one at a time, and a 10–25 second model call as an action would hold every
 other edit on the page behind it — and in the Simulator, would make a running countdown lie. Those
-four endpoints are Route Handlers that still go through the same session and tenant rules as any
+five endpoints are Route Handlers that still go through the same session and tenant rules as any
 action.
 
 ## Security model
@@ -115,13 +127,29 @@ The parts worth reading first, because they are what the rest of the code is arr
 - **User text reaching a model is material, never instructions.** One `fence()` helper strips
   invisible characters and wraps the text in a tag it cannot close; the system prompts say
   directions found inside are ignored. Feedback that carries directions is flagged, and a second
-  flag in a week places a hold on writing.
+  flag in a week places a hold on writing. A footing has a smaller surface again — the rubrics are
+  fixed by us, the state is pure data, and nothing is generated — so the worst a hostile posting can
+  do is nudge a level.
+- **Two AI providers, both named.** Anthropic gets cover letters, question sets and interview
+  answers; TypeSafe gets the posting, the resume and the attached letter for a footing. Both take
+  extracted text only, so an uploaded file never leaves the private bucket. Each key is read in one
+  module and nowhere else, and an e2e test fails if either key — or either variable's name — ever
+  reaches a client bundle. `/privacy` is the user-facing version of this paragraph, and
+  `docs/architecture.md` the developer-facing one; they must not disagree.
 - **Every input crossing the server boundary is validated** in one Zod module. Free text is bounded
   (an unbounded column is a DoS surface), and `javascript:`/`data:` URLs are rejected on write.
 - **Every model call is bounded by something.** Letters and interviews come out of a weekly quota
   reserved before the call and given back if it fails. Scoring an Attempt spends no quota — it is
   part of the Attempt already paid for — so it is capped per Attempt instead, because "spends no
-  quota" would otherwise mean "free to repeat for ever".
+  quota" would otherwise mean "free to repeat for ever". A footing is the one call bounded by
+  neither: it costs about two hundredths of a cent, so it is on every plan with no limit, behind a
+  per-tenant **daily ceiling** that is a circuit breaker rather than an entitlement — never shown,
+  never in the plan comparison, never an upsell (`docs/adr/0007-*`).
+- **Disclosure is a gate, not a checkbox.** Every session must accept the current terms before any
+  authenticated route renders, because an account can arrive through a social sign-in and never see
+  the sign-up form (`docs/adr/0008-*`). The record is a row under the tenant policy — not Supabase
+  `user_metadata`, which the subject can write — and the gate is also the backfill for accounts that
+  predate the terms.
 - **The middleware is not an authorization boundary.** `src/proxy.ts` makes optimistic redirects
   from the cookie alone. Delete it and nothing becomes reachable: pages call `requirePageSession()`
   and the data layer `requireSession()`, both of which verify the token with Auth.
@@ -148,6 +176,9 @@ http://127.0.0.1:54324, and Supabase Studio is at http://127.0.0.1:54323.
 
 - **Cover letters and the Interview Simulator need `ANTHROPIC_API_KEY`** in `.env.local`. Without
   one, both cards say the feature is unavailable and everything else works.
+- **Footing needs `TYPESAFE_API_KEY`**, the same way. Without one the card is absent rather than
+  broken, and everything else works. Make a key for this project alone, so it can be revoked on its
+  own.
 - **The Interview Simulator also needs a browser that transcribes speech** (Chrome, Edge, or Safari);
   answers are spoken, and no audio is ever recorded or uploaded — only the text.
 - **Google and GitHub sign-in** are off until a provider's credentials are set; see
@@ -193,7 +224,7 @@ over `DIRECT_URL`, so it works against the hosted project too.
 ```bash
 npm test                   # Vitest unit + component (jsdom). No database.
 npm run test:integration   # Vitest against the local stack: data layer, RLS policies, Storage, quotas
-npm run test:e2e           # Playwright: builds, serves on :3100, starts a fake Anthropic API, runs the specs
+npm run test:e2e           # Playwright: builds, serves on :3100, starts fake Anthropic and TypeSafe APIs, runs the specs
 npm run verify             # lint + typecheck + unit + integration + e2e — what CI runs on every push
 ```
 
@@ -313,10 +344,11 @@ the hosted probes that were run before account deletion went live. In outline:
    allow-list. Copy the **publishable** key, never the secret one.
 2. **Vercel** — import the repo (the build runs `prisma generate` first) and set `DATABASE_URL`,
    `DIRECT_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
-   `ANTHROPIC_API_KEY`, and optionally the Resend and social-provider values. **Never** set the
-   `TEST_*` variables: `TEST_POSTGRES_URL` is the local superuser.
-3. **Check it** — sign up and verify, upload and download a resume, write a letter, run an interview,
-   and sign in once with each social provider. That round trip is the one thing no local test reaches.
+   `ANTHROPIC_API_KEY`, `TYPESAFE_API_KEY`, and optionally the Resend and social-provider values.
+   **Never** set the `TEST_*` variables: `TEST_POSTGRES_URL` is the local superuser.
+3. **Check it** — sign up and verify, agree to the terms, upload and download a resume, write a
+   letter, run an interview, score a footing, and sign in once with each social provider. That round
+   trip is the one thing no local test reaches.
 
 After the first deploy: application schema changes ship as a Prisma migration run against the hosted
 `DIRECT_URL`; provisioning changes as a new file in `supabase/migrations/` and `npx supabase db push`.

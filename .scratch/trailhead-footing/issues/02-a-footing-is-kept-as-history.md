@@ -8,7 +8,7 @@ for history rather than replacement; **ADR-0004** for why erasure is a migration
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] `Footing`: `id`, `userId`, `jobId`, `scoredAt`, and the staleness stamp — `resumeId`,
       `coverLetterId`, and SHA-256 hashes of the resume text, the description and the letter text.

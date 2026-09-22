@@ -18,6 +18,8 @@ const TABLES = [
   "InterviewQuota",
   "PracticeRound",
   "PracticeQuestion",
+  "Footing",
+  "FootingDimension",
   "TermsAcceptance",
 ] as const;
 
@@ -67,6 +69,17 @@ async function seedEverything(tx: TenantClient, userId: string) {
       questions: { create: { userId, category: "personal", order: 0, text: "What drains you at work?" } },
     },
   });
+  await tx.footing.create({
+    data: {
+      userId,
+      jobId: job.id,
+      resumeId: document.id,
+      resumeHash: "r",
+      descriptionHash: "d",
+      coverLetterHash: "",
+      dimensions: { create: { userId, dimension: "skills", score: 75, confidence: 0.8 } },
+    },
+  });
   await tx.termsAcceptance.create({ data: { userId, version: "2026-09-22" } });
   return { job, contact, document };
 }
@@ -86,6 +99,8 @@ async function countAll(db: TenantClient | typeof prisma) {
     InterviewQuota: await db.interviewQuota.count(),
     PracticeRound: await db.practiceRound.count(),
     PracticeQuestion: await db.practiceQuestion.count(),
+    Footing: await db.footing.count(),
+    FootingDimension: await db.footingDimension.count(),
     TermsAcceptance: await db.termsAcceptance.count(),
   };
 }
@@ -165,6 +180,8 @@ describe("ticket 04: tenant isolation, proven", () => {
       InterviewQuota: 1,
       PracticeRound: 1,
       PracticeQuestion: 1,
+      Footing: 1,
+      FootingDimension: 1,
       TermsAcceptance: 1,
     });
 

@@ -107,6 +107,7 @@ model Job {
   contacts        JobContact[]
   activity        ActivityEntry[]
   attempts        Attempt[]
+  footings        Footing[]
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
@@ -230,8 +231,8 @@ model UserPlan {
 
 /// An Account's record of having agreed to one version of the terms (CONTEXT.md; ADR-0008).
 /// Append-only: a new version is a new row, never an edit to the old one, so the history says who
-/// accepted what and when. `acceptedAt` is the only timestamp: an `updatedAt` would imply a row that
-/// can be updated, and nothing updates one.
+/// accepted what and when. `acceptedAt` is the only timestamp for the same reason a Footing has only
+/// `scoredAt`: an `updatedAt` would imply a row that can be updated, and nothing updates one.
 ///
 /// Deliberately NOT Supabase `user_metadata`. That is writable by the user it belongs to, so it
 /// cannot hold a record ABOUT that same user — do not "simplify" this table away into it.
@@ -242,6 +243,71 @@ model TermsAcceptance {
   acceptedAt DateTime @default(now())
 
   @@id([userId, version])
+}
+
+/// The five things a Footing scores. Members match `FOOTING_DIMENSIONS` in `src/lib/footing.ts`;
+/// `enum-assertions.ts` fails the typecheck if they drift.
+///
+/// Named `Dimension` rather than `FootingDimension` only because the table below already has that
+/// name, which is the glossary's term for one scored dimension of one Footing. The enum says which
+/// dimension; the table says how that dimension scored.
+enum Dimension {
+  skills
+  experience
+  domain
+  proof_of_work
+  letter
+}
+
+/// A **Footing** (CONTEXT.md; ADR-0007): the kept result of scoring one Job's posting against its
+/// Application kit. **Append-only** — scoring inserts, and nothing ever updates or deletes one. The
+/// newest row for a Job is "the Footing"; the rest are its history, which is what makes "is my
+/// rewritten resume actually doing better here" answerable at all.
+///
+/// **The overall is not a column.** It is computed from the four weighted dimensions at read time, so
+/// changing the weights re-reads history correctly instead of leaving a number no formula explains.
+///
+/// No `createdAt`/`updatedAt`, unlike most tables here, and deliberately: `scoredAt` is when this row
+/// came to exist, and an `updatedAt` would imply a row that can be updated. Nothing updates one.
+///
+/// The staleness stamp is hashes rather than copies — `Document.text` already "doubles as the content
+/// hash for later comparison" — and `resumeId`/`coverLetterId` are plain columns with **no relation**
+/// on purpose: a Footing whose Document was later deleted is kept and reads permanently stale, so the
+/// stamp has to outlive the Document rather than cascade away with it.
+model Footing {
+  id              String             @id @default(cuid(2))
+  userId          String             @db.Uuid
+  jobId           String
+  job             Job                @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  scoredAt        DateTime           @default(now())
+  /// The Documents that were in the Application kit when this ran. Not foreign keys — see above.
+  resumeId        String?
+  coverLetterId   String?
+  /// SHA-256 of each text as it stood. Empty string where there was nothing to hash.
+  resumeHash      String
+  descriptionHash String
+  coverLetterHash String
+  dimensions      FootingDimension[]
+
+  /// The job page asks for this Job's Footings, newest first.
+  @@index([userId, jobId, scoredAt(sort: Desc)])
+}
+
+/// One **Footing dimension** of one Footing: where it landed, and how sure the provider was.
+/// One row per dimension per Footing, so a dimension is a column a later cross-Job pass can query
+/// (ADR-0007) rather than a field inside a JSON blob.
+model FootingDimension {
+  footingId  String
+  userId     String    @db.Uuid
+  footing    Footing   @relation(fields: [footingId], references: [id], onDelete: Cascade)
+  dimension  Dimension
+  /// 0–100, already normalised from the rubric's levels. Shown as a band, never as a number.
+  score      Int
+  /// The provider's own confidence in that position, 0–1.
+  confidence Float
+
+  @@id([footingId, dimension])
+  @@index([userId])
 }
 
 /// The five fixed dimensions an Attempt's questions are drawn from. Members match `CATEGORIES` in

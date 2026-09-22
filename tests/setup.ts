@@ -18,6 +18,18 @@ vi.mock("@/components/job/cover-letter-client", () => ({
   },
 }));
 
+/*
+ * The same for the Footing card and the Letter dimension beside the attached letter: every job page
+ * renders against a Tenant who has never scored this Job, so the card shows its invitation and
+ * nothing asks a server. tests/components/footing.test.tsx replaces this with its own fake.
+ */
+vi.mock("@/components/job/footing-client", () => ({
+  footingClient: {
+    panel: async () => ({ available: true, newest: null, earlier: [] }),
+    score: async () => ({ ok: false, error: "unavailable", message: "Not in component tests." }),
+  },
+}));
+
 afterEach(() => {
   cleanup();
 });

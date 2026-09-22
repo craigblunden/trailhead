@@ -7,7 +7,7 @@ See `spec.md` → How it is shown, Confidence.
 
 **Blocked by:** 03
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] Beside the Application kit: the overall band word, then the four dimensions each with their own
       band. The Letter dimension sits beside the letter instead, not with the four.

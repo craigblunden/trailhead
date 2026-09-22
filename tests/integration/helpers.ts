@@ -12,6 +12,8 @@ const APPLICATION_TABLES = [
   "Attempt",
   "PracticeQuestion",
   "PracticeRound",
+  "FootingDimension",
+  "Footing",
   "Job",
   "Contact",
   "Document",

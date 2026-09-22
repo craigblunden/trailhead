@@ -6,7 +6,7 @@ See `spec.md` → How it is shown. **ADR-0007** → "History, not replacement".
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] When a Job has more than one Footing, the newest carries a line comparing its overall band to the
       previous one — *"Stronger than your last resume on this one"*, or steadier wording when the band

@@ -4,6 +4,8 @@ import type {
   AttemptQuestion as AttemptQuestionRow,
   Contact as ContactRow,
   Document as DocumentRow,
+  Footing as FootingModel,
+  FootingDimension as FootingDimensionRow,
   Job as JobModel,
   JobContact as JobContactRow,
   PracticeQuestion as PracticeQuestionRow,
@@ -12,6 +14,7 @@ import type {
 import type { ContactDetail, ContactListItem } from "@/lib/contacts";
 import { isoDate } from "@/lib/dates";
 import type { DocumentSummary } from "@/lib/documents";
+import { FOOTING_DIMENSIONS, type Footing, type FootingChange, type FootingStamp } from "@/lib/footing";
 import { ATTEMPT_LENGTHS, isKnownLength, type Attempt, type TakeawayPoint } from "@/lib/interview";
 import { STAGES, type ActivityEntry, type Contact, type Job } from "@/lib/jobs";
 import { PRACTICE_MIX, PRACTICE_SECONDS, type PracticeCategory, type PracticeRound } from "@/lib/practice";
@@ -303,5 +306,46 @@ export function toPracticeRoundDto(row: PracticeRoundRow): PracticeRound {
         text: question.text,
         ...(question.answeredAt ? { answer: { transcript: question.transcript } } : {}),
       })),
+  };
+}
+
+/** A Footing row with its scored dimensions — what a Footing DTO is built from. */
+export type FootingRow = FootingModel & { dimensions: FootingDimensionRow[] };
+
+/**
+ * What a Footing saw when it ran (footing ticket 02): which Documents were attached, and the three
+ * texts as hashes. Read back out of the row so `changedSince()` can compare it against the Job as it
+ * stands, without the hashes ever crossing the boundary to the browser — a Footing's DTO carries
+ * what changed, not the fingerprints it changed from.
+ */
+export function toFootingStamp(row: Pick<FootingRow, "resumeId" | "coverLetterId" | "resumeHash" | "descriptionHash" | "coverLetterHash">): FootingStamp {
+  return {
+    resumeId: row.resumeId,
+    coverLetterId: row.coverLetterId,
+    resumeHash: row.resumeHash,
+    descriptionHash: row.descriptionHash,
+    coverLetterHash: row.coverLetterHash,
+  };
+}
+
+/**
+ * A Footing as the job page holds it. The dimensions are ordered by `FOOTING_DIMENSIONS` rather than
+ * by whatever order the rows came back in, so the breakdown never reshuffles between reads.
+ *
+ * `changed` is worked out by the caller against the Job as it stands now; a Footing with nothing
+ * changed is current. No overall is carried: it is derived from these four at read time, so tuning
+ * the weights re-reads history correctly (**ADR-0007**).
+ */
+export function toFootingDto(row: FootingRow, changed: FootingChange[]): Footing {
+  const byDimension = new Map(row.dimensions.map((scored) => [scored.dimension, scored]));
+  return {
+    id: row.id,
+    jobId: row.jobId,
+    scoredAt: row.scoredAt.toISOString(),
+    changed,
+    dimensions: FOOTING_DIMENSIONS.flatMap((dimension) => {
+      const scored = byDimension.get(dimension);
+      return scored ? [{ dimension, score: scored.score, confidence: scored.confidence }] : [];
+    }),
   };
 }
