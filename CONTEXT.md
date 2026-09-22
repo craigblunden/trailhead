@@ -81,6 +81,23 @@ The stored result of comparing one Document against one Job's Requirements. Pers
 with what it saw, so it can go **stale** when either side changes.
 _Avoid_: Report, Review, Scan
 
+**Footing**:
+How securely the Tenant stands against one Job: the kept result of scoring that Job's posting against
+its Application kit. Five Footing dimensions, each with its own band, and one overall band across the
+four that describe the Tenant. Deliberately **not** an Analysis — it finds no Gaps, cites nothing, and
+cannot say why (ADR-0007). It says where to look, and the dimension reading lowest is what to look
+at. Scored on the Tenant's act, never on change alone, and it goes **stale** exactly as an Analysis
+does.
+_Avoid_: Fit, Match (which belongs to Requirements and Evidence), Score (alone), Rating, Analysis
+
+**Footing dimension**:
+One of the five things a Footing scores — skills, experience, domain, proof of work, and the letter.
+Each is scored against its own ordered descriptions and shown with its own band, because "how strong a
+candidate is this" is a judgement no single question can carry honestly. The letter's dimension is
+shown beside the letter and is never part of the overall: a letter can be rewritten in a minute, and a
+history cannot.
+_Avoid_: Category (which belongs to the Interview Simulator), Criterion, Axis, Factor
+
 **Portfolio review**:
 The aggregate pass across every active Job at once, which is where recurring Gaps become visible
 ("most of these roles want proof of work"). Distinct from an Analysis, which sees exactly one Job.
@@ -92,8 +109,8 @@ often"). Reads Application kits and Stages, never job descriptions — so it fin
 _Avoid_: Insights, Analytics, Report
 
 **Stale**:
-Said of an Analysis whose Document or job description has changed since it ran. A stale Analysis is
-still shown, and never silently recomputed — re-running is always the user's act.
+Said of an Analysis or a Footing whose Document or job description has changed since it ran. A stale
+one is still shown, and never silently recomputed — running it again is always the user's act.
 
 ### Writing letters
 
@@ -213,6 +230,14 @@ a different idea)
 The user's login — an email and password, or a social sign-in — and the one thing a Tenant belongs
 to. The Account is who signs in; the Tenant is what they own.
 _Avoid_: Profile, User (as an entity), Tenant (as a synonym)
+
+**Terms acceptance**:
+An Account's record of having agreed to one version of the terms: which version, and when. Taken after
+signing in rather than on the sign-up form, because an Account may arrive through a social sign-in and
+never see that form (ADR-0008). Kept as history — a new version is a new acceptance, never an edit to
+the old one. Erased with the Tenant.
+_Avoid_: Consent (which implies something withdrawable while the Account remains), Agreement, TOS,
+Opt-in
 
 **Account deletion**:
 Ending an Account and erasing its Tenant with it, at once and for good: every Job, Contact,
