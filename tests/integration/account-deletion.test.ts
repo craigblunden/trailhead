@@ -442,6 +442,8 @@ describe("account issue 04: deleting an Account in the data layer", () => {
       email: alex.email,
       providers: ["email"],
       plan: "basic",
+      // Nothing asked for: the summary carries the Upgrade request only while one is outstanding.
+      upgradeRequest: null,
       jobs: 1,
       documents: 2,
       contacts: 1,

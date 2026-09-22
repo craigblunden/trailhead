@@ -4,14 +4,15 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
 
+import { ActionError } from "@/components/action-client";
 import { AccountView } from "@/components/account/account-view";
 import { PlanComparison } from "@/components/account/plan-comparison";
 import type { AccountSummary } from "@/lib/account";
 import type { QuotaStatus } from "@/lib/generation";
 import type { InterviewQuotaStatus } from "@/lib/interview";
-import { PLANS, PLAN_LIMITS, type Plan } from "@/lib/plans";
+import { ALREADY_REQUESTED, PLANS, PLAN_LIMITS, type Plan } from "@/lib/plans";
 import { createTrail } from "../fakes/trail";
-import { render, renderWithJobs, screen, waitFor, within } from "../test-utils";
+import { renderWithJobs, screen, waitFor, within } from "../test-utils";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn() }),
@@ -23,6 +24,7 @@ const account = vi.hoisted(() => ({
   summary: vi.fn(),
   letters: vi.fn(),
   interviews: vi.fn(),
+  requestUpgrade: vi.fn(),
   remove: vi.fn(),
 }));
 
@@ -35,6 +37,7 @@ const SUMMARY: AccountSummary = {
   email: "sam.rivera@example.com",
   providers: ["email", "google"],
   plan: "free",
+  upgradeRequest: null,
   jobs: 12,
   documents: 2,
   contacts: 8,
@@ -66,13 +69,17 @@ beforeEach(() => {
   // Cleared, not just re-stubbed: PAGE-10 holds that a locked Plan never reads the count.
   account.interviews.mockClear().mockResolvedValue(interviews());
   account.remove.mockReset();
+  account.requestUpgrade.mockReset().mockResolvedValue({ plan: "basic", requestedAt: new Date("2026-09-22") });
 });
+
+/** The summary as it reads for a Tenant on `plan`, with no Upgrade request outstanding. */
+const on = (plan: Plan): AccountSummary => ({ ...SUMMARY, plan });
 
 describe("the Plans coming-soon section (account issue 05)", () => {
   const column = (plan: Plan) => screen.getByRole("listitem", { name: PLAN_NAMES[plan] });
 
   it("PAGE-1: each Plan shows its Limits from PLAN_LIMITS, and an unlimited one reads Unlimited", () => {
-    render(<PlanComparison current="free" />);
+    renderWithJobs(<PlanComparison summary={on("free")} />);
 
     for (const plan of PLANS) {
       const { documents, lettersPerWeek } = PLAN_LIMITS[plan];
@@ -90,18 +97,28 @@ describe("the Plans coming-soon section (account issue 05)", () => {
   });
 
   it("PAGE-2: only the current Plan is marked", () => {
-    render(<PlanComparison current="basic" />);
+    renderWithJobs(<PlanComparison summary={on("basic")} />);
 
     expect(within(column("basic")).getByText("Your plan")).toBeInTheDocument();
     expect(within(column("free")).queryByText("Your plan")).toBeNull();
     expect(within(column("pro")).queryByText("Your plan")).toBeNull();
   });
 
-  it("PAGE-3: says paying is coming soon, and nothing in it can be focused", () => {
-    const { container } = render(<PlanComparison current="free" />);
+  it("PAGE-3: says paying is coming soon and asking is the way, and the ask is the only control", () => {
+    // Was "nothing in it can be focused". Upgrade requests (ADR-0009) give the section exactly one
+    // control — the ask — and still no price, no link and no checkout.
+    const { container } = renderWithJobs(<PlanComparison summary={on("free")} />);
 
-    expect(screen.getByText("Paying for a plan is coming soon.")).toBeInTheDocument();
-    expect(container.querySelectorAll("a, button, input, select, textarea, [tabindex]")).toHaveLength(0);
+    expect(
+      screen.getByText("Paying for a plan is coming soon — until then, ask and I’ll move you across by hand."),
+    ).toBeInTheDocument();
+    expect(container.querySelectorAll("a, input, select, textarea, [tabindex]")).toHaveLength(0);
+    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual(["Ask to upgrade to Basic"]);
+  });
+
+  it("PAGE-3b: on the top Plan the section offers nothing to ask for", () => {
+    renderWithJobs(<PlanComparison summary={on("pro")} />);
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("PAGE-4: no Limit is written into the component: every number comes from PLAN_LIMITS", () => {
@@ -292,5 +309,69 @@ describe("the Delete account dialog (account issue 06)", () => {
   it("DLG-7: the open dialog has no axe violations", async () => {
     const { dialog } = await openDialog({ plan: "pro" });
     expect(await axe(dialog, AXE_OPTIONS)).toHaveNoViolations();
+  });
+});
+
+describe("asking to upgrade (upgrade-requests ticket 04, ADR-0009)", () => {
+  const ask = (section: HTMLElement) => within(section).getByRole("button", { name: /^(Ask to upgrade|Upgrade requested)/ });
+
+  it("REQ-14: a free Tenant is offered basic, in Your plan and again beside the plans", async () => {
+    renderWithJobs(<AccountView />);
+
+    const plan = await screen.findByRole("region", { name: "Your plan" });
+    const plans = await screen.findByRole("region", { name: "Plans — coming soon" });
+    expect(ask(plan)).toHaveTextContent("Ask to upgrade to Basic");
+    expect(ask(plans)).toHaveTextContent("Ask to upgrade to Basic");
+  });
+
+  it("REQ-15: a basic Tenant is offered pro", async () => {
+    account.summary.mockResolvedValue({ ...SUMMARY, plan: "basic" });
+    renderWithJobs(<AccountView />, { trail: createTrail({ plan: "basic" }) });
+
+    const plan = await screen.findByRole("region", { name: "Your plan" });
+    expect(ask(plan)).toHaveTextContent("Ask to upgrade to Pro");
+  });
+
+  it("REQ-16: a pro Tenant is offered nothing — there is nothing above it", async () => {
+    account.summary.mockResolvedValue({ ...SUMMARY, plan: "pro" });
+    renderWithJobs(<AccountView />, { trail: createTrail({ plan: "pro" }) });
+
+    const plan = await screen.findByRole("region", { name: "Your plan" });
+    expect(within(plan).queryByRole("button", { name: /upgrade/i })).toBeNull();
+  });
+
+  it("REQ-17: with a request outstanding the button is disabled and says so, before anything is clicked", async () => {
+    account.summary.mockResolvedValue({
+      ...SUMMARY,
+      upgradeRequest: { plan: "basic", requestedAt: new Date("2026-09-20") },
+    });
+    renderWithJobs(<AccountView />);
+
+    const plan = await screen.findByRole("region", { name: "Your plan" });
+    expect(ask(plan)).toBeDisabled();
+    expect(ask(plan)).toHaveTextContent("Upgrade requested — I’ll be in touch");
+    expect(account.requestUpgrade).not.toHaveBeenCalled();
+  });
+
+  it("REQ-18: asking sends nothing to the server and leaves the button disabled", async () => {
+    const rendered = renderWithJobs(<AccountView />);
+    const plan = await screen.findByRole("region", { name: "Your plan" });
+
+    await rendered.user.click(ask(plan));
+
+    // The client names no Plan: the server reads the Tenant's own and derives the next one up.
+    expect(account.requestUpgrade).toHaveBeenCalledWith();
+    await waitFor(() => expect(ask(plan)).toBeDisabled());
+    expect(ask(plan)).toHaveTextContent("Upgrade requested — I’ll be in touch");
+  });
+
+  it("REQ-19: a refusal is shown in the rule's own words rather than swallowed", async () => {
+    account.requestUpgrade.mockRejectedValue(new ActionError("rejected", ALREADY_REQUESTED, {}, "already-requested"));
+    const rendered = renderWithJobs(<AccountView />);
+    const plan = await screen.findByRole("region", { name: "Your plan" });
+
+    await rendered.user.click(ask(plan));
+
+    expect(await within(plan).findByRole("alert")).toHaveTextContent(ALREADY_REQUESTED);
   });
 });

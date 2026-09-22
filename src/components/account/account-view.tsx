@@ -6,6 +6,7 @@ import { useId } from "react";
 import { accountClient } from "@/components/account/account-actions-client";
 import { DeleteAccount } from "@/components/account/delete-account";
 import { PlanComparison } from "@/components/account/plan-comparison";
+import { RequestUpgrade } from "@/components/account/request-upgrade";
 import { AppHeader } from "@/components/app-header";
 import { BrandLogo } from "@/components/brand-logo";
 import { useLimits } from "@/components/documents/documents-provider";
@@ -114,11 +115,14 @@ export function AccountView() {
                   </>
                 )}
               </dl>
+
+              {/* Asking is the only way onto a Plan today, so the ask sits with the Plan it is about. */}
+              <RequestUpgrade summary={account} className="mt-4" />
             </Section>
 
             {/* Linked to from elsewhere — a Practice round's end — so it has an address of its own. */}
             <Section title="Plans — coming soon" id="plans">
-              <PlanComparison current={account.plan} />
+              <PlanComparison summary={account} />
             </Section>
 
             <Section title="Delete account" className="mt-10 ring-destructive/30">

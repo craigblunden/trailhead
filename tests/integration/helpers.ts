@@ -20,6 +20,7 @@ const APPLICATION_TABLES = [
   "GenerationQuota",
   "InterviewQuota",
   "TermsAcceptance",
+  "UpgradeRequest",
   "UserPlan",
 ] as const;
 

@@ -113,6 +113,7 @@ Text the user enters is sent to two AI companies, and to nobody else, to do the 
 ## Optional
 
 - Account page: who the user is signed in as, their plan, and deleting the account for good. Each plan sets how many Documents can be held, how many cover letters can be written a week, and how many Interview Simulator interviews can be started a week.
+- Asking for a higher plan: there is nothing to buy. A button on the account page asks to be moved to the next plan up, which emails the person who runs Trailhead; they move the account across by hand. While a request is outstanding the button says so and cannot be pressed again, and an unanswered request expires after two weeks so it can be asked again.
 `;
 
 export function GET() {

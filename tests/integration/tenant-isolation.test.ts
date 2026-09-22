@@ -21,6 +21,7 @@ const TABLES = [
   "Footing",
   "FootingDimension",
   "TermsAcceptance",
+  "UpgradeRequest",
 ] as const;
 
 /** Seeds one row in every application table for `userId`, returning the ids. */
@@ -81,6 +82,7 @@ async function seedEverything(tx: TenantClient, userId: string) {
     },
   });
   await tx.termsAcceptance.create({ data: { userId, version: "2026-09-22" } });
+  await tx.upgradeRequest.create({ data: { userId, plan: "basic" } });
   return { job, contact, document };
 }
 
@@ -102,6 +104,7 @@ async function countAll(db: TenantClient | typeof prisma) {
     Footing: await db.footing.count(),
     FootingDimension: await db.footingDimension.count(),
     TermsAcceptance: await db.termsAcceptance.count(),
+    UpgradeRequest: await db.upgradeRequest.count(),
   };
 }
 
@@ -133,8 +136,7 @@ describe("ticket 04: tenant isolation, proven", () => {
       from pg_policies where schemaname = 'public' order by tablename, cmd
     `;
     // UserPlan is the one table the app role may only read (ADR-0001): a SELECT policy for it, and
-    // a policy naming the migrator, which sets Plans. Every other table has one policy over
-    // read and write.
+    // a policy naming the migrator, which sets Plans.
     const userPlan = policies.filter((p) => p.tablename === "UserPlan");
     expect(userPlan.map(({ cmd, roles }) => ({ cmd, roles }))).toEqual([
       { cmd: "ALL", roles: ["trailhead_migrator"] },
@@ -142,8 +144,21 @@ describe("ticket 04: tenant isolation, proven", () => {
     ]);
     expect(userPlan.find((p) => p.cmd === "SELECT")?.qual).toContain("tenant_id()");
 
-    const rest = policies.filter((p) => p.tablename !== "UserPlan");
-    expect(rest.map((p) => p.tablename).sort()).toEqual(TABLES.filter((t) => t !== "UserPlan").sort());
+    // UpgradeRequest is the other table the operator's own role touches (ADR-0009): the tenant's
+    // policy, plus one naming the migrator — forced RLS binds the owner, so without it the operator
+    // could not read the requests they are emailed about. The app role's write side is still fenced
+    // by its grants, which hold no UPDATE or DELETE.
+    const upgradeRequest = policies.filter((p) => p.tablename === "UpgradeRequest");
+    expect(upgradeRequest.map(({ cmd, roles }) => ({ cmd, roles: roles.join() })).sort((a, b) => a.roles.localeCompare(b.roles))).toEqual([
+      { cmd: "ALL", roles: "trailhead_app" },
+      { cmd: "ALL", roles: "trailhead_migrator" },
+    ]);
+    expect(upgradeRequest.find((p) => p.roles.includes("trailhead_app"))?.qual).toContain("tenant_id()");
+
+    // Every other table has one policy over read and write.
+    const operatorTables = ["UserPlan", "UpgradeRequest"];
+    const rest = policies.filter((p) => !operatorTables.includes(p.tablename));
+    expect(rest.map((p) => p.tablename).sort()).toEqual(TABLES.filter((t) => !operatorTables.includes(t)).sort());
     for (const policy of rest) {
       expect(policy.cmd).toBe("ALL");
       expect(policy.roles).toEqual(["trailhead_app"]);
@@ -183,6 +198,7 @@ describe("ticket 04: tenant isolation, proven", () => {
       Footing: 1,
       FootingDimension: 1,
       TermsAcceptance: 1,
+      UpgradeRequest: 1,
     });
 
     const asB = await withTenant(userB, (tx) => countAll(tx));

@@ -2,7 +2,7 @@ import { formatResetDay } from "@/lib/dates";
 import type { QuotaStatus } from "@/lib/generation";
 import type { AttemptLength, InterviewQuotaStatus } from "@/lib/interview";
 import { pluralize } from "@/lib/jobs";
-import type { Limit, Plan } from "@/lib/plans";
+import type { Limit, Plan, UpgradeRequest } from "@/lib/plans";
 
 /**
  * The account page and Account deletion (CONTEXT.md), the parts both sides of the boundary share.
@@ -16,6 +16,8 @@ export type AccountSummary = {
   /** Auth's provider ids for every way the Account signs in: `email`, `google`, `github`. */
   providers: string[];
   plan: Plan;
+  /** The Tenant's Upgrade request while one is outstanding, already filtered for lapse server-side. */
+  upgradeRequest: UpgradeRequest | null;
   jobs: number;
   /** Held, as the Documents Limit counts them. */
   documents: number;

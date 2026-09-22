@@ -2,6 +2,7 @@ import { join } from "node:path";
 
 import pg from "pg";
 
+import { withMigrator, type SqlClient } from "../scripts/plan/set-plan";
 import { expectNoAxeViolations } from "./checks";
 import { SIGNED_OUT, createJob, expect, signUpAndVerify, test } from "./fixtures";
 
@@ -105,5 +106,63 @@ test.describe("account issue 07: Account deletion, end to end", () => {
       objects: 0,
       users: 0,
     });
+  });
+});
+
+test.describe("upgrade-requests ticket 04: asking to be moved up a Plan", () => {
+  const MIGRATOR_URL =
+    process.env.DIRECT_URL ?? "postgresql://trailhead_migrator:trailhead_migrator@127.0.0.1:54322/postgres";
+
+  /**
+   * Seeds and clears requests as `trailhead_migrator`, which owns the tables — not as `postgres`,
+   * which holds only the SELECT and DELETE that `erase_my_account` needs (ADR-0004). A test that
+   * wants an outstanding request goes the same way the operator would.
+   */
+  const asMigrator = <T,>(run: (client: SqlClient) => Promise<T>) => withMigrator(MIGRATOR_URL, run);
+
+  /** The user id behind the worker's account, for the row an outstanding request needs. */
+  const idOf = (email: string) =>
+    asPostgres(
+      async (client) =>
+        (await client.query<{ id: string }>("select id from auth.users where email = $1", [email])).rows[0].id,
+    );
+
+  test.afterEach(async ({ account }) => {
+    const userId = await idOf(account.email);
+    await asMigrator((client) => client.query('delete from public."UpgradeRequest" where "userId" = $1', [userId]));
+  });
+
+  test("a free Tenant is offered basic, in Your plan and beside the plans", async ({ page }) => {
+    await page.goto("/account");
+    const plan = page.getByRole("region", { name: "Your plan" });
+    const plans = page.getByRole("region", { name: "Plans — coming soon" });
+
+    // Enabled, and naming the next Plan up rather than the top one.
+    await expect(plan.getByRole("button", { name: "Ask to upgrade to Basic" })).toBeEnabled();
+    await expect(plans.getByRole("button", { name: "Ask to upgrade to Basic" })).toBeEnabled();
+    await expect(plans.getByText("ask and I’ll move you across by hand")).toBeVisible();
+    await expectNoAxeViolations(page);
+  });
+
+  test("with a request outstanding the button is disabled, in both places, without clicking anything", async ({
+    page,
+    account,
+  }) => {
+    // Seeded rather than clicked: pressing the button would send real mail through Resend, which the
+    // e2e stack has no configuration for. What is under test here is the state, not the send.
+    const userId = await idOf(account.email);
+    await asMigrator((client) =>
+      client.query('insert into public."UpgradeRequest" ("id", "userId", "plan") values ($1, $2, $3::"Plan")', [
+        `e2e-${Date.now()}`,
+        userId,
+        "basic",
+      ]),
+    );
+
+    await page.goto("/account");
+    const asked = page.getByRole("button", { name: "Upgrade requested — I’ll be in touch" });
+    await expect(asked.first()).toBeDisabled();
+    await expect(asked).toHaveCount(2);
+    await expectNoAxeViolations(page);
   });
 });
