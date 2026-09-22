@@ -1,6 +1,6 @@
 # Terms and privacy: saying what goes to which AI provider, and recording that it was agreed to
 
-**Status:** not started
+**Status:** implemented
 
 Settled in a grilling session on 2026-09-22. The glossary gained **Terms acceptance** (`CONTEXT.md`).
 **ADR-0008** records why acceptance is taken after signing in rather than on the sign-up form.

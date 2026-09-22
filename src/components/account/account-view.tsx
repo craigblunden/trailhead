@@ -11,6 +11,7 @@ import { BrandLogo } from "@/components/brand-logo";
 import { useLimits } from "@/components/documents/documents-provider";
 import { LoadingTrail } from "@/components/loading-trail";
 import { PageMain } from "@/components/page-main";
+import { LegalLinks } from "@/components/site-footer";
 import { PlanMark } from "@/components/plan-mark";
 import { Button } from "@/components/ui/button";
 import {
@@ -127,6 +128,9 @@ export function AccountView() {
               </p>
               <DeleteAccount summary={account} />
             </Section>
+
+            {/* What you agreed to when you signed in, readable again without leaving the app. */}
+            <LegalLinks className="mt-2 justify-start" />
           </div>
         )}
       </PageMain>

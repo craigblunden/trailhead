@@ -6,7 +6,7 @@ See `spec.md` → Where acceptance is taken. **ADR-0008**.
 
 **Blocked by:** 01, 02, 03
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] On the `(app)` layout's path: a session with no acceptance of `TERMS_VERSION` reaches the
       acceptance step and nothing else. One place, not a check each route remembers.

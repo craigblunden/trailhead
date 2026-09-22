@@ -32,7 +32,24 @@ export async function signUpAndVerify(page: Page, account: Account = newAccount(
 
   await page.goto(link!);
   await expect(page).toHaveURL(/\/board$/);
+  await acceptTerms(page);
   return account;
+}
+
+/**
+ * The terms gate (terms ticket 04) stands between a new session and the rest of the app, whichever
+ * way the Account signed in. Every account these tests create meets it once; accepting here is what
+ * every other journey in the suite assumes has already happened.
+ *
+ * Tolerant on purpose: an Account that has already accepted never sees it, and a helper that failed
+ * in that case would be a helper every sign-in had to think about.
+ */
+export async function acceptTerms(page: Page) {
+  const heading = page.getByRole("heading", { level: 1, name: "Before you carry on" });
+  if (!(await heading.isVisible().catch(() => false))) return;
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Agree and continue" }).click();
+  await expect(heading).toBeHidden();
 }
 
 export async function signIn(page: Page, account: Account) {
@@ -41,6 +58,7 @@ export async function signIn(page: Page, account: Account) {
   await page.getByLabel("Password").fill(account.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/board$/);
+  await acceptTerms(page);
 }
 
 export async function signOut(page: Page) {

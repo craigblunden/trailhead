@@ -18,6 +18,7 @@ const TABLES = [
   "InterviewQuota",
   "PracticeRound",
   "PracticeQuestion",
+  "TermsAcceptance",
 ] as const;
 
 /** Seeds one row in every application table for `userId`, returning the ids. */
@@ -66,6 +67,7 @@ async function seedEverything(tx: TenantClient, userId: string) {
       questions: { create: { userId, category: "personal", order: 0, text: "What drains you at work?" } },
     },
   });
+  await tx.termsAcceptance.create({ data: { userId, version: "2026-09-22" } });
   return { job, contact, document };
 }
 
@@ -84,6 +86,7 @@ async function countAll(db: TenantClient | typeof prisma) {
     InterviewQuota: await db.interviewQuota.count(),
     PracticeRound: await db.practiceRound.count(),
     PracticeQuestion: await db.practiceQuestion.count(),
+    TermsAcceptance: await db.termsAcceptance.count(),
   };
 }
 
@@ -162,6 +165,7 @@ describe("ticket 04: tenant isolation, proven", () => {
       InterviewQuota: 1,
       PracticeRound: 1,
       PracticeQuestion: 1,
+      TermsAcceptance: 1,
     });
 
     const asB = await withTenant(userB, (tx) => countAll(tx));

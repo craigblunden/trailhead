@@ -57,13 +57,13 @@ test.describe("signed in", () => {
     await expect(page.getByRole("navigation", { name: "Primary" })).toBeHidden();
     await expect(page.getByRole("button", { name: /Account menu/ })).toBeHidden();
 
-    await page.getByRole("button", { name: "Menu" }).click();
+    await page.getByRole("button", { name: "Menu", exact: true }).click();
     await page.getByRole("dialog", { name: "Menu" }).getByRole("link", { name: "Contacts" }).click();
     await expect(page).toHaveURL(/\/contacts$/);
     await expect(page.getByRole("dialog", { name: "Menu" })).toBeHidden();
 
     await page.setViewportSize({ width: 1024, height: 900 });
-    await expect(page.getByRole("button", { name: "Menu" })).toBeHidden();
+    await expect(page.getByRole("button", { name: "Menu", exact: true })).toBeHidden();
     await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
   });
 

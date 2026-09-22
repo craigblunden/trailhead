@@ -7,7 +7,7 @@ See `spec.md` → What the pages actually say.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] `src/app/(public)/terms/page.tsx` and `.../privacy/page.tsx`, with the site's existing layout and
       `TrailScene`, each with its own `metadata.title`.

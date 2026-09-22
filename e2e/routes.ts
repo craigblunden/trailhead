@@ -4,6 +4,10 @@ export const PUBLIC_ROUTES = [
   { name: "signup", path: "/signup" },
   { name: "login", path: "/login" },
   { name: "forgot-password", path: "/forgot-password" },
+  // The disclosure pages (terms tickets 01, 02): public, and read by signed-in Tenants from the
+  // acceptance gate too, so they are swept at every width like any other signed-out screen.
+  { name: "terms", path: "/terms" },
+  { name: "privacy", path: "/privacy" },
 ] as const;
 
 /**

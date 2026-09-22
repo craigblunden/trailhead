@@ -8,7 +8,7 @@ the developer-facing half; the two must not disagree.
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] A section per provider. **Anthropic**: cover letters, interview question sets, Attempt scoring.
       **TypeSafe**: the Footing. For each — what text is sent, what is not, the no-training commitment

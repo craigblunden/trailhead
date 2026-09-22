@@ -6,7 +6,7 @@ See `spec.md` → What is recorded. **ADR-0008**; **ADR-0004** for why erasure i
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** ready-for-review
 
 - [ ] `src/lib/terms.ts` exports `TERMS_VERSION` — one constant, owning the number the way
       `PLAN_LIMITS` owns its numbers, with a comment saying that bumping it re-prompts every Account.
