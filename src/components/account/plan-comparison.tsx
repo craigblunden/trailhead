@@ -1,26 +1,31 @@
 import { useId } from "react";
 
+import { RequestUpgrade } from "@/components/account/request-upgrade";
 import { PlanBlaze } from "@/components/plan-mark";
+import type { AccountSummary } from "@/lib/account";
 import { PLANS, PLAN_LABEL, PLAN_LIMITS, type Limit, type Plan } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 const limitText = (limit: Limit) => (limit === "unlimited" ? "Unlimited" : String(limit));
 
 /**
- * Every Plan side by side with its Limits, the current one marked. Static, like the Supporting
- * documents preview on a Job: there is no way to pay for a Plan yet, so nothing here is a control,
- * a link, or a price. Every number is read from `PLAN_LIMITS`, never written here — a test holds
- * that.
+ * Every Plan side by side with its Limits, the current one marked. There is still no price and no
+ * checkout — the one control is the ask (ADR-0009), repeated here because this is where the Practice
+ * round's upsell lands, below `Your plan` and its copy of the same button. Every number is read from
+ * `PLAN_LIMITS`, never written here — a test holds that.
  */
-export function PlanComparison({ current }: { current: Plan }) {
+export function PlanComparison({ summary }: { summary: AccountSummary }) {
   return (
     <>
-      <p className="mt-1 text-sm text-muted-foreground">Paying for a plan is coming soon.</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Paying for a plan is coming soon — until then, ask and I’ll move you across by hand.
+      </p>
       <ul className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         {PLANS.map((plan) => (
-          <PlanColumn key={plan} plan={plan} current={plan === current} />
+          <PlanColumn key={plan} plan={plan} current={plan === summary.plan} />
         ))}
       </ul>
+      <RequestUpgrade summary={summary} className="mt-4" />
     </>
   );
 }

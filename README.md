@@ -51,7 +51,9 @@ cannot say what to write, and does not pretend to (`docs/adr/0007-*`).
 
 **Plans and limits.** `free`, `basic`, `pro` set how many documents a tenant may hold and how many
 letters and interviews they may start per week. There is no billing integration — a plan is granted
-with `npm run db:plan`. Changing plan never deletes anything.
+with `npm run db:plan`. Changing plan never deletes anything. A tenant who wants the next plan up asks
+from the account page, which emails me the command to run; the request stays pending until the plan is
+granted, and lapses after fourteen days if it is not (`docs/adr/0009-*`).
 
 **Account deletion.** One confirmation erases every row, every file, and the Auth user in a single
 transaction. No grace period, nothing to restore.
@@ -259,7 +261,7 @@ Three kinds of test do three different jobs here:
 | `/interview/[jobId]`, `/interview/[jobId]/[attemptId]` | A timed attempt, and its scorecard |
 | `/interview/practice`, `/interview/practice/[roundId]` | A practice round, and reading one back |
 | `/interview/tutorial` | The one guided question shown before a first run |
-| `/account` | Who you are signed in as, your plan, and account deletion |
+| `/account` | Who you are signed in as, your plan, asking for the next one up, and account deletion |
 | `/llms.txt` | The product described for users' own LLMs, built from the same constants as validation. The repo-root `llms.txt` is for coding agents and is never served |
 | `POST /api/jobs/[id]/cover-letter` | Writes or rewrites a letter from the job and its resume |
 | `POST /api/jobs/[id]/interview` | Starts an attempt: reserves quota, generates the question set |
@@ -319,10 +321,11 @@ Worth reading, in roughly this order:
 | `.scratch/trailhead-interview-second-pass/` | Fairer scoring after using it: unreached questions, missed points, takeaways |
 | `.scratch/trailhead-practice-round/` | A free, unscored round, and questions asked aloud |
 | `.scratch/trailhead-practice-feedback/` | Fixes from watching a first-time user on a phone |
+| `.scratch/trailhead-upgrade-requests/` | Asking to be moved up a plan, with no billing integration to do it |
 
 Decisions expensive to reverse are ADRs in `docs/adr/` — why a plan lives in a table the app role can
 only read, why a job keeps its last draft, why account deletion needs a definer function, why a
-practice round is not an attempt.
+practice round is not an attempt, why a pending upgrade request is derived rather than stored.
 
 ## Design system
 

@@ -9,7 +9,7 @@ import { documentsBucket } from "@/server/storage/documents-bucket";
 
 import { heldBy } from "./documents";
 import { AccountDeletionError, RuleError } from "./errors";
-import { planOf } from "./plans";
+import { pendingUpgradeRequest, planOf } from "./plans";
 
 /**
  * The data access layer for the Account (CONTEXT.md) and Account deletion (ADR-0004).
@@ -33,12 +33,17 @@ const STORAGE_PAGE = 100;
 /** Who is signed in, how, on which Plan, and what their Tenant holds. */
 export async function accountSummary(): Promise<AccountSummary> {
   const { userId, name, email, providers } = await requireSession();
-  const held = await withTenant(userId, async (tx, tenant) => ({
-    plan: await planOf(tenant),
-    jobs: await tx.job.count({ where: { userId } }),
-    documents: await tx.document.count({ where: heldBy(userId) }),
-    contacts: await tx.contact.count({ where: { userId } }),
-  }));
+  const held = await withTenant(userId, async (tx, tenant) => {
+    const plan = await planOf(tenant);
+    return {
+      plan,
+      // Pending is derived from the Plan just read, so both come out of the one transaction (ADR-0009).
+      upgradeRequest: await pendingUpgradeRequest(tenant, plan),
+      jobs: await tx.job.count({ where: { userId } }),
+      documents: await tx.document.count({ where: heldBy(userId) }),
+      contacts: await tx.contact.count({ where: { userId } }),
+    };
+  });
   return { name, email, providers, ...held };
 }
 

@@ -229,6 +229,26 @@ model UserPlan {
   updatedAt DateTime @default(now())
 }
 
+/// An Upgrade request (CONTEXT.md; ADR-0009): a Tenant asking to be moved to the next Plan up.
+///
+/// Insert-only. `trailhead_app` holds `select` and `insert` and deliberately NOT `update` or
+/// `delete`: whether a request is still **pending** is derived from the Tenant's Plan and
+/// `requestedAt` — do NOT add a `status`, `resolvedAt` or `declinedAt` column here. Granting the
+/// Plan is what resolves a request, and a status nobody remembers to flip is worse than none.
+///
+/// A row that ASKS for a Plan is not a Plan: `UserPlan` keeps the grants ADR-0001 gave it, and
+/// nothing reads an UpgradeRequest when deciding a Limit.
+model UpgradeRequest {
+  id          String   @id @default(cuid(2))
+  userId      String   @db.Uuid
+  /// The Plan asked for — the next one up from the Tenant's Plan when the request was made.
+  plan        Plan
+  requestedAt DateTime @default(now())
+
+  /// Pending reads the newest row for the Tenant; the rest are the history of who has been asking.
+  @@index([userId, requestedAt])
+}
+
 /// An Account's record of having agreed to one version of the terms (CONTEXT.md; ADR-0008).
 /// Append-only: a new version is a new row, never an edit to the old one, so the history says who
 /// accepted what and when. `acceptedAt` is the only timestamp for the same reason a Footing has only

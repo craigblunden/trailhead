@@ -258,3 +258,12 @@ A number a Plan sets: how many Documents a Tenant may hold, and how many cover l
 written per week. A Limit may be **unlimited**. Changing Plan never deletes anything: a Tenant over a
 Limit keeps what it has and cannot add until under it again.
 _Avoid_: Cap, Quota (as a synonym — the _quota_ is this week's count against the letters Limit)
+
+**Upgrade request**:
+A Tenant's asking to be moved to the next Plan up. A message to the owner, not a transaction and not a
+promise: the Plan changes only when the owner moves it by hand, and nothing about the Tenant changes in
+the meantime. A request is **pending** while the Plan it names is still above the Tenant's own and it
+has not yet lapsed — derived from the Plan, never stored as a status (ADR-0009). Ignoring one is a soft
+no that expires. Erased with the Tenant.
+_Avoid_: Subscription, Purchase, Order, Checkout, Upgrade (alone — the upgrade is the owner's act, the
+request is the Tenant's)

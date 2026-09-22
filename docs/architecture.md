@@ -474,6 +474,12 @@ erDiagram
     string version
     timestamp acceptedAt
   }
+  UpgradeRequest {
+    string id
+    uuid userId
+    enum plan
+    timestamp requestedAt
+  }
 ```
 
 `Footing.resumeId` and `Footing.coverLetterId` are plain columns, not foreign keys: a Footing whose
@@ -485,6 +491,12 @@ that subject.
 
 Every table carries its own `userId`, so every policy tests a column rather than reaching through a
 parent. Users themselves live in Supabase's `auth` schema, which Prisma does not model.
+
+`UpgradeRequest` is the mirror of that table and the one the application role may insert into but
+never update or delete (**ADR-0009**): it records a Tenant asking to be moved up a Plan. Whether a
+request is still pending is derived from the Tenant's Plan and `requestedAt` rather than stored, so
+granting the Plan resolves it and an unanswered one lapses after fourteen days. A row that asks for a
+Plan is not a Plan, and nothing reads one when enforcing a Limit.
 
 `UserPlan` is the one table the application role can read but not write (ADR-0001): a Tenant's
 Plan decides its Limits — Documents held, cover letters per week, Interview Simulator Attempts per
