@@ -173,6 +173,38 @@ describe("what the prompt receives (ticket 18; feedback issue 03)", () => {
     expect(buildCoverLetterPrompt(inputs).user).not.toContain("<sample_letter>");
     expect(buildCoverLetterPrompt({ ...inputs, sampleLetter: "  " }).user).not.toContain("<sample_letter>");
   });
+
+  it("GEN-P8: the shape names each thing the letter has to do, in order, inside the same one-page budget", () => {
+    const { system } = buildCoverLetterPrompt(inputs);
+
+    // Still one page, still no tone or length dial: the shape got denser, not longer.
+    expect(system).toMatch(/250 to 350 words in all/);
+    expect(system).toMatch(/fits on a single page/);
+    // The named person when the posting names one, the hiring team when it does not.
+    expect(system).toMatch(/Address the person the posting names if it names one/);
+    // Why this role: the overlap between what the posting asks for and what the resume shows.
+    expect(system).toMatch(/1\. Why this role\./);
+    expect(system).toMatch(/where the resume shows the applicant doing that work/);
+    // One short paragraph per employer, high level enough to interest a hiring manager.
+    expect(system).toMatch(/2\. What they did, and where\./);
+    expect(system).toMatch(/at most two employers/);
+    // What draws them to the company — from the posting, never from anywhere else.
+    expect(system).toMatch(/3\. Why this company\./);
+    expect(system).toMatch(/only from the posting/);
+    // What others said about the work, at the size the resume says it.
+    expect(system).toMatch(/4\. Recognition\./);
+    // A gap, named plainly, and never one of the posting's core requirements.
+    expect(system).toMatch(/5\. A gap, told straight\./);
+    expect(system).toMatch(/never a core requirement/);
+    // The close, and the order things give way in when the budget runs out.
+    expect(system).toMatch(/6\. The close\./);
+    expect(system).toMatch(/drop them in this order/);
+
+    // The order is the point: the overlap first, the close last.
+    const order = ["1. Why this role.", "2. What they did, and where.", "3. Why this company.", "4. Recognition.", "5. A gap, told straight.", "6. The close."];
+    const at = order.map((heading) => system.indexOf(heading));
+    expect(at).toEqual([...at].sort((a, b) => a - b));
+  });
 });
 
 describe("the Claude call (tickets 18, 19; feedback issue 03)", () => {
